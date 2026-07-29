@@ -41,14 +41,19 @@ class RacingEnv(gym.Env):
             self.car.velocity -= self.car.acceleration
 
         elif action == 3:
-            if abs(self.car.velocity) > 0.1:
-                turn_speed = 2 * (abs(self.car.velocity) / self.car.max_speed)
-                self.car.angle += turn_speed
+            self.car.steering = max(
+            self.car.steering - 2,
+            -self.car.max_steering,
+            )
 
         elif action == 4:
-            if abs(self.car.velocity) > 0.1:
-                turn_speed = 2 * (abs(self.car.velocity) / self.car.max_speed)
-                self.car.angle -= turn_speed
+            self.car.steering = min(
+            self.car.steering + 2,
+            self.car.max_steering,
+            )
+
+        else:
+            self.car.steering *= 0.9
 
         # Save previous position
         old_x = self.car.x
@@ -58,10 +63,10 @@ class RacingEnv(gym.Env):
         self.car.update()
 
         # Collision with track
-        if not self.track.is_on_track(self.car.x, self.car.y):
-            self.car.x = old_x
-            self.car.y = old_y
-            self.car.velocity = 0
+        #if not self.track.is_on_track(self.car.x, self.car.y):
+         #   self.car.x = old_x
+          #  self.car.y = old_y
+           # self.car.velocity = 0
 
         # Observation
         observation = (

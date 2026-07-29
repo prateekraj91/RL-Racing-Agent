@@ -20,37 +20,22 @@ track = env.track
 
 running = True
 
+trajectory = []
+
 while running:
     # Handle events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    # Keyboard input
-    keys = pygame.key.get_pressed()
-
-    if keys[pygame.K_w]:
-        observation, reward, terminated, truncated, info = env.step(1)
-        print(f"Obs: {observation} | Reward: {reward:.2f}")
-
-
-    if keys[pygame.K_s]:
-        observation, reward, terminated, truncated, info = env.step(2)
-        print(f"Obs: {observation} | Reward: {reward:.2f}")
-
-    if keys[pygame.K_a]:
-        observation, reward, terminated, truncated, info = env.step(3)
-        print(f"Obs: {observation} | Reward: {reward:.2f}")
-
-    if keys[pygame.K_d]:
-        observation, reward, terminated, truncated, info = env.step(4)
-        print(f"Obs: {observation} | Reward: {reward:.2f}")
-
-    if not (keys[pygame.K_w] or keys[pygame.K_s] or
-            keys[pygame.K_a] or keys[pygame.K_d]):
-        observation, reward, terminated, truncated, info = env.step(0)
+    # Constant throttle + steering test
+    observation, reward, terminated, truncated, info = env.step(1)  # accelerate
+    env.car.steering = 20  # constant steering angle
+    print(f"Obs: {observation} | Reward: {reward:.2f}")
 
     car = env.car
+
+    trajectory.append((car.x, car.y))
 
     # Draw everything
     screen.fill((30, 30, 30))
@@ -78,3 +63,19 @@ while running:
     
 
 pygame.quit()
+
+import matplotlib.pyplot as plt
+
+xs = [p[0] for p in trajectory]
+ys = [p[1] for p in trajectory]
+
+plt.figure(figsize=(6, 6))
+plt.plot(xs, ys)
+plt.gca().set_aspect("equal")
+plt.title("Turning Circle Validation")
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.grid(True)
+
+plt.savefig("turning_circle.png")
+print("Saved turning_circle.png")
