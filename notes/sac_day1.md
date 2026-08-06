@@ -1,0 +1,150 @@
+Abstract
+
+Problems in existing RL
+- Needs millions of samples
+- Very sensitive to hyperparameters
+
+SAC
+- Off-policy Actor-Critic
+- Uses Maximum Entropy RL
+- Maximizes reward + entropy
+- Uses stochastic policy
+
+Goal
+- Better exploration
+- Better stability
+- Better sample efficiency
+
+Section 1: Introduction
+
+Problems with existing RL
+- Needs huge amounts of data (poor sample efficiency).
+- Very sensitive to hyperparameters.
+- Difficult to use reliably in real-world tasks.
+
+On-policy vs Off-policy
+- On-policy: learns only from newly collected experience.
+- Off-policy: reuses old experience from a replay buffer.
+- Off-policy is more sample efficient but harder to stabilize.
+
+DDPG
+- Off-policy and sample efficient.
+- Very brittle and sensitive to hyperparameters.
+
+Maximum Entropy RL
+- Optimizes reward + entropy.
+- Encourages exploration.
+- Produces more robust policies.
+
+SAC's Goal
+- Combine:
+  - Off-policy learning
+  - Actor-Critic
+  - Maximum Entropy
+- Achieve better stability and sample efficiency.
+
+Section 2: Related Work
+
+SAC combines three ideas
+- Actor-Critic architecture
+- Off-policy learning
+- Maximum Entropy objective
+
+Actor-Critic
+- Critic evaluates the current policy.
+- Actor improves the policy.
+- Repeat until the policy gets better.
+
+Previous Actor-Critic methods
+- Used entropy mainly as a regularizer.
+- SAC makes entropy part of the optimization objective.
+
+DDPG
+- Off-policy and sample efficient.
+- Uses a deterministic policy.
+- Difficult to stabilize.
+
+SVG(0)
+- Does not optimize the maximum entropy objective.
+- Does not use a separate value network.
+
+Previous Maximum Entropy methods
+- Improved exploration.
+- Did not consistently outperform DDPG.
+
+SAC
+- Combines off-policy learning with a stochastic actor.
+- More stable.
+- Better sample efficiency.
+
+Section 3: Preliminaries
+
+MDP
+- S = States
+- A = Actions
+- p = Transition function
+- r = Reward function
+
+Policy
+- Maps states to actions.
+
+Standard RL
+- Maximizes expected reward.
+
+Maximum Entropy RL
+- Maximizes reward + entropy.
+- Encourages exploration.
+- Produces more robust policies.
+
+Alpha (α)
+- Controls the importance of entropy.
+- Small α → more reward-focused.
+- Large α → more exploration.
+
+Advantages of Maximum Entropy
+- Better exploration.
+- Can represent multiple good actions.
+- Faster and more stable learning.
+
+SAC vs TD3
+
+Similarities
+- Both are off-policy algorithms.
+- Both use a replay buffer.
+- Both are Actor-Critic methods.
+- Both work well in continuous action spaces.
+
+TD3
+- Uses a deterministic policy.
+- Optimizes only expected reward.
+- Exploration comes from adding external noise.
+- More sensitive to hyperparameters.
+- Can be unstable during training.
+
+SAC
+- Uses a stochastic policy.
+- Optimizes reward + entropy.
+- Exploration is built into the objective.
+- Better exploration.
+- More stable training.
+- Better sample efficiency.
+
+Main Idea
+
+TD3:
+Reward → Best action
+
+SAC:
+Reward + Entropy → Best distribution of actions
+
+Why SAC was proposed
+
+To combine:
+- Off-policy learning
+- Actor-Critic architecture
+- Maximum Entropy RL
+
+Result:
+- Faster learning
+- Better exploration
+- More stable training

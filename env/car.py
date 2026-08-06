@@ -46,3 +46,43 @@ class Car:
             angular_velocity = self.velocity / turning_radius
 
             self.angle += math.degrees(angular_velocity * self.dt * 10)
+
+    def cast_rays(self, track, ray_angles=(-90, -45, 0, 45, 90), max_dist=200, step=4):
+        distances = []
+        for ra in ray_angles:
+            a = math.radians(self.angle + ra)
+            dx = math.cos(a)
+            dy = -math.sin(a)
+            dist = max_dist
+            d = 0.0
+            while d <= max_dist:
+                px = self.x + dx * d
+                py = self.y + dy * d
+                if not track.is_on_track(px, py):
+                    dist = d
+                    break
+                d += step
+            distances.append(float(dist))
+        return distances
+
+    def draw_rays(self, screen, track, ray_angles=(-90, -45, 0, 45, 90), max_dist=200, step=4):
+        import pygame
+        for ra in ray_angles:
+            a = math.radians(self.angle + ra)
+            dx = math.cos(a)
+            dy = -math.sin(a)
+            dist = max_dist
+            d = 0.0
+            while d <= max_dist:
+                px = self.x + dx * d
+                py = self.y + dy * d
+                if not track.is_on_track(px, py):
+                    dist = d
+                    break
+                d += step
+            end_x = self.x + dx * dist
+            end_y = self.y + dy * dist
+            pygame.draw.line(screen, (255, 60, 60),
+                             (int(self.x), int(self.y)),
+                             (int(end_x), int(end_y)), 2)
+            pygame.draw.circle(screen, (255, 255, 0), (int(end_x), int(end_y)), 4)

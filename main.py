@@ -14,6 +14,18 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("RL Racing Agent")
 
 env = RacingEnv()
+for i in range(20):
+    env.reset()
+
+    x, y, heading = env.track.start_pose()
+    print(f"Track {i+1}: start=({x:.1f}, {y:.1f}), heading={heading:.1f}")
+
+    screen.fill((30, 30, 30))
+    env.track.draw(screen)
+
+    pygame.display.flip()
+    pygame.image.save(screen, f"track_{i+1}.png")
+    pygame.time.wait(300)   # show each track for 1 second
 
 car = env.car
 track = env.track
@@ -57,6 +69,8 @@ while running:
     rotated_rect = rotated_surface.get_rect(center=(car.x, car.y))
 
     screen.blit(rotated_surface, rotated_rect)
+
+    car.draw_rays(screen, track)
 
     pygame.display.flip()
     clock.tick(60)

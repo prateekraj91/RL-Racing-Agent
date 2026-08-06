@@ -13,6 +13,7 @@ class Track:
     New helpers:
         track.centerline             -> (N, 2) ndarray of the spline centerline
         track.start_pose()           -> (x, y, heading_deg) at the start line
+        track.track_heading(x, y)    -> road direction (deg, y-up) nearest (x,y)
     """
 
     def __init__(self, seed=None, width=70, base_r=210, n_ctrl=8,
@@ -63,6 +64,26 @@ class Track:
         raise RuntimeError("Track generator: no drivable track found in max_tries")
 
     # ---------- queries ----------
+    def _nearest(self, x, y):
+        """Closest point on the centerline to (x, y).
+
+        Returns (index, t, proj, dist):
+            index -> segment i (from _a[i] to _b[i])
+            t     -> clamped projection param in [0, 1] along that segment
+            proj  -> (2,) ndarray, the closest point itself
+            dist  -> unsigned distance from (x, y) to proj
+        Reused by track_heading now, and by signed distance later.
+        """
+        p = np.array([x, y], dtype=float)
+        ab = self._b - self._a
+        ab2 = np.einsum('ij,ij->i', ab, ab) + 1e-9
+        t = np.einsum('ij,ij->i', p - self._a, ab) / ab2
+        t = np.clip(t, 0.0, 1.0)
+        proj = self._a + t[:, None] * ab
+        d = np.linalg.norm(proj - p, axis=1)
+        i = int(d.argmin())
+        return i, float(t[i]), proj[i], float(d[i])
+
     def is_on_track(self, x, y):
         p = np.array([x, y], dtype=float)
         ab = self._b - self._a
@@ -71,6 +92,28 @@ class Track:
         proj = self._a + t[:, None] * ab
         dmin = np.linalg.norm(proj - p, axis=1).min()
         return bool(dmin <= self.half)
+
+    def track_heading(self, x, y):
+        """Road direction at the point nearest (x, y), in degrees, y-up.
+
+        Uses the SAME atan2(-dy, dx) convention as start_pose(), so it is
+        directly comparable to car.angle. Heading error is then simply
+        car.angle - track_heading(...), wrapped to [-180, 180].
+        """
+        i, _, _, _ = self._nearest(x, y)
+        dx = self._b[i, 0] - self._a[i, 0]
+        dy = self._b[i, 1] - self._a[i, 1]
+        return float(np.degrees(np.arctan2(-dy, dx)))
+
+    def signed_distance(self, x, y):
+        """Distance from center line, signed. + = right of center, - = left."""
+        i, _, proj, dist = self._nearest(x, y)
+        dx = self._b[i, 0] - self._a[i, 0]
+        dy = self._b[i, 1] - self._a[i, 1]
+        # which side of the road direction the car sits on
+        cross = dx * (y - proj[1]) - dy * (x - proj[0])
+        sign = 1.0 if cross > 0 else -1.0
+        return sign * dist
 
     def start_pose(self):
         p0 = self.centerline[0]

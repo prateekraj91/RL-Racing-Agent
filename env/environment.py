@@ -19,7 +19,10 @@ class RacingEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
+        self.track = Track()
+
         self.car = Car()
+        self.car.x, self.car.y, self.car.angle = self.track.start_pose()
 
         observation = (
             self.car.x,
@@ -67,6 +70,13 @@ class RacingEnv(gym.Env):
          #   self.car.x = old_x
           #  self.car.y = old_y
            # self.car.velocity = 0
+
+        err = self.car.angle - self.track.track_heading(self.car.x, self.car.y)
+        err = (err + 180.0) % 360.0 - 180.0
+        dist = self.track.signed_distance(self.car.x, self.car.y)
+        slip = 0.0
+        rays = self.car.cast_rays(self.track)
+        print("heading err:", round(err, 1), "| dist:", round(dist, 1), "| slip:", round(slip, 2), "| rays:", [round(r) for r in rays])
 
         # Observation
         observation = (
