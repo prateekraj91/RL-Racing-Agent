@@ -114,6 +114,32 @@ class Track:
         cross = dx * (y - proj[1]) - dy * (x - proj[0])
         sign = 1.0 if cross > 0 else -1.0
         return sign * dist
+    
+    def get_progress(self, x, y):
+        """Return normalized progress along the closed-loop centerline.
+
+        0.0 = start of track
+        1.0 = one full lap
+        """
+        i, t, _, _ = self._nearest(x, y)
+
+        segment_lengths = np.linalg.norm(
+            self._b - self._a,
+            axis=1
+        )
+
+        cumulative_length = np.concatenate(
+            ([0.0], np.cumsum(segment_lengths))
+        )
+
+        distance_along_track = (
+            cumulative_length[i]
+            + t * segment_lengths[i]
+        )
+
+        total_length = cumulative_length[-1]
+
+        return float(distance_along_track / total_length)
 
     def start_pose(self):
         p0 = self.centerline[0]

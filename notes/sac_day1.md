@@ -148,3 +148,91 @@ Result:
 - Faster learning
 - Better exploration
 - More stable training
+
+Section 4: Soft Policy Iteration
+
+Soft Policy Iteration
+
+Goal:
+- Improve the policy while maximizing both reward and entropy.
+
+Two steps:
+
+1. Policy Evaluation
+- Estimate how good the current stochastic policy is.
+- Includes both expected reward and entropy.
+
+2. Policy Improvement
+- Update the actor toward actions with higher soft Q-values.
+- The improved policy remains stochastic.
+
+Repeat:
+Policy evaluation → Policy improvement → better policy
+
+Section 5: Soft Actor-Critic
+
+SAC Core Components
+
+1. Actor
+- Stochastic policy.
+- Outputs a probability distribution over actions.
+- Learns which actions are useful while maintaining exploration.
+
+2. Critic
+- Estimates Q(s, a).
+- SAC uses two Q-functions to reduce overestimation bias.
+
+3. Replay Buffer
+- Stores past transitions:
+  (state, action, reward, next_state, done)
+- Allows off-policy learning.
+- Experience can be reused multiple times.
+
+4. Entropy Temperature α
+- Controls reward vs exploration.
+- Higher α → stronger exploration.
+- Lower α → more reward-focused behavior.
+
+5. Target Networks
+- Stabilize critic learning.
+- Slowly track the learned Q-networks.
+
+SAC Training Loop
+
+Environment
+    ↓
+state
+    ↓
+Actor
+    ↓
+action
+    ↓
+Environment
+    ↓
+reward + next state
+    ↓
+Replay Buffer
+    ↓
+Critic update
+    ↓
+Actor update
+    ↓
+Temperature α update
+    ↓
+Repeat
+
+Your Racing Environment
+        ↓
+state
+        ↓
+SAC Actor
+        ↓
+steering / throttle action
+        ↓
+Racing Environment
+        ↓
+reward
+        ↓
+Replay Buffer
+        ↓
+SAC learns
