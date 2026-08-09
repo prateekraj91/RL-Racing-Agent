@@ -3,7 +3,7 @@ import gymnasium as gym
 
 from env.car import Car
 from env.track import Track
-
+import math
 
 class RacingEnv(gym.Env):
 
@@ -23,7 +23,7 @@ class RacingEnv(gym.Env):
         self.observation_space = gym.spaces.Box(
             low=-1000,
             high=1000,
-            shape=(4,),
+            shape=(9,),
             dtype=np.float32,
         )
 
@@ -40,12 +40,32 @@ class RacingEnv(gym.Env):
             self.car.y,
         )
 
-        observation = np.array(
-            [
+        err = (
+            self.car.angle
+            - self.track.track_heading(
                 self.car.x,
                 self.car.y,
-                self.car.angle,
+            )
+        )
+
+        err = (err + 180.0) % 360.0 - 180.0
+
+        dist = self.track.signed_distance(
+            self.car.x,
+            self.car.y,
+        )
+
+        slip = 0.0
+
+        rays = self.car.cast_rays(self.track)
+
+        observation = np.array(
+            [
                 self.car.velocity,
+                err,
+                dist,
+                slip,
+                *rays,
             ],
             dtype=np.float32,
         )
@@ -152,7 +172,16 @@ class RacingEnv(gym.Env):
             self.car.y,
         )
 
-        slip = 0.0
+        speed = math.hypot(self.car.vx, self.car.vy)
+
+        if speed > 1e-6:
+            velocity_angle = math.degrees(
+                math.atan2(-self.car.vy, self.car.vx)
+            )
+            slip = velocity_angle - self.car.angle
+            slip = (slip + 180.0) % 360.0 - 180.0
+        else:
+            slip = 0.0
 
         rays = self.car.cast_rays(self.track)
 
@@ -180,14 +209,14 @@ class RacingEnv(gym.Env):
         # Observation
         # -------------------------
 
-        observation = np.array(
+        observation = (
             [
-                self.car.x,
-                self.car.y,
-                self.car.angle,
                 self.car.velocity,
-            ],
-            dtype=np.float32,
+                err,
+                dist,
+                slip,
+                *rays,
+            ]
         )
 
         info = {

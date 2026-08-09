@@ -10,6 +10,9 @@ class Car:
 
         self.velocity = 0
 
+        self.vx = 0
+        self.vy = 0
+
         self.acceleration = 0.08
         self.max_speed = 4
         self.friction = 0.03
@@ -37,8 +40,11 @@ class Car:
 
         heading = math.radians(self.angle)
 
-        self.x += self.velocity * math.cos(heading) * self.dt * 60
-        self.y -= self.velocity * math.sin(heading) * self.dt * 60
+        self.vx = self.velocity * math.cos(heading)
+        self.vy = -self.velocity * math.sin(heading)
+
+        self.x += self.vx * self.dt * 60
+        self.y += self.vy * self.dt * 60
 
         if abs(self.steering) > 0.01:
             turning_radius = self.wheelbase / math.tan(math.radians(self.steering))
