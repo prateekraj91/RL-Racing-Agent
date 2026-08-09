@@ -1,34 +1,53 @@
+import numpy as np
+import gymnasium as gym
+
 from env.car import Car
 from env.track import Track
-import gymnasium as gym
 
 
 class RacingEnv(gym.Env):
+
     def __init__(self):
+        super().__init__()
+
         self.track = Track()
-        self.reset()
+        self.car = Car()
+
+        # 0 = coast
+        # 1 = accelerate
+        # 2 = brake
+        # 3 = steer left
+        # 4 = steer right
         self.action_space = gym.spaces.Discrete(5)
-        
+
         self.observation_space = gym.spaces.Box(
             low=-1000,
             high=1000,
             shape=(4,),
-            dtype=float,
+            dtype=np.float32,
         )
-        
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
         self.track = Track()
-
         self.car = Car()
+
         self.car.x, self.car.y, self.car.angle = self.track.start_pose()
 
-        observation = (
+        self.previous_progress = self.track.get_progress(
             self.car.x,
             self.car.y,
-            self.car.angle,
-            self.car.velocity,
+        )
+
+        observation = np.array(
+            [
+                self.car.x,
+                self.car.y,
+                self.car.angle,
+                self.car.velocity,
+            ],
+            dtype=np.float32,
         )
 
         info = {}
@@ -36,66 +55,151 @@ class RacingEnv(gym.Env):
         return observation, info
 
     def step(self, action):
-        # Handle actions
+
+        # -------------------------
+        # Handle action
+        # -------------------------
+
         if action == 1:
+            # Accelerate
             self.car.velocity += self.car.acceleration
 
         elif action == 2:
+            # Brake
             self.car.velocity -= self.car.acceleration
 
         elif action == 3:
+            # Steer left
             self.car.steering = max(
-            self.car.steering - 2,
-            -self.car.max_steering,
+                self.car.steering - 2,
+                -self.car.max_steering,
             )
 
         elif action == 4:
+            # Steer right
             self.car.steering = min(
-            self.car.steering + 2,
-            self.car.max_steering,
+                self.car.steering + 2,
+                self.car.max_steering,
             )
 
         else:
+            # Coast
             self.car.steering *= 0.9
 
-        # Save previous position
-        old_x = self.car.x
-        old_y = self.car.y
+        # -------------------------
+        # Update physics
+        # -------------------------
 
-        # Update car physics
         self.car.update()
 
-        # Collision with track
-        #if not self.track.is_on_track(self.car.x, self.car.y):
-         #   self.car.x = old_x
-          #  self.car.y = old_y
-           # self.car.velocity = 0
+        # -------------------------
+        # Calculate progress
+        # -------------------------
 
-        err = self.car.angle - self.track.track_heading(self.car.x, self.car.y)
-        err = (err + 180.0) % 360.0 - 180.0
-        dist = self.track.signed_distance(self.car.x, self.car.y)
-        slip = 0.0
-        rays = self.car.cast_rays(self.track)
-        print("heading err:", round(err, 1), "| dist:", round(dist, 1), "| slip:", round(slip, 2), "| rays:", [round(r) for r in rays])
-
-        # Observation
-        observation = (
+        current_progress = self.track.get_progress(
             self.car.x,
             self.car.y,
-            self.car.angle,
-            self.car.velocity,
         )
-        
-        reward = 0
 
-        if self.track.is_on_track(self.car.x, self.car.y):
-            reward += 0.1
-            
-        reward += self.car.velocity * 0.1
+        progress = current_progress - self.previous_progress
 
-        terminated = False
+        self.previous_progress = current_progress
+
+        # -------------------------
+        # Check whether car crashed
+        # -------------------------
+
+        crashed = not self.track.is_on_track(
+            self.car.x,
+            self.car.y,
+        )
+
+        # -------------------------
+        # Reward
+        # -------------------------
+
+        speed_reward = self.car.velocity * 0.01
+
+        reward = progress + speed_reward
+
+        # Off-track / crash penalty
+        if crashed:
+            reward -= 2.0
+
+        # -------------------------
+        # Episode termination
+        # -------------------------
+
+        terminated = crashed
         truncated = False
 
-        info = {}
+        # -------------------------
+        # Debug information
+        # -------------------------
 
-        return observation, reward, terminated, truncated, info 
+        err = (
+            self.car.angle
+            - self.track.track_heading(
+                self.car.x,
+                self.car.y,
+            )
+        )
+
+        err = (err + 180.0) % 360.0 - 180.0
+
+        dist = self.track.signed_distance(
+            self.car.x,
+            self.car.y,
+        )
+
+        slip = 0.0
+
+        rays = self.car.cast_rays(self.track)
+
+        print(
+            "progress:",
+            round(current_progress, 4),
+            "delta:",
+            round(progress, 4),
+            "| reward:",
+            round(reward, 4),
+        )
+
+        print(
+            "heading err:",
+            round(err, 1),
+            "| dist:",
+            round(dist, 1),
+            "| slip:",
+            round(slip, 2),
+            "| rays:",
+            [round(r) for r in rays],
+        )
+
+        # -------------------------
+        # Observation
+        # -------------------------
+
+        observation = np.array(
+            [
+                self.car.x,
+                self.car.y,
+                self.car.angle,
+                self.car.velocity,
+            ],
+            dtype=np.float32,
+        )
+
+        info = {
+            "progress": progress,
+            "speed_reward": speed_reward,
+            "crashed": crashed,
+        }
+
+        return (
+            observation,
+            reward,
+            terminated,
+            truncated,
+            info,
+        )
