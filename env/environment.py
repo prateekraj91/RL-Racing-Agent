@@ -7,11 +7,15 @@ import math
 
 class RacingEnv(gym.Env):
 
-    def __init__(self):
+    def __init__(self, max_steps=2000, verbose=False):
         super().__init__()
 
         self.track = Track()
         self.car = Car()
+
+        self.max_steps = max_steps
+        self.step_count = 0
+        self.verbose = verbose
 
         # 0 = coast
         # 1 = accelerate
@@ -30,8 +34,15 @@ class RacingEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        self.track = Track()
+        # Derive a deterministic track seed from Gymnasium's RNG.
+        # self.np_random was seeded by super().reset(seed=seed) above.
+        # If seed=None was passed, self.np_random is random → random track (same as before).
+        # If seed=N was passed, self.np_random is deterministic → same track every time.
+        track_seed = int(self.np_random.integers(0, 2**31))
+        self.track = Track(seed=track_seed)
         self.car = Car()
+
+        self.step_count = 0
 
         self.car.x, self.car.y, self.car.angle = self.track.start_pose()
 
@@ -150,8 +161,10 @@ class RacingEnv(gym.Env):
         # Episode termination
         # -------------------------
 
+        self.step_count += 1
+
         terminated = crashed
-        truncated = False
+        truncated = (not terminated) and (self.step_count >= self.max_steps)
 
         # -------------------------
         # Debug information
@@ -185,38 +198,40 @@ class RacingEnv(gym.Env):
 
         rays = self.car.cast_rays(self.track)
 
-        print(
-            "progress:",
-            round(current_progress, 4),
-            "delta:",
-            round(progress, 4),
-            "| reward:",
-            round(reward, 4),
-        )
+        if self.verbose:
+            print(
+                "progress:",
+                round(current_progress, 4),
+                "delta:",
+                round(progress, 4),
+                "| reward:",
+                round(reward, 4),
+            )
 
-        print(
-            "heading err:",
-            round(err, 1),
-            "| dist:",
-            round(dist, 1),
-            "| slip:",
-            round(slip, 2),
-            "| rays:",
-            [round(r) for r in rays],
-        )
+            print(
+                "heading err:",
+                round(err, 1),
+                "| dist:",
+                round(dist, 1),
+                "| slip:",
+                round(slip, 2),
+                "| rays:",
+                [round(r) for r in rays],
+            )
 
         # -------------------------
         # Observation
         # -------------------------
 
-        observation = (
+        observation = np.array(
             [
                 self.car.velocity,
                 err,
                 dist,
                 slip,
                 *rays,
-            ]
+            ],
+            dtype=np.float32,
         )
 
         info = {

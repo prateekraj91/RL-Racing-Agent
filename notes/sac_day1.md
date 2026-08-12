@@ -236,3 +236,51 @@ reward
 Replay Buffer
         ↓
 SAC learns
+
+Reward Shaping
+
+Problem
+
+- Sparse rewards can make RL difficult to learn.
+- We can add intermediate rewards to provide more learning signal.
+- Arbitrary reward shaping can change the optimal policy.
+- The agent may learn to maximize the shaping reward instead of the actual task objective.
+
+Example in racing
+
+Bad shaping:
+
+- +1 for moving forward
+- +1 for high speed
+- +1 for staying near the center
+
+Potential problem:
+
+- The car may learn to drive fast or stay near the center without actually finishing the race.
+
+Potential-Based Reward Shaping
+
+Ng et al. (1999) showed that policy invariance can be preserved using potential-based shaping.
+
+F(s, s') = γΦ(s') - Φ(s)
+
+Where:
+
+- Φ(s) = potential function representing the desirability/progress of state s.
+- γ = discount factor.
+- F(s,s') = shaping reward.
+
+Shaped reward:
+
+R'(s,a,s') = R(s,a,s') + γΦ(s') - Φ(s)
+
+For the racing agent:
+
+- Φ(s) could represent progress along the track.
+- Moving forward → positive shaping reward.
+- Moving backward → negative shaping reward.
+
+Key takeaway
+
+- Do not add arbitrary rewards without considering how they change the objective.
+- Potential-based shaping provides dense feedback while preserving the optimal policy under the theorem's assumptions.
