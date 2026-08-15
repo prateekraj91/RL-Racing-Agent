@@ -38,8 +38,17 @@ class RacingEnv(gym.Env):
         # self.np_random was seeded by super().reset(seed=seed) above.
         # If seed=None was passed, self.np_random is random → random track (same as before).
         # If seed=N was passed, self.np_random is deterministic → same track every time.
-        track_seed = int(self.np_random.integers(0, 2**31))
+
+
+
+        if options is not None and "track_seed" in options:
+            track_seed = options["track_seed"]
+        else:
+            track_seed = int(self.np_random.integers(0, 2**31))
+
         self.track = Track(seed=track_seed)
+
+
         self.car = Car()
 
         self.step_count = 0
@@ -50,6 +59,8 @@ class RacingEnv(gym.Env):
             self.car.x,
             self.car.y,
         )
+        self.lap_progress = 0.0
+        self.lap_completed = False
 
         err = (
             self.car.angle
@@ -134,7 +145,17 @@ class RacingEnv(gym.Env):
 
         progress = current_progress - self.previous_progress
 
+        if progress < -0.5:
+            progress += 1.0
+        elif progress > 0.5:
+            progress -= 1.0
+
+        
+        self.lap_progress += progress
         self.previous_progress = current_progress
+
+        if self.lap_progress >= 1.0:
+            self.lap_completed = True
 
         # -------------------------
         # Check whether car crashed
@@ -236,8 +257,10 @@ class RacingEnv(gym.Env):
 
         info = {
             "progress": progress,
+            "lap_progress": self.lap_progress,
             "speed_reward": speed_reward,
             "crashed": crashed,
+            "lap_completed": self.lap_completed,
         }
 
         return (

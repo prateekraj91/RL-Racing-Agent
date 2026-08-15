@@ -51,7 +51,7 @@ class Car:
 
             angular_velocity = self.velocity / turning_radius
 
-            self.angle += math.degrees(angular_velocity * self.dt * 10)
+            self.angle += math.degrees(angular_velocity * self.dt * 60)
 
     def cast_rays(self, track, ray_angles=(-90, -45, 0, 45, 90), max_dist=200, step=4):
         distances = []
