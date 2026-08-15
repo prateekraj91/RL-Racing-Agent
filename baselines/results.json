@@ -1,0 +1,119 @@
+{
+  "track_seeds": [
+    101,
+    202,
+    303,
+    404,
+    505
+  ],
+  "max_steps": 2000,
+  "results": {
+    "random": [
+      {
+        "track_seed": 101,
+        "steps": 2000,
+        "lap_progress": 0.001,
+        "first_lap_step": null,
+        "total_reward": 0.0137,
+        "crashed": false,
+        "policy": "random"
+      },
+      {
+        "track_seed": 202,
+        "steps": 2000,
+        "lap_progress": -0.0002,
+        "first_lap_step": null,
+        "total_reward": -0.0025,
+        "crashed": false,
+        "policy": "random"
+      },
+      {
+        "track_seed": 303,
+        "steps": 2000,
+        "lap_progress": 0.0033,
+        "first_lap_step": null,
+        "total_reward": 0.0418,
+        "crashed": false,
+        "policy": "random"
+      },
+      {
+        "track_seed": 404,
+        "steps": 2000,
+        "lap_progress": -0.0046,
+        "first_lap_step": null,
+        "total_reward": -0.0587,
+        "crashed": false,
+        "policy": "random"
+      },
+      {
+        "track_seed": 505,
+        "steps": 2000,
+        "lap_progress": -0.0006,
+        "first_lap_step": null,
+        "total_reward": -0.0077,
+        "crashed": false,
+        "policy": "random"
+      }
+    ],
+    "pure_pursuit": [
+      {
+        "track_seed": 101,
+        "steps": 2000,
+        "lap_progress": 3.2943,
+        "first_lap_step": 634,
+        "total_reward": 44.9263,
+        "crashed": false,
+        "policy": "pure_pursuit"
+      },
+      {
+        "track_seed": 202,
+        "steps": 2000,
+        "lap_progress": 3.4019,
+        "first_lap_step": 612,
+        "total_reward": 44.8795,
+        "crashed": false,
+        "policy": "pure_pursuit"
+      },
+      {
+        "track_seed": 303,
+        "steps": 2000,
+        "lap_progress": 3.4831,
+        "first_lap_step": 597,
+        "total_reward": 44.7103,
+        "crashed": false,
+        "policy": "pure_pursuit"
+      },
+      {
+        "track_seed": 404,
+        "steps": 2000,
+        "lap_progress": 3.4721,
+        "first_lap_step": 605,
+        "total_reward": 44.9913,
+        "crashed": false,
+        "policy": "pure_pursuit"
+      },
+      {
+        "track_seed": 505,
+        "steps": 2000,
+        "lap_progress": 3.3521,
+        "first_lap_step": 622,
+        "total_reward": 45.2385,
+        "crashed": false,
+        "policy": "pure_pursuit"
+      }
+    ]
+  },
+  "summary": {
+    "random": {
+      "laps_completed": 0,
+      "avg_progress": -0.0002,
+      "avg_reward": -0.0027
+    },
+    "pure_pursuit": {
+      "laps_completed": 5,
+      "avg_progress": 3.4007,
+      "avg_reward": 44.9492,
+      "avg_first_lap_step": 614
+    }
+  }
+}
