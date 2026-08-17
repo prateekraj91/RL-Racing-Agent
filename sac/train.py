@@ -5,7 +5,7 @@ from sac.agent import SACAgent
 import random
 
 import numpy as np
-import torch
+
 
 torch.manual_seed(42)
 np.random.seed(42)
@@ -39,6 +39,8 @@ observation, info = env.reset(
 )
 
 total_steps = 10000
+WARMUP_STEPS = 1000
+EVAL_EVERY = 1000
 
 best_progress = -float('inf')
 best_reward = 0.0
@@ -48,18 +50,27 @@ best_crashed = False
 
 for step in range(total_steps):
 
-    # Convert observation to a PyTorch tensor
-    observation_tensor = torch.tensor(
-        observation,
-        dtype=torch.float32,
-    ).unsqueeze(0)
+    if step == 0:
+        print("WARMUP START")
+        
+    if step == WARMUP_STEPS:
+        print("WARMUP COMPLETE | Buffer:", len(agent.replay_buffer))
 
-    # Ask the actor for an action
-    action_tensor, _ = agent.actor.sample(
-        observation_tensor
-    )
-
-    action = action_tensor.detach().numpy()[0]
+    if step < WARMUP_STEPS:
+        action = env.action_space.sample()
+    else:
+        # Convert observation to a PyTorch tensor
+        observation_tensor = torch.tensor(
+            observation,
+            dtype=torch.float32,
+        ).unsqueeze(0)
+    
+        # Ask the actor for an action
+        action_tensor, _ = agent.actor.sample(
+            observation_tensor
+        )
+    
+        action = action_tensor.detach().numpy()[0]
 
     if step < 10:
         print("ACTION:", action)
@@ -89,8 +100,9 @@ for step in range(total_steps):
         if info["crashed"]:
             crashes += 1
 
+        phase = "Warmup" if step < WARMUP_STEPS else "Training"
         print(
-            "Episode:",
+            f"[{phase}] Episode:",
             episodes,
             "| Lap progress:",
             round(info["lap_progress"], 4),
@@ -102,8 +114,8 @@ for step in range(total_steps):
             options={"track_seed": TRACK_SEED}
         )
 
-    # Start learning once we have enough experiences
-    if len(agent.replay_buffer) >= 64:
+    # Start learning once we have enough experiences and finished warmup
+    if step >= WARMUP_STEPS and len(agent.replay_buffer) >= 64:
 
         result = agent.update(
             batch_size=64
@@ -114,7 +126,7 @@ for step in range(total_steps):
             print(
                 "Step:",
                 step,
-                "| Reward:",
+                "[Training] | Reward:",
                 round(reward, 4),
                 "| Buffer:",
                 len(agent.replay_buffer),
@@ -125,24 +137,38 @@ for step in range(total_steps):
                 "| Critic 2:",
                 round(result["critic2_loss"], 3),
             )
+    elif step < WARMUP_STEPS and step % 100 == 0:
+        print(
+            "Step:",
+            step,
+            "[Warmup] | Reward:",
+            round(reward, 4),
+            "| Buffer:",
+            len(agent.replay_buffer),
+        )
 
-    if step == 0 or (step + 1) % 100 == 0:
-        if step == 0:
-            print("OVERFIT TEST")
+    if (step + 1) % EVAL_EVERY == 0:
             
         eval_obs, _ = eval_env.reset(options={"track_seed": TRACK_SEED})
         eval_reward = 0.0
         eval_progress = 0.0
         eval_completed = False
         eval_crashed = False
+        eval_steps = 0
+        off_track_steps = 0
         
-        for _ in range(500):
+        for eval_step in range(500):
             obs_t = torch.tensor(eval_obs, dtype=torch.float32).unsqueeze(0)
             with torch.no_grad():
                 mean, _ = agent.actor(obs_t)
                 act = torch.tanh(mean).numpy()[0]
                 
             eval_obs, r, term, trunc, info_e = eval_env.step(act)
+            eval_steps += 1
+
+            if info_e["crashed"]:
+                off_track_steps += 1
+
             eval_reward += r
             eval_progress = info_e["lap_progress"]
             
@@ -153,9 +179,21 @@ for step in range(total_steps):
                 
             if term or trunc:
                 break
-                
-        display_step = 0 if step == 0 else step + 1
-        print(f"Step {display_step:<4} | Reward: {eval_reward:<8.4f} | Progress: {eval_progress:<6.4f} | Completed: {eval_completed} | Crashed: {eval_crashed}")
+
+        lap_time = eval_steps if eval_completed else None
+        off_track_rate = off_track_steps / eval_steps if eval_steps > 0 else 0.0
+
+        display_step = step + 1
+
+        print(
+            f"EVAL | Step: {display_step} "
+            f"| Reward: {eval_reward:.4f} "
+            f"| Progress: {eval_progress:.4f} "
+            f"| Completed: {eval_completed} "
+            f"| Crashed: {eval_crashed} "
+            f"| Lap time: {lap_time}"
+            f"| Off-track rate: {off_track_rate:.2%}"
+            )
 
         if eval_progress > best_progress:
             best_progress = eval_progress
@@ -166,7 +204,7 @@ for step in range(total_steps):
             torch.save(agent.actor.state_dict(), "best_actor.pth")
 
 print()
-print("OVERFIT TEST COMPLETE")
+print("EVALUATION COMPLETE")
 print("Training finished.")
 print("Replay buffer:", len(agent.replay_buffer))
 
