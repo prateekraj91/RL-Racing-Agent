@@ -14,14 +14,25 @@ random.seed(42)
 
 TRACK_SEED = 101
 
+MEDIUM_TRACK = {
+    "width": 70,
+    "base_r": 250,
+    "n_ctrl": 10,
+    "min_radius": 80,
+    "cx": 400,
+    "cy": 300,
+    }
+
 env = RacingEnv(
     max_steps=500,
     verbose=False,
-)
+    track_kwargs=MEDIUM_TRACK
+    )
 
 eval_env = RacingEnv(
     max_steps=500,
     verbose=False,
+    track_kwargs=MEDIUM_TRACK,
 )
 
 agent = SACAgent()
@@ -244,8 +255,7 @@ for _ in range(500):
     
     total_reward += reward
     final_lap_progress = info["lap_progress"]
-    if final_lap_progress > max_lap_progress:
-        max_lap_progress = final_lap_progress
+    max_lap_progress = max(max_lap_progress, final_lap_progress)
         
     final_velocity = env.car.velocity
     

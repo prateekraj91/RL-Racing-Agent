@@ -25,7 +25,7 @@ for i in range(20):
 
     pygame.display.flip()
     pygame.image.save(screen, f"track_{i+1}.png")
-    pygame.time.wait(300)   # show each track for 1 second
+    pygame.time.wait(300)  # show each track for 1 second
 
 car = env.car
 track = env.track
@@ -51,9 +51,9 @@ while running:
 
     # Draw everything
     screen.fill((30, 30, 30))
-    
+
     track.draw(screen)
-    
+
     if track.is_on_track(car.x, car.y):
         status_color = (0, 255, 0)
     else:
@@ -74,7 +74,7 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
-    
+
 
 pygame.quit()
 
@@ -93,3 +93,7 @@ plt.grid(True)
 
 plt.savefig("turning_circle.png")
 print("Saved turning_circle.png")
+
+
+
+    

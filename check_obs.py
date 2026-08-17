@@ -21,3 +21,9 @@ for _ in range(500):
 
 print("MIN:", mins)
 print("MAX:", maxs)
+
+
+def hello():
+    print("hello")
+    print("world")
+

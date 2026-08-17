@@ -7,10 +7,20 @@ import math
 
 class RacingEnv(gym.Env):
 
-    def __init__(self, max_steps=2000, verbose=False):
+    def __init__(
+    self,
+    max_steps=2000,
+    verbose=False,
+    track_kwargs=None,
+    ):
         super().__init__()
 
-        self.track = Track()
+        self.track_kwargs = track_kwargs or {}
+
+        self.track = Track(
+            **self.track_kwargs
+            )
+
         self.car = Car()
 
         self.max_steps = max_steps
@@ -50,8 +60,10 @@ class RacingEnv(gym.Env):
         else:
             track_seed = int(self.np_random.integers(0, 2**31))
 
-        self.track = Track(seed=track_seed)
-
+        self.track = Track(
+            seed=track_seed,
+            **self.track_kwargs
+        )
 
         self.car = Car()
 
@@ -165,13 +177,15 @@ class RacingEnv(gym.Env):
         if crashed:
             reward -= 0.1
 
+        reward *= 100
+
         # -------------------------
         # Episode termination
         # -------------------------
 
         self.step_count += 1
 
-        terminated = crashed
+        terminated = crashed or self.lap_completed
         truncated = (not terminated) and (self.step_count >= self.max_steps)
 
         # -------------------------
@@ -257,3 +271,4 @@ class RacingEnv(gym.Env):
             truncated,
             info,
         )
+        

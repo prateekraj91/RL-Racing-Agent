@@ -7,10 +7,20 @@ from sac.agent import SACAgent
 
 TRACK_SEED = 101
 
+MEDIUM_TRACK = {
+    "width": 70,
+    "base_r": 250,
+    "n_ctrl": 10,
+    "min_radius": 80,
+    "cx": 400,
+    "cy": 300,
+}
+
 
 env = RacingEnv(
     max_steps=500,
     verbose=False,
+    track_kwargs=MEDIUM_TRACK,
 )
 
 agent = SACAgent()
@@ -22,14 +32,14 @@ agent = SACAgent()
 
 agent.actor.load_state_dict(
     torch.load(
-        "actor.pth",
+        "best_actor.pth",
         map_location="cpu",
     )
 )
 
 agent.actor.eval()
 
-print("Loaded trained actor from actor.pth")
+print("Loaded trained actor from best_actor.pth")
 
 
 # -------------------------
@@ -37,6 +47,8 @@ print("Loaded trained actor from actor.pth")
 # -------------------------
 
 pygame.init()
+
+font = pygame.font.SysFont(None, 24)
 
 screen = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("SAC Racing Agent")
@@ -116,6 +128,22 @@ while running:
         env.track,
     )
 
+    hud = [
+        f"Speed: {env.car.velocity:.2f}",
+        f"Lap progress: {info.get('lap_progress', 0.0):.3f}",
+        f"Reward: {reward:.4f}",
+        f"Steering: {action[0]:.2f}",
+        f"Throttle: {action[1]:.2f}",
+        f"Crashed: {info.get('crashed', False)}",
+    ]
+
+    y = 10
+
+    for line in hud:
+        text = font.render(line, True, (255, 255, 255))
+        screen.blit(text, (10, y))
+        y += 25
+
     pygame.display.flip()
 
     clock.tick(60)
@@ -130,6 +158,5 @@ while running:
         observation, info = env.reset(
             options={"track_seed": TRACK_SEED}
         )
-
 
 pygame.quit()
