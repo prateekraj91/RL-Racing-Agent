@@ -22,7 +22,11 @@ class RacingEnv(gym.Env):
         # 2 = brake
         # 3 = steer left
         # 4 = steer right
-        self.action_space = gym.spaces.Discrete(5)
+        self.action_space = gym.spaces.Box(
+            low=np.array([-1.0, -1.0], dtype=np.float32),
+            high=np.array([1.0, 1.0], dtype=np.float32),
+            dtype=np.float32,
+        )
 
         self.observation_space = gym.spaces.Box(
             low=-1000,
@@ -99,34 +103,17 @@ class RacingEnv(gym.Env):
     def step(self, action):
 
         # -------------------------
-        # Handle action
+        # Handle continuous action
         # -------------------------
+        
 
-        if action == 1:
-            # Accelerate
-            self.car.velocity += self.car.acceleration
+        
+        steering_action = float(np.clip(action[0], -1.0, 1.0))
+        throttle_action = float(np.clip(action[1], -1.0, 1.0))
 
-        elif action == 2:
-            # Brake
-            self.car.velocity -= self.car.acceleration
+        self.car.steering = steering_action * self.car.max_steering
 
-        elif action == 3:
-            # Steer left
-            self.car.steering = max(
-                self.car.steering - 2,
-                -self.car.max_steering,
-            )
-
-        elif action == 4:
-            # Steer right
-            self.car.steering = min(
-                self.car.steering + 2,
-                self.car.max_steering,
-            )
-
-        else:
-            # Coast
-            self.car.steering *= 0.9
+        self.car.velocity += throttle_action * self.car.acceleration
 
         # -------------------------
         # Update physics
@@ -176,7 +163,7 @@ class RacingEnv(gym.Env):
 
         # Off-track / crash penalty
         if crashed:
-            reward -= 2.0
+            reward -= 0.1
 
         # -------------------------
         # Episode termination
