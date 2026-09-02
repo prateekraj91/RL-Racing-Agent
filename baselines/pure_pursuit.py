@@ -1,20 +1,43 @@
 """Pure-pursuit / follow-centerline baseline for RL Racing Agent.
 
-Uses a priority-based action selector that works within Discrete(5):
-  - Large angle error  → steer (action 3 or 4)
-  - Heading OK, too slow → accelerate (action 1)
-  - Heading OK, too fast → brake (action 2)
-  - Otherwise           → coast (action 0)
+Continuous-action controller: a lookahead point is taken on the centerline, and
+steering is driven by the heading error to that point plus a signed cross-track
+term. Throttle is a proportional speed controller against a curvature-aware
+speed cap (it brakes when over the cap).
 
 Usage:
-  python -m baselines.pure_pursuit              # headless batch on all 5 tracks
-  python -m baselines.pure_pursuit --visual     # pygame visualization (first track)
-  python -m baselines.pure_pursuit --visual 303 # pygame visualization (track 303)
-  python -m baselines.pure_pursuit --debug      # headless with per-step debug output
+  python -m baselines.pure_pursuit                 # headless batch, medium tracks
+  python -m baselines.pure_pursuit --config default
+  python -m baselines.pure_pursuit --visual        # pygame visualization (first track)
+  python -m baselines.pure_pursuit --visual 303    # pygame visualization (track 303)
+  python -m baselines.pure_pursuit --debug         # headless with per-step debug output
 """
+
+# ─── ACTION CONTRACT (verified against env/environment.py:123-128, env/car.py:39-54) ──
+#
+#   action = np.array([steering, throttle], dtype=np.float32)    Box(-1.0, 1.0, (2,))
+#
+#   action[0]  STEERING  in [-1, 1]  ->  car.steering = action[0] * car.max_steering (30°)
+#                +1.0 = full LEFT   (heading angle increases, CCW on screen)
+#                -1.0 = full RIGHT  (heading angle decreases, CW on screen)
+#
+#   action[1]  THROTTLE  in [-1, 1]  ->  car.velocity += action[1] * car.acceleration (0.08)
+#                +1.0 = full accelerate       -1.0 = full brake / reverse
+#                velocity clamped to [-2.0, 4.0]; friction 0.03/step decays toward 0
+#
+#   Error signals (env/track.py):
+#     heading_err = wrap180(car.angle - track.track_heading(x, y))
+#                   > 0  ->  car points LEFT of road    ->  correct with NEGATIVE steering
+#     signed_dist = track.signed_distance(x, y)
+#                   > 0  ->  car is RIGHT of centerline ->  correct with POSITIVE steering
+#
+#   Car min turning radius at full steer = wheelbase / tan(30°) = 86.6 px
+# ──────────────────────────────────────────────────────────────────────────────────────
 
 import math
 import sys
+
+import numpy as np
 
 from env.environment import RacingEnv
 
@@ -22,16 +45,34 @@ from env.environment import RacingEnv
 
 TRACK_SEEDS = [101, 202, 303, 404, 505]
 
-LOOKAHEAD = 80.0        # pixels ahead on centerline to aim for
-SPEED_CAP = 2.0         # target cruising speed
-MIN_SPEED = 0.15        # below this, must accelerate (can't steer at v≈0)
+MEDIUM_TRACK = {
+    "width": 70,
+    "base_r": 250,
+    "n_ctrl": 10,
+    "min_radius": 80,
+    "cx": 400,
+    "cy": 300,
+}
 
-# Proportional steering controller.
-# With fixed car physics (dt*60 angular scaling), the car's effective
-# turning radius is ~87px at max steering, which can follow all track
-# curves (min_radius=70) with some use of the 35px track half-width.
-STEERING_GAIN = 1.0     # desired_steering = gain * angle_error
-STEERING_TOLERANCE = 4.0  # don't adjust steering if within this of desired
+TRACK_CONFIGS = {
+    "medium": MEDIUM_TRACK,
+    "default": {},
+}
+
+LOOKAHEAD = 55.0        # pixels ahead on centerline to aim for
+
+# Steering gains. steer_deg is later normalised by car.max_steering.
+K_HEADING = 1.15        # deg of steer per deg of heading error to the lookahead point
+K_CROSS = 0.10          # deg of steer per pixel of cross-track error
+
+# Speed control. The car's turning radius is speed-independent (kinematic model),
+# but higher speed means more distance covered per control step, so tracking error
+# grows in corners — hence the curvature-aware cap.
+SPEED_CAP = 2.6         # straight-line cruising cap
+CORNER_SPEED = 1.5      # cap when the corner is tight
+CORNER_ERR_LO = 8.0     # |heading err| below this -> full SPEED_CAP
+CORNER_ERR_HI = 35.0    # |heading err| above this -> CORNER_SPEED
+K_THROTTLE = 2.0        # proportional gain on (target_speed - velocity)
 
 WIDTH = 800
 HEIGHT = 600
@@ -90,24 +131,18 @@ def get_target_point(track, x, y, lookahead):
 # ─── Action selection ────────────────────────────────────────────────────────
 
 def choose_action(env, step_count=0, debug=False):
-    """Proportional steering controller exploiting steering persistence.
+    """Continuous pure-pursuit controller.
 
-    Key physics facts from the environment:
-      - Discrete(5): each step does exactly ONE of: coast/accel/brake/left/right
-      - action 1 (accel) and action 2 (brake) do NOT change car.steering
-      - action 0 (coast) decays steering *= 0.9
-      - actions 3/4 change steering by ±2°
-      - angular_velocity = velocity / turning_radius  (proportional to speed)
-      - So: steering PERSISTS during accel/brake. Once set, we can accelerate
-        and the car keeps turning — and turns FASTER as speed increases.
+    Steering combines two error signals the env already exposes:
+      - heading error to a lookahead point on the centerline (primary)
+      - signed cross-track distance from the centerline (recentring)
+    Both are converted to a desired steering angle in degrees, then normalised
+    by car.max_steering and clipped into the action range.
 
-    Strategy:
-      1. Compute desired_steering = GAIN * angle_error (clamped to ±max)
-      2. If car.steering is far from desired → send steer action to adjust
-      3. Otherwise → send accel/brake/coast for speed control
-      4. Special case: velocity ≈ 0 → always accelerate (can't steer stopped)
+    Throttle is proportional control toward a curvature-aware speed cap, so it
+    brakes (negative throttle) whenever the car is over the cap for the corner.
 
-    Returns (action, debug_dict).
+    Returns (action, debug_dict) where action is np.float32 array [steer, throttle].
     """
     car = env.car
     track = env.track
@@ -115,85 +150,48 @@ def choose_action(env, step_count=0, debug=False):
     # --- Lookahead target ---
     target_x, target_y = get_target_point(track, car.x, car.y, LOOKAHEAD)
 
-    # --- Angle error ---
+    # --- Heading error to the target (y-up convention, matches car.angle) ---
     dx = target_x - car.x
     dy = target_y - car.y
     target_angle = math.degrees(math.atan2(-dy, dx))
 
-    angle_error = target_angle - car.angle
-    angle_error = (angle_error + 180.0) % 360.0 - 180.0
+    heading_err = (car.angle - target_angle + 180.0) % 360.0 - 180.0
 
-    # --- Proportional steering target ---
-    # angle_error > 0 → target is left (CCW) → need positive steering
-    # angle_error < 0 → target is right (CW)  → need negative steering
-    desired_steering = max(-car.max_steering,
-                           min(car.max_steering, STEERING_GAIN * angle_error))
-    steering_error = desired_steering - car.steering
-    steering_ok = abs(steering_error) < STEERING_TOLERANCE
+    # --- Signed cross-track error (+ = right of centerline) ---
+    cross_err = track.signed_distance(car.x, car.y)
 
-    # --- Dynamic speed cap ---
-    # Slow down in curves: reduce effective speed cap when angle error is large.
-    # At 0° error → full SPEED_CAP; at ±30°+ → reduced to MIN_SPEED.
-    abs_err = abs(angle_error)
-    if abs_err < 10:
-        effective_cap = SPEED_CAP
+    # --- Steering command (degrees, then normalised) ---
+    # heading_err > 0 (pointing left of target)  -> steer right -> negative
+    # cross_err  > 0 (right of centerline)       -> steer left  -> positive
+    steer_deg = -K_HEADING * heading_err + K_CROSS * cross_err
+
+    steering = float(np.clip(steer_deg / car.max_steering, -1.0, 1.0))
+
+    # --- Curvature-aware speed cap ---
+    abs_err = abs(heading_err)
+    if abs_err <= CORNER_ERR_LO:
+        target_speed = SPEED_CAP
+    elif abs_err >= CORNER_ERR_HI:
+        target_speed = CORNER_SPEED
     else:
-        # Linear ramp-down: from SPEED_CAP at 10° to a floor of 1.0 at 45°+
-        t = min((abs_err - 10) / 35.0, 1.0)
-        effective_cap = SPEED_CAP * (1.0 - t) + 1.0 * t
+        frac = (abs_err - CORNER_ERR_LO) / (CORNER_ERR_HI - CORNER_ERR_LO)
+        target_speed = SPEED_CAP + frac * (CORNER_SPEED - SPEED_CAP)
 
-    # --- Decision logic ---
-    reason = ""
+    # --- Proportional throttle: brakes when over the cap ---
+    throttle = float(
+        np.clip(K_THROTTLE * (target_speed - car.velocity), -1.0, 1.0)
+    )
 
-    if car.velocity < MIN_SPEED:
-        # Can't steer at near-zero speed. Must accelerate first.
-        action = 1
-        reason = "bootstrap"
-
-    elif not steering_ok:
-        # Steering needs adjustment. Each action changes steering by ±2°.
-        # But also check: if we're going too fast for this curve, brake instead.
-        if car.velocity > effective_cap + 0.5:
-            action = 2
-            reason = "curve_brake"
-        elif steering_error > 0:
-            action = 4   # steering += 2 (more positive → turn left)
-            reason = "adj_steer_L"
-        else:
-            action = 3   # steering -= 2 (more negative → turn right)
-            reason = "adj_steer_R"
-
-    elif car.velocity < effective_cap:
-        # Steering is set correctly. Accelerate — steering persists,
-        # and higher speed means faster turning.
-        action = 1
-        reason = "accelerate"
-
-    elif car.velocity > effective_cap + 0.3:
-        action = 2
-        reason = "brake"
-
-    else:
-        # At target speed, heading correct.
-        # Only coast if steering is near zero (don't decay steering in curves).
-        if abs(car.steering) < 2.0:
-            action = 0
-            reason = "coast"
-        else:
-            # Maintain current state — don't coast (would decay steering).
-            # Send a no-op accelerate (velocity is near cap, so clamped anyway).
-            action = 1
-            reason = "hold"
+    action = np.array([steering, throttle], dtype=np.float32)
 
     dbg = {
         "target": (round(target_x, 1), round(target_y, 1)),
-        "target_angle": round(target_angle, 1),
-        "angle_error": round(angle_error, 1),
-        "desired_steer": round(desired_steering, 1),
+        "heading_err": round(heading_err, 1),
+        "cross_err": round(cross_err, 1),
+        "target_speed": round(target_speed, 2),
         "speed": round(car.velocity, 3),
-        "steering": round(car.steering, 2),
-        "action": action,
-        "reason": reason,
+        "steering": round(steering, 3),
+        "throttle": round(throttle, 3),
     }
 
     return action, dbg
@@ -201,39 +199,47 @@ def choose_action(env, step_count=0, debug=False):
 
 # ─── Headless evaluation ────────────────────────────────────────────────────
 
-def run_headless(track_seed, debug=False):
+def run_headless(track_seed, debug=False, track_kwargs=None, max_steps=2000):
     """Run one episode headlessly. Returns summary dict."""
-    env = RacingEnv(max_steps=2000, verbose=False)
+    env = RacingEnv(max_steps=max_steps, verbose=False,
+                    track_kwargs=track_kwargs or {})
     obs, info = env.reset(options={"track_seed": track_seed})
 
     total_reward = 0.0
+    off_track_steps = 0
 
-    for step in range(2000):
+    for step in range(max_steps):
         action, dbg = choose_action(env, step_count=step, debug=debug)
 
         if debug:
             print(
                 f"  step={step:4d}  "
-                f"action={dbg['action']}({dbg['reason']:>13s})  "
-                f"angle_err={dbg['angle_error']:+7.1f}°  "
-                f"desired={dbg['desired_steer']:+6.1f}  "
-                f"speed={dbg['speed']:5.3f}  "
-                f"steering={dbg['steering']:+6.2f}  "
+                f"steer={dbg['steering']:+6.3f}  "
+                f"throttle={dbg['throttle']:+6.3f}  "
+                f"head_err={dbg['heading_err']:+7.1f}°  "
+                f"cross={dbg['cross_err']:+6.1f}  "
+                f"speed={dbg['speed']:5.3f}/{dbg['target_speed']:4.2f}  "
                 f"target={dbg['target']}"
             )
 
         obs, reward, terminated, truncated, info = env.step(action)
         total_reward += reward
 
+        if info["crashed"]:
+            off_track_steps += 1
+
         if terminated or truncated:
             break
 
+    steps = env.step_count
     result = {
         "track_seed": track_seed,
-        "steps": env.step_count,
-        "lap_progress": env.lap_progress,
+        "steps": steps,
+        "lap_progress": round(env.lap_progress, 4),
         "lap_completed": env.lap_completed,
-        "total_reward": total_reward,
+        "lap_time": steps if env.lap_completed else None,
+        "off_track_rate": round(off_track_steps / max(steps, 1), 4),
+        "total_reward": round(total_reward, 4),
         "crashed": info.get("crashed", False),
     }
 
@@ -242,9 +248,9 @@ def run_headless(track_seed, debug=False):
         f"Track {track_seed}: "
         f"steps={result['steps']:4d}, "
         f"lap_progress={result['lap_progress']:.4f}, "
-        f"lap_completed={result['lap_completed']}, "
-        f"reward={result['total_reward']:+8.4f}, "
-        f"crashed={result['crashed']}  "
+        f"lap_time={str(result['lap_time']):>4s}, "
+        f"off_track_rate={result['off_track_rate']:.2%}, "
+        f"reward={result['total_reward']:+9.2f}  "
         f"[{status}]"
     )
 
@@ -269,7 +275,7 @@ def draw_car(screen, car):
     pygame.draw.line(screen, (255, 200, 0), (int(car.x), int(car.y)), (int(hx), int(hy)), 2)
 
 
-def run_visual(track_seed):
+def run_visual(track_seed, track_kwargs=None):
     """Run one episode with pygame rendering."""
     import pygame
 
@@ -279,7 +285,7 @@ def run_visual(track_seed):
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("monospace", 14)
 
-    env = RacingEnv(max_steps=2000, verbose=False)
+    env = RacingEnv(max_steps=2000, verbose=False, track_kwargs=track_kwargs or {})
     obs, info = env.reset(options={"track_seed": track_seed})
 
     running = True
@@ -326,10 +332,10 @@ def run_visual(track_seed):
         # HUD
         hud_lines = [
             f"step: {env.step_count}",
-            f"action: {dbg['action']} ({dbg['reason']})",
-            f"angle_err: {dbg['angle_error']:+.1f}°",
-            f"speed: {dbg['speed']:.3f}",
-            f"steering: {dbg['steering']:+.2f}",
+            f"steer: {dbg['steering']:+.3f}  throttle: {dbg['throttle']:+.3f}",
+            f"head_err: {dbg['heading_err']:+.1f}°",
+            f"cross_err: {dbg['cross_err']:+.1f}",
+            f"speed: {dbg['speed']:.3f} / {dbg['target_speed']:.2f}",
             f"progress: {env.lap_progress:.4f}",
             f"reward: {total_reward:+.2f}",
         ]
@@ -363,32 +369,43 @@ def run_visual(track_seed):
 if __name__ == "__main__":
     args = sys.argv[1:]
 
+    config_name = "medium"
+    if "--config" in args:
+        ci = args.index("--config")
+        config_name = args[ci + 1]
+        del args[ci:ci + 2]
+    track_kwargs = TRACK_CONFIGS[config_name]
+
     if "--visual" in args:
         args.remove("--visual")
         seed = int(args[0]) if args else TRACK_SEEDS[0]
-        run_visual(seed)
+        run_visual(seed, track_kwargs=track_kwargs)
 
     else:
         debug = "--debug" in args
 
-        print("=" * 80)
-        print("Pure-Pursuit Baseline — Batch Evaluation")
-        print(f"  LOOKAHEAD={LOOKAHEAD}  SPEED_CAP={SPEED_CAP}  GAIN={STEERING_GAIN}  TOL={STEERING_TOLERANCE}°")
-        print("=" * 80)
+        print("=" * 88)
+        print(f"Pure-Pursuit Baseline — Batch Evaluation  [{config_name} tracks]")
+        print(f"  LOOKAHEAD={LOOKAHEAD}  K_HEADING={K_HEADING}  K_CROSS={K_CROSS}  "
+              f"SPEED_CAP={SPEED_CAP}  CORNER_SPEED={CORNER_SPEED}")
+        print("=" * 88)
 
         results = []
         for seed in TRACK_SEEDS:
-            r = run_headless(seed, debug=debug)
+            r = run_headless(seed, debug=debug, track_kwargs=track_kwargs)
             results.append(r)
 
-        print("-" * 80)
+        print("-" * 88)
         laps = sum(1 for r in results if r["lap_completed"])
         crashes = sum(1 for r in results if r["crashed"])
         avg_prog = sum(r["lap_progress"] for r in results) / len(results)
         avg_rew = sum(r["total_reward"] for r in results) / len(results)
+        lap_times = [r["lap_time"] for r in results if r["lap_time"] is not None]
+        avg_lap = sum(lap_times) / len(lap_times) if lap_times else None
         print(
             f"Summary: {laps}/{len(results)} laps completed, "
             f"{crashes} crashes, "
+            f"avg_lap_time={avg_lap if avg_lap is None else round(avg_lap, 1)}, "
             f"avg_progress={avg_prog:.4f}, "
             f"avg_reward={avg_rew:+.2f}"
         )
