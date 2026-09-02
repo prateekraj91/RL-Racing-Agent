@@ -11,7 +11,21 @@ Usage:
 
 import pygame
 import sys
+import numpy as np
 from env.environment import RacingEnv
+
+# ─── ACTION CONTRACT (verified against env/environment.py:123-128, env/car.py:39-54) ──
+#
+#   action = np.array([steering, throttle], dtype=np.float32)    Box(-1.0, 1.0, (2,))
+#
+#   action[0]  STEERING  in [-1, 1]  ->  car.steering = action[0] * car.max_steering (30°)
+#                +1.0 = full LEFT   (heading angle increases, CCW on screen)
+#                -1.0 = full RIGHT  (heading angle decreases, CW on screen)
+#
+#   action[1]  THROTTLE  in [-1, 1]  ->  car.velocity += action[1] * car.acceleration (0.08)
+#                +1.0 = full accelerate       -1.0 = full brake / reverse
+#                velocity clamped to [-2.0, 4.0]; friction 0.03/step decays toward 0
+# ──────────────────────────────────────────────────────────────────────────────────────
 
 def main():
     seed = None
@@ -40,22 +54,22 @@ def main():
         # ── Read held keys → pick action ──
         keys = pygame.key.get_pressed()
 
-        # Priority: throttle/brake first, then steering, else coast.
-        # We can only send one discrete action per step, but steering
-        # is also settable directly, so we handle both.
-        action = 0  # coast
-
+        # The continuous API takes steering and throttle together, so
+        # (unlike the old discrete mapping) you can steer and accelerate
+        # in the same step — no priority hack needed.
+        throttle = 0.0
         if keys[pygame.K_UP] or keys[pygame.K_w]:
-            action = 1  # accelerate
+            throttle = 1.0       # accelerate
         elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            action = 2  # brake
+            throttle = -1.0      # brake / reverse
 
-        # Steering is handled via actions 3/4 so it goes through
-        # the same env logic (clamping, decay on coast).
+        steering = 0.0
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            action = 3  # steer left
+            steering = 1.0       # full left
         elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            action = 4  # steer right
+            steering = -1.0      # full right
+
+        action = np.array([steering, throttle], dtype=np.float32)
 
         # ── Step ──
         obs, reward, terminated, truncated, info = env.step(action)
