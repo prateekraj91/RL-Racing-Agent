@@ -1,7 +1,25 @@
 import pygame
+import numpy as np
 from env.environment import RacingEnv
 import math
 from env.track import Track
+
+# ─── ACTION CONTRACT (verified against env/environment.py:123-128, env/car.py:39-54) ──
+#
+#   action = np.array([steering, throttle], dtype=np.float32)    Box(-1.0, 1.0, (2,))
+#
+#   action[0]  STEERING  in [-1, 1]  ->  car.steering = action[0] * car.max_steering (30°)
+#                +1.0 = full LEFT   (heading angle increases, CCW on screen)
+#                -1.0 = full RIGHT  (heading angle decreases, CW on screen)
+#
+#   action[1]  THROTTLE  in [-1, 1]  ->  car.velocity += action[1] * car.acceleration (0.08)
+#                +1.0 = full accelerate       -1.0 = full brake / reverse
+#                velocity clamped to [-2.0, 4.0]; friction 0.03/step decays toward 0
+# ──────────────────────────────────────────────────────────────────────────────────────
+
+# Constant steering angle for the turning-circle validation, in degrees.
+# Normalised into the action range below.
+TURN_CIRCLE_STEER_DEG = 20.0
 
 pygame.init()
 
@@ -40,9 +58,14 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    # Constant throttle + steering test
-    observation, reward, terminated, truncated, info = env.step(1)  # accelerate
-    env.car.steering = 20  # constant steering angle
+    # Constant throttle + steering test.
+    # The continuous API sets steering and throttle in the same step, so the
+    # old post-step `env.car.steering = 20` poke is no longer needed.
+    action = np.array(
+        [TURN_CIRCLE_STEER_DEG / env.car.max_steering, 1.0],
+        dtype=np.float32,
+    )
+    observation, reward, terminated, truncated, info = env.step(action)
     print(f"Obs: {observation} | Reward: {reward:.2f}")
 
     car = env.car
