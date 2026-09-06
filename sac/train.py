@@ -37,6 +37,24 @@ import random
 
 import numpy as np
 
+# -------------------------
+# Named training configs — a run is fully specified by config name + seed.
+# Add new configs here; never hardcode track params in the loop again.
+# -------------------------
+CONFIGS = {
+    "medium": {
+        "track_kwargs": {"width": 70, "base_r": 250, "n_ctrl": 10,
+                         "min_radius": 80, "cx": 400, "cy": 300},
+        "track_seed": 101,
+        "max_steps": 500,
+    },
+    "default": {
+        "track_kwargs": {},          # env built-in defaults (base_r=210, min_radius=70)
+        "track_seed": 101,
+        "max_steps": 500,
+    },
+}
+
 
 parser = argparse.ArgumentParser(description="SAC training for RL Racing Agent")
 parser.add_argument("--wandb", action="store_true",
@@ -53,36 +71,43 @@ parser.add_argument("--eval-every", type=int, default=1000,
                     help="run a deterministic eval every N steps")
 parser.add_argument("--out-dir", default=".",
                     help="directory for best_actor.pth / actor.pth")
+parser.add_argument("--config", choices=list(CONFIGS), default="medium",
+                    help="named training config (track params + seed + max_steps)")
+parser.add_argument("--seed", type=int, default=42,
+                    help="master seed — seeds torch, numpy, random, AND the env action spaces")
 args = parser.parse_args()
 
 
-torch.manual_seed(42)
-np.random.seed(42)
-random.seed(42)
+SEED = args.seed
+torch.manual_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
 
 
-TRACK_SEED = 101
+cfg = CONFIGS[args.config]
+TRACK_SEED = cfg["track_seed"]
+track_kwargs = cfg["track_kwargs"]
+max_steps = cfg["max_steps"]
 
-MEDIUM_TRACK = {
-    "width": 70,
-    "base_r": 250,
-    "n_ctrl": 10,
-    "min_radius": 80,
-    "cx": 400,
-    "cy": 300,
-    }
+print(f"config: {args.config}  |  track_seed={TRACK_SEED}  |  max_steps={max_steps}")
+print(f"track_kwargs: {track_kwargs}")
 
 env = RacingEnv(
-    max_steps=500,
+    max_steps=max_steps,
     verbose=False,
-    track_kwargs=MEDIUM_TRACK
-    )
+    track_kwargs=track_kwargs,
+)
 
 eval_env = RacingEnv(
-    max_steps=500,
+    max_steps=max_steps,
     verbose=False,
-    track_kwargs=MEDIUM_TRACK,
+    track_kwargs=track_kwargs,
 )
+
+# Seed the action-space RNGs — this is the one np.random.seed does NOT cover.
+# Without this, env.action_space.sample() during warmup is non-reproducible.
+env.action_space.seed(SEED)
+eval_env.action_space.seed(SEED + 1)   # different stream so eval != train warmup
 
 agent = SACAgent()
 
@@ -95,6 +120,7 @@ crashes = 0
 # -------------------------
 
 observation, info = env.reset(
+    seed=SEED,
     options={"track_seed": TRACK_SEED}
 )
 
@@ -123,7 +149,7 @@ if args.wandb:
             "warmup_steps": WARMUP_STEPS,
             "eval_every": EVAL_EVERY,
             "track_seed": TRACK_SEED,
-            "track_config": MEDIUM_TRACK,
+            "track_config": track_kwargs,
             "max_episode_steps": env.max_steps,
             "batch_size": 64,
             "gamma": 0.99,
@@ -400,7 +426,12 @@ print(f"Best checkpoint step: {best_step}")
 print(f"Completed: {best_completed}")
 print(f"Crashed: {best_crashed}")
 
-agent.actor.load_state_dict(torch.load(best_path))
+if os.path.exists(best_path):
+    agent.actor.load_state_dict(torch.load(best_path))
+else:
+     print(f"[warn] no best checkpoint at {best_path} "
+          f"(no eval beat -inf — run longer than --eval-every={EVAL_EVERY}); "
+          f"skipping final diagnostic eval.")
 
 observation, info = env.reset(options={"track_seed": TRACK_SEED})
 
@@ -451,6 +482,32 @@ torch.save(
 )
 
 print(f"Saved actor to {final_path}")
+
+# -------------------------
+# Save run manifest next to the checkpoint (reproducibility record)
+# -------------------------
+import json
+
+manifest = {
+    "config_name": args.config,
+    "seed": SEED,
+    "track_seed": TRACK_SEED,
+    "track_kwargs": track_kwargs,
+    "max_steps": max_steps,
+    "total_steps": args.steps,
+    "warmup": args.warmup,
+    "eval_every": args.eval_every,
+    "best_progress": best_progress,
+    "best_step": best_step,
+    "command": f"python -m sac.train --config {args.config} --seed {SEED} "
+               f"--steps {args.steps} --warmup {args.warmup} --eval-every {args.eval_every}",
+}
+
+manifest_path = os.path.join(args.out_dir, "run_config.json")
+with open(manifest_path, "w") as f:
+    json.dump(manifest, f, indent=2)
+
+print(f"Saved run manifest to {manifest_path}")
 
 if run is not None:
     run.summary["final/lap_completed"] = int(lap_completed)
