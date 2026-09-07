@@ -1,0 +1,21 @@
+DEMO SEED | 40 episodes -> 17014 transitions | laps=40 (clean=12) crashes=0 | mean_prog=1.0012 max_prog=1.0023
+DEMO SEED | protected 17014 demo transitions from eviction
+================================================================================================
+CURRICULUM RUN  name=exp2_demos_s42  curriculum=none  seed=42
+  medium_only width= 70 max_steps= 500  budget=200000
+TARGET: medium width=70 max_steps=500 track_seed=101  -> success = lap_completed AND not crashed
+================================================================================================
+
+------------------------------------------------------------------------------------------------
+TIER 0 medium_only  width=70  max_steps=500  budget=200000  buffer=17014
+------------------------------------------------------------------------------------------------
+EVAL | Step:   5000 | Tier: medium_only || TIER prog= 1.0013 lap=True  crash=False || TARGET prog= 1.0013 lap=True  crash=False steps= 402 v= 3.58 R=  1399.84 |   1.2m
+*** TARGET SOLVED at step 5000: lap_completed=True crashed=False lap_time=402 ***
+EVAL | Step:  10000 | Tier: medium_only || TIER prog= 1.0016 lap=True  crash=False || TARGET prog= 1.0016 lap=True  crash=False steps= 399 v= 3.60 R=  1389.89 |  34.2m
+EVAL | Step:  15000 | Tier: medium_only || TIER prog= 1.0015 lap=True  crash=False || TARGET prog= 1.0015 lap=True  crash=False steps= 418 v= 3.44 R=  1391.47 |  44.9m
+EVAL | Step:  20000 | Tier: medium_only || TIER prog= 1.0015 lap=True  crash=False || TARGET prog= 1.0015 lap=True  crash=False steps= 414 v= 3.47 R=  1446.77 |  46.1m
+EVAL | Step:  25000 | Tier: medium_only || TIER prog= 1.0002 lap=True  crash=False || TARGET prog= 1.0002 lap=True  crash=False steps= 433 v= 3.33 R=  1333.32 |  47.2m
+EVAL | Step:  30000 | Tier: medium_only || TIER prog= 1.0025 lap=True  crash=False || TARGET prog= 1.0025 lap=True  crash=False steps= 397 v= 3.59 R=  1392.62 |  48.3m
+EVAL | Step:  35000 | Tier: medium_only || TIER prog= 1.0015 lap=True  crash=False || TARGET prog= 1.0015 lap=True  crash=False steps= 399 v= 3.59 R=  1422.13 |  49.6m
+EVAL | Step:  40000 | Tier: medium_only || TIER prog= 1.0008 lap=True  crash=False || TARGET prog= 1.0008 lap=True  crash=False steps= 399 v= 3.58 R=  1397.42 |  50.8m
+EVAL | Step:  45000 | Tier: medium_only || TIER prog= 1.0002 lap=True  crash=False || TARGET prog= 1.0002 lap=True  crash=False steps= 400 v= 3.58 R=  1392.54 |  52.0m

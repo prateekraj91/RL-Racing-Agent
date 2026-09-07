@@ -77,6 +77,7 @@ class RacingEnv(gym.Env):
         )
         self.lap_progress = 0.0
         self.lap_completed = False
+        self.prev_steering = 0.0
 
         err = (
             self.car.angle
@@ -169,13 +170,38 @@ class RacingEnv(gym.Env):
         # Reward
         # -------------------------
 
-        speed_reward = self.car.velocity * 0.01
+        reward = progress * 20.0
 
-        reward = progress + speed_reward
+        # reward v2 — curvature-aware speed penalty:
+        # punish carrying speed toward a close wall/corner. rays = forward beam
+        # distances; the smallest = nearest wall ahead. Small min_ahead + high
+        # speed  ->  big penalty, so braking-before-corners scores higher.
+        rays = self.car.cast_rays(self.track)
+        min_ahead = min(rays)
+        CORNER_THRESH = 120.0        # beam distance under which a corner counts as "close"
+        # speed_frac is hoisted out of the branch: the else-branch reads it, so
+        # leaving it bound only inside the if-branch is a NameError on any track
+        # wide enough for min_ahead to clear CORNER_THRESH (width > ~240px).
+        # Unreachable on medium (width 70 -> lateral rays pin min_ahead at ~36),
+        # so this is inert there; the curriculum's wide tiers need it.
+        speed_frac = max(self.car.velocity, 0.0) / 4.0                 # 0..1, fraction of max speed
+        if min_ahead < CORNER_THRESH:
+            tightness  = (CORNER_THRESH - min_ahead) / CORNER_THRESH   # 0..1, bigger = tighter
+            reward -= 0.02 * tightness * speed_frac
+        else:
+            reward += 0.01 * speed_frac
+
+        # reward v2 — steering-smoothness penalty:
+        # discourage jerky steering by penalising the change from last step's steering.
+        steer_change = abs(steering_action - self.prev_steering)
+        reward -= 0.01 * steer_change
+        self.prev_steering = steering_action
+
+
 
         # Off-track / crash penalty
         if crashed:
-            reward -= 0.1
+            reward -= 0.2
 
         reward *= 100
 
@@ -259,7 +285,7 @@ class RacingEnv(gym.Env):
         info = {
             "progress": progress,
             "lap_progress": self.lap_progress,
-            "speed_reward": speed_reward,
+            "speed_reward": 0.0,
             "crashed": crashed,
             "lap_completed": self.lap_completed,
         }

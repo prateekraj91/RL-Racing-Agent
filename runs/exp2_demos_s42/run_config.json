@@ -1,0 +1,69 @@
+{
+  "run_name": "exp2_demos_s42",
+  "curriculum": "none",
+  "tiers": [
+    {
+      "name": "medium_only",
+      "track_kwargs": {
+        "base_r": 250,
+        "n_ctrl": 10,
+        "min_radius": 80,
+        "cx": 400,
+        "cy": 300,
+        "width": 70
+      },
+      "track_seed": 101,
+      "max_steps": 500,
+      "steps": 200000
+    }
+  ],
+  "seed": 42,
+  "warmup": 5000,
+  "eval_every": 5000,
+  "batch_size": 64,
+  "steps_scale": 1.0,
+  "reset_buffer_per_tier": false,
+  "demos": 40,
+  "demo_noise": 0.7,
+  "demo_clean_frac": 0.3,
+  "demo_stats": {
+    "episodes": 40,
+    "transitions": 17014,
+    "laps": 40,
+    "clean_laps": 12,
+    "crashes": 0,
+    "mean_progress": 1.0012,
+    "max_progress": 1.0023
+  },
+  "total_steps": 45000,
+  "target_config": {
+    "track_kwargs": {
+      "width": 70,
+      "base_r": 250,
+      "n_ctrl": 10,
+      "min_radius": 80,
+      "cx": 400,
+      "cy": 300
+    },
+    "track_seed": 101,
+    "max_steps": 500
+  },
+  "best_target_progress": 1.0025,
+  "solved_at_step": 5000,
+  "solved_eval": {
+    "steps": 402,
+    "reward": 1399.84,
+    "progress": 1.0013,
+    "completed": true,
+    "crashed": false,
+    "lap_time": 402,
+    "mean_speed": 3.58
+  },
+  "n_evals": 9,
+  "n_solved_evals": 9,
+  "solve_rate": 1.0,
+  "completed_run": false,
+  "stopped_early": "stopped after 9/9 consecutive solved evals to free CPU for the seed-robustness runs",
+  "reconstructed_from_log": true,
+  "command": "python -m sac.train_curriculum --curriculum none --seed 42 --name exp2_demos_s42 --demos 40"
+}

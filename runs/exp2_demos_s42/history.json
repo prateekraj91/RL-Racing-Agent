@@ -1,0 +1,164 @@
+[
+  {
+    "step": 5000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0013,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 402,
+      "reward": 1399.84,
+      "progress": 1.0013,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 402,
+      "mean_speed": 3.58
+    }
+  },
+  {
+    "step": 10000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0016,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 399,
+      "reward": 1389.89,
+      "progress": 1.0016,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 399,
+      "mean_speed": 3.6
+    }
+  },
+  {
+    "step": 15000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0015,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 418,
+      "reward": 1391.47,
+      "progress": 1.0015,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 418,
+      "mean_speed": 3.44
+    }
+  },
+  {
+    "step": 20000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0015,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 414,
+      "reward": 1446.77,
+      "progress": 1.0015,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 414,
+      "mean_speed": 3.47
+    }
+  },
+  {
+    "step": 25000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0002,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 433,
+      "reward": 1333.32,
+      "progress": 1.0002,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 433,
+      "mean_speed": 3.33
+    }
+  },
+  {
+    "step": 30000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0025,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 397,
+      "reward": 1392.62,
+      "progress": 1.0025,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 397,
+      "mean_speed": 3.59
+    }
+  },
+  {
+    "step": 35000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0015,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 399,
+      "reward": 1422.13,
+      "progress": 1.0015,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 399,
+      "mean_speed": 3.59
+    }
+  },
+  {
+    "step": 40000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0008,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 399,
+      "reward": 1397.42,
+      "progress": 1.0008,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 399,
+      "mean_speed": 3.58
+    }
+  },
+  {
+    "step": 45000,
+    "tier": "medium_only",
+    "tier_eval": {
+      "progress": 1.0002,
+      "completed": true,
+      "crashed": false
+    },
+    "target_eval": {
+      "steps": 400,
+      "reward": 1392.54,
+      "progress": 1.0002,
+      "completed": true,
+      "crashed": false,
+      "lap_time": 400,
+      "mean_speed": 3.58
+    }
+  }
+]
