@@ -1,26 +1,59 @@
+"""Pygame visualisation of a trained SAC actor.
+
+Usage:
+    python -m sac.visualize                                   # unchanged default
+    python -m sac.visualize --checkpoint runs/exp2_demos_s42/solved_actor.pth
+    python -m sac.visualize --config default --seed 303
+
+Defaults reproduce the previous hardcoded behaviour exactly: best_actor.pth on
+the medium track, track_seed 101, max_steps 500.
+"""
+
+import argparse
+
 import pygame
 import torch
 
 from env.environment import RacingEnv
 from sac.agent import SACAgent
+from sac.curricula import MEDIUM_TRACK_KWARGS
 
 
-TRACK_SEED = 101
-
-MEDIUM_TRACK = {
-    "width": 70,
-    "base_r": 250,
-    "n_ctrl": 10,
-    "min_radius": 80,
-    "cx": 400,
-    "cy": 300,
+# Same named configs as sac/train.py's CONFIGS. That module runs argparse at
+# import time, so its dict cannot be imported here; MEDIUM_TRACK_KWARGS in
+# sac/curricula.py is the shared definition of the medium track.
+CONFIGS = {
+    "medium": {
+        "track_kwargs": MEDIUM_TRACK_KWARGS,
+        "max_steps": 500,
+    },
+    "default": {
+        "track_kwargs": {},          # env built-in defaults (base_r=210, min_radius=70)
+        "max_steps": 500,
+    },
 }
 
 
+parser = argparse.ArgumentParser(description="Visualise a trained SAC actor")
+parser.add_argument("--checkpoint", default="best_actor.pth",
+                    help="actor state_dict to load (default: best_actor.pth)")
+parser.add_argument("--config", choices=list(CONFIGS), default="medium",
+                    help="named track config (default: medium)")
+parser.add_argument("--seed", type=int, default=101,
+                    help="track seed (default: 101)")
+args = parser.parse_args()
+
+
+cfg = CONFIGS[args.config]
+TRACK_SEED = args.seed
+track_kwargs = cfg["track_kwargs"]
+max_steps = cfg["max_steps"]
+
+
 env = RacingEnv(
-    max_steps=500,
+    max_steps=max_steps,
     verbose=False,
-    track_kwargs=MEDIUM_TRACK,
+    track_kwargs=track_kwargs,
 )
 
 agent = SACAgent()
@@ -32,14 +65,16 @@ agent = SACAgent()
 
 agent.actor.load_state_dict(
     torch.load(
-        "best_actor.pth",
+        args.checkpoint,
         map_location="cpu",
     )
 )
 
 agent.actor.eval()
 
-print("Loaded trained actor from best_actor.pth")
+print(f"Loaded trained actor from {args.checkpoint}")
+print(f"config: {args.config}  |  track_seed={TRACK_SEED}  |  max_steps={max_steps}")
+print(f"track_kwargs: {track_kwargs}")
 
 
 # -------------------------
