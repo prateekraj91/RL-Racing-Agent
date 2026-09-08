@@ -1,3 +1,15 @@
+"""Roll out one lap with a trained SAC actor and save the full trace to .npz.
+
+Usage:
+    python -m analysis.collect_run                                   # unchanged default
+    python -m analysis.collect_run --checkpoint runs/exp2_demos_s42/solved_actor.pth
+    python -m analysis.collect_run --config default --seed 303
+
+Defaults reproduce the previous hardcoded behaviour exactly: best_actor.pth on
+the medium track, track_seed 101. A non-default --checkpoint gets its stem
+appended to the output filename so it cannot clobber the committed runs.
+"""
+
 import os
 import numpy as np
 import torch
@@ -19,9 +31,13 @@ MEDIUM_TRACK = {
 
 MAX_STEPS = 2000   # generous cap so a full lap isn't cut short
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--config", choices=["medium", "default"], default="medium")
-parser.add_argument("--seed", type=int, default=101)
+parser = argparse.ArgumentParser(description="Collect one lap from a trained SAC actor")
+parser.add_argument("--checkpoint", default="best_actor.pth",
+                    help="actor state_dict to load (default: best_actor.pth)")
+parser.add_argument("--config", choices=["medium", "default"], default="medium",
+                    help="named track config (default: medium)")
+parser.add_argument("--seed", type=int, default=101,
+                    help="track seed (default: 101)")
 args = parser.parse_args()
 
 TRACK_SEED = args.seed
@@ -33,6 +49,11 @@ if args.config == "medium":
 else:
     track_kwargs = {}          # default config = the one it fails
     out_name = f"default_seed{TRACK_SEED}"
+
+# analysis/runs/{medium,default}_seed101.npz are committed artifacts, so only the
+# default checkpoint may write to those names.
+if args.checkpoint != parser.get_default("checkpoint"):
+    out_name += f"_{os.path.splitext(os.path.basename(args.checkpoint))[0]}"
 
 
 # -------------------------
@@ -48,11 +69,12 @@ env = RacingEnv(
 agent = SACAgent()
 
 agent.actor.load_state_dict(
-    torch.load("best_actor.pth", map_location="cpu")
+    torch.load(args.checkpoint, map_location="cpu")
 )
 agent.actor.eval()
 
-print("Loaded trained actor from best_actor.pth")
+print(f"Loaded trained actor from {args.checkpoint}")
+print(f"config: {args.config}  |  track_seed={TRACK_SEED}  |  max_steps={MAX_STEPS}")
 
 
 # -------------------------
