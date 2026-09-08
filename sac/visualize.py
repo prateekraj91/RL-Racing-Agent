@@ -4,6 +4,7 @@ Usage:
     python -m sac.visualize                                   # unchanged default
     python -m sac.visualize --checkpoint runs/exp2_demos_s42/solved_actor.pth
     python -m sac.visualize --config default --seed 303
+    python -m sac.visualize --grip                        # grip-limited physics
 
 Defaults reproduce the previous hardcoded behaviour exactly: best_actor.pth on
 the medium track, track_seed 101, max_steps 500.
@@ -41,6 +42,8 @@ parser.add_argument("--config", choices=list(CONFIGS), default="medium",
                     help="named track config (default: medium)")
 parser.add_argument("--seed", type=int, default=101,
                     help="track seed (default: 101)")
+parser.add_argument("--grip", action="store_true", default=False,
+                    help="enable grip-limited cornering physics (default: off)")
 args = parser.parse_args()
 
 
@@ -54,6 +57,7 @@ env = RacingEnv(
     max_steps=max_steps,
     verbose=False,
     track_kwargs=track_kwargs,
+    grip_limit=args.grip,
 )
 
 agent = SACAgent()
@@ -75,6 +79,7 @@ agent.actor.eval()
 print(f"Loaded trained actor from {args.checkpoint}")
 print(f"config: {args.config}  |  track_seed={TRACK_SEED}  |  max_steps={max_steps}")
 print(f"track_kwargs: {track_kwargs}")
+print(f"grip physics: {'ON  (grip-limited cornering)' if args.grip else 'OFF (default)'}")
 
 
 # -------------------------

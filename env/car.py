@@ -25,6 +25,10 @@ class Car:
 
         self.dt = 1 / 60            # fixed timestep
 
+        # grip-limited cornering (experimental, off by default)
+        self.grip_limit = False     # True enables realistic grip physics
+        self.max_grip = 0.09        # max lateral accel before understeer  [TUNE]
+
     def update(self):
         if self.velocity > 0:
             self.velocity -= self.friction
@@ -48,6 +52,14 @@ class Car:
 
         if abs(self.steering) > 0.01:
             turning_radius = self.wheelbase / math.tan(math.radians(self.steering))
+
+            if self.grip_limit:
+                # lateral accel demanded = v^2 / r; if it exceeds grip, understeer:
+                # widen radius to the tightest the grip actually allows at this speed.
+                lateral_accel = (self.velocity ** 2) / abs(turning_radius)
+                if lateral_accel > self.max_grip:
+                    grip_radius = (self.velocity ** 2) / self.max_grip
+                    turning_radius = math.copysign(grip_radius, turning_radius)
 
             angular_velocity = self.velocity / turning_radius
 
