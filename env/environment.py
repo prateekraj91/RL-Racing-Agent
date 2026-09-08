@@ -12,16 +12,19 @@ class RacingEnv(gym.Env):
     max_steps=2000,
     verbose=False,
     track_kwargs=None,
+    grip_limit=False,
     ):
         super().__init__()
 
         self.track_kwargs = track_kwargs or {}
+        self.grip_limit = grip_limit
 
         self.track = Track(
             **self.track_kwargs
             )
 
         self.car = Car()
+        self.car.grip_limit = self.grip_limit
 
         self.max_steps = max_steps
         self.step_count = 0
@@ -66,6 +69,7 @@ class RacingEnv(gym.Env):
         )
 
         self.car = Car()
+        self.car.grip_limit = self.grip_limit
 
         self.step_count = 0
 
