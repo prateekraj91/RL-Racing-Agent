@@ -9,7 +9,7 @@ from sac.replay_buffer import ReplayBuffer
 
 class SACAgent:
 
-    def __init__(self, obs_dim=9, action_dim=2):
+    def __init__(self, obs_dim=9, action_dim=2, lr=3e-4, target_entropy=None):
 
         self.actor = SACActor(
             obs_dim,
@@ -33,10 +33,10 @@ class SACAgent:
 
         self.alpha_optimizer = optim.Adam(
             [self.log_alpha],
-            lr=3e-4,
+            lr=lr,
         )
 
-        self.target_entropy = -action_dim
+        self.target_entropy = target_entropy if target_entropy is not None else -action_dim
 
         self.target_critic1 = copy.deepcopy(self.critic1)
         self.target_critic2 = copy.deepcopy(self.critic2)
@@ -45,19 +45,19 @@ class SACAgent:
 
         self.actor_optimizer = optim.Adam(
             self.actor.parameters(),
-            lr=3e-4,
+            lr=lr,
         )
 
         self.critic1_optimizer = optim.Adam(
             self.critic1.parameters(),
-            lr=3e-4,
+            lr=lr,
         )
 
         self.critic2_optimizer = optim.Adam(
             self.critic2.parameters(),
-            lr=3e-4,
+            lr=lr,
         )
-
+        
     def soft_update(self, source, target, tau=0.005):
         
         for target_param, source_param in zip(

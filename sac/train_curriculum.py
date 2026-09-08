@@ -70,6 +70,10 @@ def build_parser():
                         "rewarding, while standing still scores exactly 0. "
                         "Not part of any solving recipe -- this modifies the "
                         "reward and must not be used to claim a solve.")
+    p.add_argument("--lr", type=float, default=3e-4,
+                   help="learning rate for all optimizers (actor, critics, alpha)")
+    p.add_argument("--entropy-target", type=float, default=None,
+                   help="SAC target entropy; default None -> -action_dim (the standard)")
     return p
 
 
@@ -133,7 +137,7 @@ def main():
                            track_kwargs=TARGET_CONFIG["track_kwargs"])
     target_env.action_space.seed(SEED + 999)
 
-    agent = SACAgent()
+    agent = SACAgent(lr=args.lr, target_entropy=args.entropy_target)
 
     # ---- Approach 2: demonstration seeding ----------------------------------
     demo_stats = None

@@ -1,0 +1,74 @@
+[
+  {
+    "lr": 0.0001,
+    "entropy_target": -1.0,
+    "solved_at": 10000,
+    "n_solved_evals": 0,
+    "best_progress": 1.0025504715537719,
+    "lap_time": 407
+  },
+  {
+    "lr": 0.0001,
+    "entropy_target": -2.0,
+    "solved_at": 10000,
+    "n_solved_evals": 0,
+    "best_progress": 1.0022611627442513,
+    "lap_time": 406
+  },
+  {
+    "lr": 0.0001,
+    "entropy_target": -4.0,
+    "solved_at": 10000,
+    "n_solved_evals": 0,
+    "best_progress": 1.002601365038526,
+    "lap_time": 404
+  },
+  {
+    "lr": 0.0003,
+    "entropy_target": -1.0,
+    "solved_at": 2000,
+    "n_solved_evals": 0,
+    "best_progress": 1.001760161379606,
+    "lap_time": 402
+  },
+  {
+    "lr": 0.0003,
+    "entropy_target": -2.0,
+    "solved_at": 2000,
+    "n_solved_evals": 0,
+    "best_progress": 1.002709037251007,
+    "lap_time": 397
+  },
+  {
+    "lr": 0.0003,
+    "entropy_target": -4.0,
+    "solved_at": 2000,
+    "n_solved_evals": 0,
+    "best_progress": 1.0026534781388219,
+    "lap_time": 401
+  },
+  {
+    "lr": 0.001,
+    "entropy_target": -1.0,
+    "solved_at": 2000,
+    "n_solved_evals": 0,
+    "best_progress": 1.002548238636049,
+    "lap_time": 396
+  },
+  {
+    "lr": 0.001,
+    "entropy_target": -2.0,
+    "solved_at": 2000,
+    "n_solved_evals": 0,
+    "best_progress": 1.0025753191861606,
+    "lap_time": 392
+  },
+  {
+    "lr": 0.001,
+    "entropy_target": -4.0,
+    "solved_at": 4000,
+    "n_solved_evals": 0,
+    "best_progress": 1.0027164603668268,
+    "lap_time": 401
+  }
+]
