@@ -4,3 +4,9 @@ venv/
 .DS_Store
 wandb/
 .pytest_cache/
+
+# Experiment run outputs are scratch (checkpoints + logs, regenerable).
+# Ignore runs/ by default, but keep the durable artifacts we explicitly committed.
+runs/*
+!runs/exp2_demos_s42/
+!runs/sweep_results.json
