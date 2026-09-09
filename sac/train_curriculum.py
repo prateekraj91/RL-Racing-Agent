@@ -74,6 +74,10 @@ def build_parser():
                    help="learning rate for all optimizers (actor, critics, alpha)")
     p.add_argument("--entropy-target", type=float, default=None,
                    help="SAC target entropy; default None -> -action_dim (the standard)")
+    p.add_argument("--grip", action="store_true", default=False,
+                   help="train under grip-limited physics: every RacingEnv "
+                        "(target, tier training, tier eval) is built with "
+                        "grip_limit=True. Default off = physics unchanged.")
     return p
 
 
@@ -134,7 +138,8 @@ def main():
 
     # The fixed target env -- never changes, defines success.
     target_env = RacingEnv(max_steps=TARGET_CONFIG["max_steps"],
-                           track_kwargs=TARGET_CONFIG["track_kwargs"])
+                           track_kwargs=TARGET_CONFIG["track_kwargs"],
+                           grip_limit=args.grip)
     target_env.action_space.seed(SEED + 999)
 
     agent = SACAgent(lr=args.lr, target_entropy=args.entropy_target)
@@ -192,6 +197,7 @@ def main():
             "demo_noise": args.demo_noise,
             "demo_clean_frac": args.demo_clean_frac,
             "clip_backward_DIAGNOSTIC": args.clip_backward,
+            "grip": args.grip,
             "demo_stats": demo_stats,
             "total_steps": global_step,
             "episodes": episodes,
@@ -217,9 +223,10 @@ def main():
         tk = tier["track_kwargs"]
         ms = tier["max_steps"]
 
-        env = RacingEnv(max_steps=ms, track_kwargs=tk)
+        env = RacingEnv(max_steps=ms, track_kwargs=tk, grip_limit=args.grip)
         env.action_space.seed(SEED + tier_idx)
-        tier_eval_env = RacingEnv(max_steps=ms, track_kwargs=tk)
+        tier_eval_env = RacingEnv(max_steps=ms, track_kwargs=tk,
+                                  grip_limit=args.grip)
 
         if args.reset_buffer_per_tier and tier_idx > 0:
             agent.replay_buffer.buffer = []
