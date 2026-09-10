@@ -29,6 +29,14 @@ class Car:
         self.grip_limit = False     # True enables realistic grip physics
         self.max_grip = 0.09        # max lateral accel before understeer  [TUNE]
 
+        # Instrumentation. grip_events counts steps where the clamp actually
+        # fired; grip_yaw_lost accumulates the fraction of the DEMANDED yaw rate
+        # that was discarded on those steps. The count alone is misleading -- on
+        # the medium track the clamp fires on 38% of steps yet costs so little
+        # yaw that a flat-out lap is unaffected -- so severity is tracked too.
+        self.grip_events = 0
+        self.grip_yaw_lost = 0.0
+
     def update(self):
         if self.velocity > 0:
             self.velocity -= self.friction
@@ -59,6 +67,8 @@ class Car:
                 lateral_accel = (self.velocity ** 2) / abs(turning_radius)
                 if lateral_accel > self.max_grip:
                     grip_radius = (self.velocity ** 2) / self.max_grip
+                    self.grip_events += 1
+                    self.grip_yaw_lost += 1.0 - abs(turning_radius) / grip_radius
                     turning_radius = math.copysign(grip_radius, turning_radius)
 
             angular_velocity = self.velocity / turning_radius

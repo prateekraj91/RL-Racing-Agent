@@ -6,6 +6,10 @@ Usage:
     python -m sac.visualize --config default --seed 303
     python -m sac.visualize --grip                        # grip-limited physics
 
+    # the grip-trained agent in the world it was trained on (docs/GRIP_EXPERIMENT.md)
+    python -m sac.visualize --checkpoint runs/grip_bites_curric_s42/solved_actor.pth \
+        --config tight --seed 24 --grip
+
 Defaults reproduce the previous hardcoded behaviour exactly: best_actor.pth on
 the medium track, track_seed 101, max_steps 500.
 """
@@ -17,7 +21,7 @@ import torch
 
 from env.environment import RacingEnv
 from sac.agent import SACAgent
-from sac.curricula import MEDIUM_TRACK_KWARGS
+from sac.curricula import MEDIUM_TRACK_KWARGS, TIGHT_TRACK_KWARGS, TIGHT_TARGET_CONFIG
 
 
 # Same named configs as sac/train.py's CONFIGS. That module runs argparse at
@@ -32,6 +36,13 @@ CONFIGS = {
         "track_kwargs": {},          # env built-in defaults (base_r=210, min_radius=70)
         "max_steps": 500,
     },
+    # The grip experiment's target. Pair it with --seed 24 --grip: the track is
+    # only tight enough for grip to bite on that seed (realized corner radius
+    # 64.5px), and without --grip the physics it was trained under are absent.
+    "tight": {
+        "track_kwargs": TIGHT_TRACK_KWARGS,
+        "max_steps": TIGHT_TARGET_CONFIG["max_steps"],
+    },
 }
 
 
@@ -41,7 +52,7 @@ parser.add_argument("--checkpoint", default="best_actor.pth",
 parser.add_argument("--config", choices=list(CONFIGS), default="medium",
                     help="named track config (default: medium)")
 parser.add_argument("--seed", type=int, default=101,
-                    help="track seed (default: 101)")
+                    help="track seed (default: 101; use 24 with --config tight)")
 parser.add_argument("--grip", action="store_true", default=False,
                     help="enable grip-limited cornering physics (default: off)")
 args = parser.parse_args()
