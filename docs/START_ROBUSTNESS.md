@@ -6,6 +6,9 @@ randomization" branch is therefore **not taken** — no randomization was added,
 condition is false.
 
 **Script:** `analysis/test_start_robustness.py`
+**Live version:** `python -m sac.visualize --checkpoint runs/exp2_demos_s42/solved_actor.pth --random-start`
+(`--random-start` respawns the car at a random position/heading/speed each episode, so the same
+check can be watched rather than only measured.)
 
 ---
 
