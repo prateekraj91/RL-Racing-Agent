@@ -5,6 +5,7 @@ Usage:
     python -m sac.visualize --checkpoint runs/exp2_demos_s42/solved_actor.pth
     python -m sac.visualize --config default --seed 303
     python -m sac.visualize --grip                        # grip-limited physics
+    python -m sac.visualize --random-start                # varied spawn each episode
 
     # the grip-trained agent in the world it was trained on (docs/GRIP_EXPERIMENT.md)
     python -m sac.visualize --checkpoint runs/grip_bites_curric_s42/solved_actor.pth \
@@ -15,7 +16,9 @@ the medium track, track_seed 101, max_steps 500.
 """
 
 import argparse
+import random
 
+import numpy as np
 import pygame
 import torch
 
@@ -55,6 +58,8 @@ parser.add_argument("--seed", type=int, default=101,
                     help="track seed (default: 101; use 24 with --config tight)")
 parser.add_argument("--grip", action="store_true", default=False,
                     help="enable grip-limited cornering physics (default: off)")
+parser.add_argument("--random-start", action="store_true", default=False,
+                    help="spawn the car at a random position/speed/heading each episode")
 args = parser.parse_args()
 
 
@@ -91,6 +96,54 @@ print(f"Loaded trained actor from {args.checkpoint}")
 print(f"config: {args.config}  |  track_seed={TRACK_SEED}  |  max_steps={max_steps}")
 print(f"track_kwargs: {track_kwargs}")
 print(f"grip physics: {'ON  (grip-limited cornering)' if args.grip else 'OFF (default)'}")
+print(f"random start: {'ON  (varied position/heading/speed)' if args.random_start else 'OFF (normal start pose)'}")
+
+
+# -------------------------
+# Random start (--random-start)
+# -------------------------
+
+def random_start(env):
+    """Teleport the car to a random centerline point, mis-aligned, at random speed.
+
+    Call immediately after env.reset(). Returns the rebuilt observation: the env
+    builds obs inline in reset()/step() with no reusable method, so the same
+    construction is replicated here. Without this the loop would keep feeding the
+    agent the stale pre-teleport observation from reset().
+
+    Mirrors analysis/test_start_robustness.py, the measured version of this check.
+    """
+    center = env.track.centerline
+    idx = random.randrange(len(center))
+
+    env.car.x = float(center[idx][0])
+    env.car.y = float(center[idx][1])
+
+    heading = env.track.track_heading(env.car.x, env.car.y)
+    offset = random.uniform(-15.0, 15.0)
+    env.car.angle = heading + offset
+    env.car.velocity = random.uniform(0.0, 4.0)
+
+    # Measure lap progress from HERE, not from the track's nominal start.
+    env.previous_progress = env.track.get_progress(env.car.x, env.car.y)
+    env.lap_progress = 0.0
+    env.lap_completed = False
+    env.step_count = 0
+
+    print(f"[random-start] pos_idx={idx:3d}/{len(center)}  "
+          f"angle_offset={offset:+.1f}deg  speed={env.car.velocity:.2f}")
+
+    # Same observation construction as RacingEnv.reset (env/environment.py:86-113).
+    err = env.car.angle - env.track.track_heading(env.car.x, env.car.y)
+    err = (err + 180.0) % 360.0 - 180.0
+    dist = env.track.signed_distance(env.car.x, env.car.y)
+    slip = 0.0
+    rays = env.car.cast_rays(env.track)
+
+    return np.array(
+        [env.car.velocity, err, dist, slip, *rays],
+        dtype=np.float32,
+    )
 
 
 # -------------------------
@@ -109,6 +162,9 @@ clock = pygame.time.Clock()
 observation, info = env.reset(
     options={"track_seed": TRACK_SEED}
 )
+
+if args.random_start:
+    observation = random_start(env)
 
 running = True
 
@@ -209,5 +265,8 @@ while running:
         observation, info = env.reset(
             options={"track_seed": TRACK_SEED}
         )
+
+        if args.random_start:
+            observation = random_start(env)
 
 pygame.quit()
