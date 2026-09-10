@@ -29,7 +29,7 @@ import torch
 
 from env.environment import RacingEnv
 from sac.agent import SACAgent
-from sac.curricula import CURRICULA, TARGET_CONFIG
+from sac.curricula import CURRICULA, TARGETS
 from sac.demo_seed import collect_demos
 
 # ─── ACTION CONTRACT (verified against env/environment.py, env/car.py) ────────
@@ -74,6 +74,12 @@ def build_parser():
                    help="learning rate for all optimizers (actor, critics, alpha)")
     p.add_argument("--entropy-target", type=float, default=None,
                    help="SAC target entropy; default None -> -action_dim (the standard)")
+    p.add_argument("--target", choices=list(TARGETS), default="medium",
+                   help="which fixed target config defines success. 'medium' is "
+                        "the historical target (seed 101, min_radius 80) and is "
+                        "the default so every prior command keeps its meaning. "
+                        "'tight' is the grip-experiment target (seed 24, "
+                        "min_radius 60) where grip physics actually bite.")
     p.add_argument("--grip", action="store_true", default=False,
                    help="train under grip-limited physics: every RacingEnv "
                         "(target, tier training, tier eval) is built with "
@@ -89,7 +95,7 @@ def evaluate(agent, env, track_seed, max_steps):
     completed = False
     crashed = False
     off_steps = 0
-    speeds, steers = [], []
+    speeds, steers, corner_r = [], [], []
 
     for n in range(max_steps):
         obs_t = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
@@ -102,6 +108,7 @@ def evaluate(agent, env, track_seed, max_steps):
         progress = info["lap_progress"]
         speeds.append(float(obs[0]))
         steers.append(float(act[0]))
+        corner_r.append(env.track.corner_radius(env.car.x, env.car.y))
         if info["crashed"]:
             crashed = True
             off_steps += 1
@@ -111,6 +118,33 @@ def evaluate(agent, env, track_seed, max_steps):
             break
 
     steps = n + 1
+    # Corner-speed management is the thing under test, and MEAN speed alone
+    # cannot show it: a policy that slows for corners and a policy that drives
+    # uniformly slower can share a mean. So split the lap by the TRUE curvature
+    # radius of the road under the car and report each half's mean speed. A
+    # policy that manages corners has corner_speed well below straight_speed; a
+    # policy that just crawls has them equal and both low.
+    # (Ray distances cannot do this job -- at width 70 the +-90 deg rays pin
+    # min(rays) at ~36px everywhere, so it carries no corner signal.)
+    # The first ~80 steps are the 0 -> 4.0 acceleration ramp, and the start pose
+    # sits in the tightest corner on the track (R=66.6px on the tight target),
+    # so leaving them in scores the launch as "slow in a corner" and invents a
+    # speed drop for a policy that has none. Measured: flat-out reads +0.96
+    # with the ramp included and exactly +0.00 without it. Cut the ramp.
+    RAMP = 80
+    sp = np.asarray(speeds, dtype=float)
+    cr = np.asarray(corner_r, dtype=float)
+    if sp.size > RAMP + 20:
+        sp_s, cr_s = sp[RAMP:], cr[RAMP:]
+    else:
+        sp_s, cr_s = sp, cr
+    if sp_s.size:
+        tight = cr_s <= np.percentile(cr_s, 30)   # tightest 30% of the lap
+        open_ = cr_s >= np.percentile(cr_s, 70)   # most open 30%
+        corner_speed = float(sp_s[tight].mean()) if tight.any() else 0.0
+        straight_speed = float(sp_s[open_].mean()) if open_.any() else 0.0
+    else:
+        corner_speed = straight_speed = 0.0
     return {
         "steps": steps,
         "reward": total_r,
@@ -119,8 +153,17 @@ def evaluate(agent, env, track_seed, max_steps):
         "crashed": crashed,
         "lap_time": steps if completed else None,
         "off_track_rate": off_steps / max(steps, 1),
-        "mean_speed": float(np.mean(speeds)) if speeds else 0.0,
+        "mean_speed": float(sp.mean()) if sp.size else 0.0,
+        "min_speed": float(sp.min()) if sp.size else 0.0,
+        "speed_std": float(sp.std()) if sp.size else 0.0,
+        "corner_speed": corner_speed,
+        "straight_speed": straight_speed,
+        # >0 means the policy is slower in the tight third than the open third,
+        # i.e. it is actually braking for corners rather than driving one speed.
+        "speed_drop": straight_speed - corner_speed,
         "mean_steer": float(np.mean(steers)) if steers else 0.0,
+        "grip_events": int(getattr(env.car, "grip_events", 0)),
+        "grip_yaw_lost": float(getattr(env.car, "grip_yaw_lost", 0.0)),
     }
 
 
@@ -133,12 +176,13 @@ def main():
     random.seed(SEED)
 
     tiers = CURRICULA[args.curriculum]
+    target_cfg = TARGETS[args.target]
     out_dir = os.path.join("runs", args.name)
     os.makedirs(out_dir, exist_ok=True)
 
     # The fixed target env -- never changes, defines success.
-    target_env = RacingEnv(max_steps=TARGET_CONFIG["max_steps"],
-                           track_kwargs=TARGET_CONFIG["track_kwargs"],
+    target_env = RacingEnv(max_steps=target_cfg["max_steps"],
+                           track_kwargs=target_cfg["track_kwargs"],
                            grip_limit=args.grip)
     target_env.action_space.seed(SEED + 999)
 
@@ -149,9 +193,13 @@ def main():
     if args.demos > 0:
         demo_stats = collect_demos(
             agent.replay_buffer, args.demos,
-            TARGET_CONFIG["track_kwargs"], TARGET_CONFIG["track_seed"],
-            TARGET_CONFIG["max_steps"], seed=SEED,
+            target_cfg["track_kwargs"], target_cfg["track_seed"],
+            target_cfg["max_steps"], seed=SEED,
             clean_frac=args.demo_clean_frac, noise_std=args.demo_noise,
+            # Demos MUST be generated under the same physics the agent trains
+            # under, or the buffer teaches a car that corners better than the
+            # one it drives.
+            grip_limit=args.grip,
         )
         # The run pushes more transitions than the buffer holds, so without
         # protection the demos are evicted mid-run -- exactly when the agent
@@ -164,8 +212,10 @@ def main():
     for t in tiers:
         print(f"  {t['name']:10s} width={t['track_kwargs']['width']:3d} "
               f"max_steps={t['max_steps']:4d}  budget={int(t['steps'] * args.steps_scale)}")
-    print(f"TARGET: medium width=70 max_steps=500 track_seed=101  "
-          f"-> success = lap_completed AND not crashed")
+    tt = target_cfg["track_kwargs"]
+    print(f"TARGET[{args.target}]: width={tt['width']} min_radius={tt['min_radius']} "
+          f"max_steps={target_cfg['max_steps']} track_seed={target_cfg['track_seed']} "
+          f"grip={args.grip}  -> success = lap_completed AND not crashed")
     print("=" * 96)
 
     global_step = 0
@@ -198,11 +248,12 @@ def main():
             "demo_clean_frac": args.demo_clean_frac,
             "clip_backward_DIAGNOSTIC": args.clip_backward,
             "grip": args.grip,
+            "target": args.target,
             "demo_stats": demo_stats,
             "total_steps": global_step,
             "episodes": episodes,
             "crashes": crashes,
-            "target_config": TARGET_CONFIG,
+            "target_config": target_cfg,
             "best_target_progress": best_target_progress,
             "solved_at_step": solved_at,
             "solved_eval": solved_eval,
@@ -211,7 +262,9 @@ def main():
             "wall_minutes": round((time.time() - t_start) / 60.0, 2),
             "command": (f"python -m sac.train_curriculum "
                         f"--curriculum {args.curriculum} --seed {SEED} "
-                        f"--name {args.name} --demos {args.demos}"),
+                        f"--name {args.name} --demos {args.demos} "
+                        f"--target {args.target}"
+                        + (" --grip" if args.grip else "")),
         }
         with open(os.path.join(out_dir, "run_config.json"), "w") as f:
             json.dump(manifest, f, indent=2)
@@ -275,8 +328,8 @@ def main():
 
             if global_step % args.eval_every == 0:
                 tier_r = evaluate(agent, tier_eval_env, tier["track_seed"], ms)
-                tgt_r = evaluate(agent, target_env, TARGET_CONFIG["track_seed"],
-                                 TARGET_CONFIG["max_steps"])
+                tgt_r = evaluate(agent, target_env, target_cfg["track_seed"],
+                                 target_cfg["max_steps"])
 
                 mins = (time.time() - t_start) / 60.0
                 print(
@@ -286,6 +339,8 @@ def main():
                     f"|| TARGET prog={tgt_r['progress']:7.4f} "
                     f"lap={str(tgt_r['completed']):5s} crash={str(tgt_r['crashed']):5s} "
                     f"steps={tgt_r['steps']:4d} v={tgt_r['mean_speed']:5.2f} "
+                    f"(cnr={tgt_r['corner_speed']:4.2f}/str={tgt_r['straight_speed']:4.2f} "
+                    f"drop={tgt_r['speed_drop']:+5.2f}) grip={tgt_r['grip_events']:4d} "
                     f"R={tgt_r['reward']:9.2f} | {mins:5.1f}m"
                 )
 
@@ -316,8 +371,8 @@ def main():
     final_best = None
     if os.path.exists(best_path):
         agent.actor.load_state_dict(torch.load(best_path))
-        final_best = evaluate(agent, target_env, TARGET_CONFIG["track_seed"],
-                              TARGET_CONFIG["max_steps"])
+        final_best = evaluate(agent, target_env, target_cfg["track_seed"],
+                              target_cfg["max_steps"])
         print(f"\nFINAL TARGET EVAL (best-on-target checkpoint): {final_best}")
 
     write_record(final_best)

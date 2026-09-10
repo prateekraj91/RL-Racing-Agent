@@ -25,6 +25,8 @@ class Track:
         # precompute segment endpoints for the distance test
         self._a = self.centerline
         self._b = np.roll(self.centerline, -1, axis=0)
+        # per-vertex curvature radius, for corner_radius() below
+        self._curv_r = self._curv_radius_profile(self.centerline)
 
     # ---------- generation ----------
     @staticmethod
@@ -37,6 +39,24 @@ class Track:
                               + (2*p0 - 5*p1 + 4*p2 - p3)*t**2
                               + (-p0 + 3*p1 - 3*p2 + p3)*t**3))
         return np.vstack(pts)
+
+    @staticmethod
+    def _curv_radius_profile(C):
+        """Curvature radius (px) at every centerline vertex.
+
+        Circumradius of the triangle (C[i-w], C[i], C[i+w]) via R = abc/4A, with
+        the same window w as _min_curv_radius so the two agree by construction.
+        Large = straight, small = tight corner.
+        """
+        win = max(2, len(C) // 60)
+        prev = np.roll(C, win, 0); nxt = np.roll(C, -win, 0)
+        a = np.linalg.norm(C - prev, axis=1)
+        b = np.linalg.norm(nxt - C, axis=1)
+        c = np.linalg.norm(nxt - prev, axis=1)
+        area = 0.5 * np.abs((prev[:, 0]-C[:, 0])*(nxt[:, 1]-C[:, 1])
+                            - (nxt[:, 0]-C[:, 0])*(prev[:, 1]-C[:, 1]))
+        area = np.where(area < 1e-6, 1e-6, area)
+        return (a*b*c) / (4*area)
 
     @staticmethod
     def _min_curv_radius(C):
@@ -104,6 +124,19 @@ class Track:
         dx = self._b[i, 0] - self._a[i, 0]
         dy = self._b[i, 1] - self._a[i, 1]
         return float(np.degrees(np.arctan2(-dy, dx)))
+
+    def corner_radius(self, x, y):
+        """Curvature radius of the road at the point nearest (x, y), in px.
+
+        Ground-truth corner tightness, independent of the ray sensor. The rays
+        cannot serve this purpose on a narrow track: at width 70 the +-90 deg
+        rays are pinned at ~36px everywhere, so min(rays) is constant and says
+        nothing about the corner ahead. Under grip physics this radius is what
+        sets the speed limit -- the fastest a car can hold it is
+        sqrt(max_grip * corner_radius).
+        """
+        i, _, _, _ = self._nearest(x, y)
+        return float(self._curv_r[i])
 
     def signed_distance(self, x, y):
         """Distance from center line, signed. + = right of center, - = left."""

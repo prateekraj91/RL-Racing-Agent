@@ -1,0 +1,127 @@
+{
+  "run_name": "grip_bites_curric_s42",
+  "curriculum": "tight_width3",
+  "tiers": [
+    {
+      "name": "T0_w110",
+      "track_kwargs": {
+        "base_r": 250,
+        "n_ctrl": 10,
+        "min_radius": 60,
+        "cx": 400,
+        "cy": 300,
+        "width": 110
+      },
+      "track_seed": 24,
+      "max_steps": 800,
+      "steps": 60000
+    },
+    {
+      "name": "T1_w090",
+      "track_kwargs": {
+        "base_r": 250,
+        "n_ctrl": 10,
+        "min_radius": 60,
+        "cx": 400,
+        "cy": 300,
+        "width": 90
+      },
+      "track_seed": 24,
+      "max_steps": 750,
+      "steps": 60000
+    },
+    {
+      "name": "T2_w070",
+      "track_kwargs": {
+        "base_r": 250,
+        "n_ctrl": 10,
+        "min_radius": 60,
+        "cx": 400,
+        "cy": 300,
+        "width": 70
+      },
+      "track_seed": 24,
+      "max_steps": 700,
+      "steps": 80000
+    }
+  ],
+  "seed": 42,
+  "warmup": 5000,
+  "eval_every": 5000,
+  "batch_size": 64,
+  "steps_scale": 1.0,
+  "reset_buffer_per_tier": false,
+  "demos": 40,
+  "demo_noise": 0.7,
+  "demo_clean_frac": 0.3,
+  "clip_backward_DIAGNOSTIC": false,
+  "grip": true,
+  "target": "tight",
+  "demo_stats": {
+    "episodes": 40,
+    "transitions": 17518,
+    "laps": 40,
+    "crashes": 0,
+    "clean_laps": 12,
+    "grip_limit": true,
+    "mean_progress": 1.0011550075818463,
+    "max_progress": 1.0020701622014463,
+    "clean_mean_speed": 3.3258082611311175
+  },
+  "total_steps": 200000,
+  "episodes": 526,
+  "crashes": 115,
+  "target_config": {
+    "track_kwargs": {
+      "base_r": 250,
+      "n_ctrl": 10,
+      "min_radius": 60,
+      "cx": 400,
+      "cy": 300,
+      "width": 70
+    },
+    "track_seed": 24,
+    "max_steps": 700
+  },
+  "best_target_progress": 1.0024188977129151,
+  "solved_at_step": 95000,
+  "solved_eval": {
+    "steps": 432,
+    "reward": 1392.4036954186224,
+    "progress": 1.0013083422273148,
+    "completed": true,
+    "crashed": false,
+    "lap_time": 432,
+    "off_track_rate": 0.0,
+    "mean_speed": 3.35971247600564,
+    "min_speed": 0.042496923357248306,
+    "speed_std": 1.0113749819050617,
+    "corner_speed": 3.5912768662532915,
+    "straight_speed": 3.8709872398736342,
+    "speed_drop": 0.2797103736203428,
+    "mean_steer": -0.5652380665140098,
+    "grip_events": 172,
+    "grip_yaw_lost": 63.360464143349326
+  },
+  "final_best_target_eval": {
+    "steps": 410,
+    "reward": 1434.848899944109,
+    "progress": 1.0024188977129151,
+    "completed": true,
+    "crashed": false,
+    "lap_time": 410,
+    "off_track_rate": 0.0,
+    "mean_speed": 3.4287434788284505,
+    "min_speed": 0.04590768739581108,
+    "speed_std": 0.963058898946586,
+    "corner_speed": 3.640488200717502,
+    "straight_speed": 3.9499289628231162,
+    "speed_drop": 0.3094407621056141,
+    "mean_steer": -0.5639959067605981,
+    "grip_events": 195,
+    "grip_yaw_lost": 66.80878976896048
+  },
+  "completed_run": true,
+  "wall_minutes": 270.82,
+  "command": "python -m sac.train_curriculum --curriculum tight_width3 --seed 42 --name grip_bites_curric_s42 --demos 40 --target tight --grip"
+}

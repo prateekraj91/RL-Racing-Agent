@@ -71,7 +71,8 @@ def _jitter_start(env, rng, max_lateral, max_heading_deg):
 
 def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
                   seed=0, clean_frac=0.30, noise_std=0.70,
-                  jitter_lateral=None, jitter_heading=12.0, verbose=True):
+                  jitter_lateral=None, jitter_heading=12.0, verbose=True,
+                  grip_limit=False):
     """Run `n_episodes` pure-pursuit episodes and push every transition into
     `buffer`. Returns a stats dict.
 
@@ -84,6 +85,13 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
                    the critic with no evidence that leaving the track is bad.
     jitter_lateral -- max start offset perpendicular to the road, in px.
                    Defaults to 60% of the track half-width (stays on track).
+    grip_limit  -- build the demo env with grip-limited physics. MUST match the
+                   physics the agent will train under. Demos collected under
+                   different physics than training are off-policy in the worst
+                   way: the stored (s, a, r, s') transitions describe a car that
+                   turns tighter than the one the agent drives, so the critic is
+                   fit to corner exits that never happen. (This defaulted to
+                   ungripped physics and silently mismatched the --grip runs.)
     """
     _apply_gains(FAST_GAINS)
     rng = np.random.default_rng(seed)
@@ -92,11 +100,13 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
     if jitter_lateral is None:
         jitter_lateral = 0.6 * half
 
-    env = RacingEnv(max_steps=max_steps, track_kwargs=track_kwargs)
+    env = RacingEnv(max_steps=max_steps, track_kwargs=track_kwargs,
+                    grip_limit=grip_limit)
 
     n_clean = max(1, int(round(n_episodes * clean_frac)))
     stats = {"episodes": 0, "transitions": 0, "laps": 0, "crashes": 0,
-             "clean_laps": 0, "progress": []}
+             "clean_laps": 0, "grip_limit": grip_limit, "progress": [],
+             "speeds": []}
 
     for ep in range(n_episodes):
         clean = ep < n_clean
@@ -108,6 +118,7 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
             # the state the action was actually chosen from.
             obs = _observe(env)
 
+        ep_speed, ep_steps = 0.0, 0
         for _ in range(max_steps):
             action, _dbg = pp.choose_action(env)
             if not clean:
@@ -118,12 +129,16 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
             next_obs, reward, terminated, truncated, info = env.step(action)
             buffer.add(obs, action, reward, next_obs, terminated)
             obs = next_obs
+            ep_speed += env.car.velocity
+            ep_steps += 1
             stats["transitions"] += 1
             if terminated or truncated:
                 break
 
         stats["episodes"] += 1
         stats["progress"].append(env.lap_progress)
+        if clean:
+            stats["speeds"].append(ep_speed / max(ep_steps, 1))
         if env.lap_completed:
             stats["laps"] += 1
             if clean:
@@ -133,12 +148,16 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
 
     stats["mean_progress"] = float(np.mean(stats["progress"]))
     stats["max_progress"] = float(np.max(stats["progress"]))
+    stats["clean_mean_speed"] = (float(np.mean(stats["speeds"]))
+                                 if stats["speeds"] else 0.0)
     del stats["progress"]
+    del stats["speeds"]
 
     if verbose:
         print(f"DEMO SEED | {stats['episodes']} episodes -> "
               f"{stats['transitions']} transitions | laps={stats['laps']} "
               f"(clean={stats['clean_laps']}) crashes={stats['crashes']} | "
+              f"grip={grip_limit} clean_v={stats['clean_mean_speed']:.2f} | "
               f"mean_prog={stats['mean_progress']:.4f} "
               f"max_prog={stats['max_progress']:.4f}")
     return stats
