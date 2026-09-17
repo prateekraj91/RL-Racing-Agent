@@ -1,0 +1,99 @@
+{
+  "run_name": "multitrack5_s42",
+  "curriculum": "none",
+  "tiers": [
+    {
+      "name": "medium_only",
+      "track_kwargs": {
+        "base_r": 250,
+        "n_ctrl": 10,
+        "min_radius": 80,
+        "cx": 400,
+        "cy": 300,
+        "width": 70
+      },
+      "track_seed": 101,
+      "max_steps": 500,
+      "steps": 200000
+    }
+  ],
+  "seed": 42,
+  "warmup": 5000,
+  "eval_every": 5000,
+  "batch_size": 64,
+  "steps_scale": 1.0,
+  "reset_buffer_per_tier": false,
+  "demos": 40,
+  "demo_noise": 0.7,
+  "demo_clean_frac": 0.3,
+  "clip_backward_DIAGNOSTIC": false,
+  "grip": false,
+  "target": "medium",
+  "demo_stats": {
+    "episodes": 40,
+    "transitions": 17014,
+    "laps": 40,
+    "crashes": 0,
+    "clean_laps": 12,
+    "grip_limit": false,
+    "mean_progress": 1.0012100116702587,
+    "max_progress": 1.0022509198048972,
+    "clean_mean_speed": 3.368814284903858
+  },
+  "total_steps": 200000,
+  "episodes": 510,
+  "crashes": 27,
+  "target_config": {
+    "track_kwargs": {
+      "width": 70,
+      "base_r": 250,
+      "n_ctrl": 10,
+      "min_radius": 80,
+      "cx": 400,
+      "cy": 300
+    },
+    "track_seed": 101,
+    "max_steps": 500
+  },
+  "best_target_progress": 1.0027965619233816,
+  "solved_at_step": 5000,
+  "solved_eval": {
+    "steps": 403,
+    "reward": 1411.6294115891822,
+    "progress": 1.0017940879949478,
+    "completed": true,
+    "crashed": false,
+    "lap_time": 403,
+    "off_track_rate": 0.0,
+    "mean_speed": 3.5843685641792367,
+    "min_speed": 0.04826458916068077,
+    "speed_std": 0.9579029393823443,
+    "corner_speed": 4.0,
+    "straight_speed": 4.0,
+    "speed_drop": 0.0,
+    "mean_steer": -0.38198355795288685,
+    "grip_events": 0,
+    "grip_yaw_lost": 0.0
+  },
+  "final_best_target_eval": {
+    "steps": 401,
+    "reward": 1377.3338211057194,
+    "progress": 1.0027965619233816,
+    "completed": true,
+    "crashed": false,
+    "lap_time": 401,
+    "off_track_rate": 0.0,
+    "mean_speed": 3.5774886944607607,
+    "min_speed": 0.048453859984874725,
+    "speed_std": 0.9576647001858748,
+    "corner_speed": 3.9794316758814547,
+    "straight_speed": 4.0,
+    "speed_drop": 0.020568324118545256,
+    "mean_steer": -0.37393217412708446,
+    "grip_events": 0,
+    "grip_yaw_lost": 0.0
+  },
+  "completed_run": true,
+  "wall_minutes": 28.42,
+  "command": "python -m sac.train_curriculum --curriculum none --seed 42 --name multitrack5_s42 --demos 40 --target medium"
+}
