@@ -1,60 +1,75 @@
-# Cross-Difficulty Generalization — v2 Zero-Shot (Jul 30)
+# Cross-Difficulty Generalization — v2 Zero-Shot (Jul 30, corrected)
+
+## Correction notice
+The first version of this doc (commit 91cb1ad..63ef4fb) used env.reset(seed=N),
+which does NOT set the track directly - it seeds Gymnasium's RNG, which then
+DERIVES an unrelated track_seed. Every seed label in that version was wrong.
+This version uses env.reset(options={"track_seed": N}), which sets the track
+seed directly (confirmed by reading RacingEnv.reset() and cross-checking
+against sac/visualize.py, which already used the correct call). All numbers
+below are re-measured with correct seeding.
 
 ## Setup
 v2 flagship (models/best_single_track_v2.pth, trained only on medium,
 width=70, min_radius=80, seed 101) evaluated zero-shot, no retraining,
 across two independent difficulty axes.
 
-## Axis 1: min_radius (corner tightness) — NO GAP
+## Axis 1: min_radius (corner tightness) - NO GAP
 Tested TIGHT_TARGET_CONFIG (min_radius 60 vs medium's 80, width unchanged)
-across 10 seeds. Result: 10/10 lap_completed, zero crashes, lap times
-(387-414 steps) inside medium's own run-to-run variance (403-450 steps).
-Corner tightness alone produces no measurable degradation.
+across 10 seeds. 2 of 10 (seeds 101, 6) produced a degenerate track/spawn
+where the car is stuck off-track from step 0 (reward=-1.0 for the full
+episode, confirmed visually via sac.visualize) - a track-generation edge
+case specific to pairing this config with those seeds, not a driving
+failure. TIGHT_TARGET_CONFIG's own comment notes it is tuned for seed 24
+specifically.
 
-Mechanism: min_radius only changes what curvature the track GENERATOR
-can produce; the agent's obs is purely local (ray-beams + heading-error
-+ signed distance), so a tight corner is not a new class of observation
-- it's a point already covered by the range of corners present on medium
-tracks. Same root cause as the Jul 29 same-difficulty null result:
-track-relative obs kills distribution shift for anything the local
-geometry already spans.
+Excluding those 2: 8/8 completed, zero crashes, rewards in line with
+medium's own variance. Corner tightness alone produces no measurable
+driving degradation.
 
-## Axis 2: width (track narrowness) — REAL GAP, FOUND AND BRACKETED
-Fixed min_radius=80 (medium's value), varied width only. 10 seeds per width.
+Mechanism: min_radius only changes what curvature the track GENERATOR can
+produce; the agent's obs is purely local (ray-beams + heading-error +
+signed distance), so a tight corner is not a new class of observation -
+it is a point already covered by the range of corners present on medium
+tracks. Same root cause as the Jul 29 same-difficulty null result.
 
-  width=70 (trained on): baseline, avg_reward ~1350-1400
-  width=40: 10/10 completed, avg_reward=1335.0  (mild decay, still solid)
-  width=36: 10/10 completed, avg_reward=1328.3  (last fully solid width)
-  width=32: 8/10 completed, avg_reward=1303.6   (cracks begin)
-  width=28: 8/10 completed, avg_reward=1037.0   (avg drops hard - failures
-                                                   are severe, not marginal)
-  width=25: 6/10 completed, avg_reward=1032.8
+## Axis 2: width (track narrowness) - REAL GAP, GRADUAL, NOT A HARD CLIFF
+Fixed min_radius=80 (medium's value), varied width only. 10 seeds per width,
+seeds re-verified with correct track_seed passing.
 
-Threshold: width 36 -> 32 is where zero-shot generalization first breaks.
-Not a hard seed-independent cliff - seeds 2 and 8 fail starting at
-width=32 and stay failed at every narrower width tested, while seeds
-1 and 5 hold until width=25. Some track geometries are harder than
-others under narrowing; the agent's margin is seed-dependent.
+  width=70 (trained on): baseline, avg_reward ~1330-1400
+  width=40: 10/10 completed, avg_reward=1335.1
+  width=36: 10/10 completed, avg_reward=1334.9
+  width=32: 10/10 completed, avg_reward=1322.1
+  width=28: 9/10  completed, avg_reward=1265.0  (first crack, seed 9 times out)
+  width=25: 8/10  completed, avg_reward=1160.6  (seeds 3, 9 time out; seed 9
+                                                   reward collapses to 31.0)
 
-Failure mode: on most TIMEOUT cases reward collapses to 30-80 (vs
-~1300 on completions), meaning the agent loses control and stalls
-early rather than nearly finishing and running out of steps. This is
-loss of control, not imprecision near the end.
+Corrected threshold: fully solid through width=32 (10/10). Degradation is
+gradual, not a cliff - first failures appear at width=28, worsen at 25.
+The earlier reported "hard cliff at 36->32" and "seeds 2/8 consistently
+fail" pattern were artifacts of the seeding bug and are retracted - with
+correct seeding, no stable seed-specific difficulty pattern is evident
+(different seeds fail at width=28 vs width=25), though 10 seeds is too
+few to rule this out definitively.
 
 ## Interpretation
-The two axes tested behave completely differently:
-- min_radius: no shift, because the agent never conditioned on global
-  track class, only local curvature it already spans.
-- width: real shift, because narrowing directly shrinks the ray-beam
-  readings and the safe heading-error margin the policy relies on -
-  values it has never seen this small during training on width=70.
+min_radius and width behave completely differently under zero-shot
+generalization:
+- min_radius: no shift - the agent never conditioned on global track
+  class, only local curvature it already spans during training.
+- width: real, gradual shift - narrowing directly shrinks the ray-beam
+  readings and the safe heading-error margin, and degradation appears
+  once width drops meaningfully below the trained value of 70 (first
+  measurable cracks around width=28, roughly 60% of training width).
 
-This is the first genuine, nonzero generalization gap found in the
-project, and it is exactly where domain randomization should pay off:
-training on a range of widths should push this threshold narrower.
+This is the first genuine, nonzero generalization gap in the project.
+It is gradual rather than catastrophic, which changes how domain
+randomization should be framed: not "fix a broken regime" but "extend
+the solid range further before gradual decay sets in."
 
 ## Status
-Axis found and bracketed (width 36->32 threshold, seed-dependent).
-Next: build a width-randomized trainer (sample width per reset from a
-range spanning this threshold), retrain, then re-run this same sweep
-on the new agent to measure how far the threshold moves.
+Axis found, corrected, and quantified. min_radius: solved (no gap once
+degenerate seeds excluded). width: real gradual gap starting ~width=28.
+Next: build a width-randomized trainer, retrain, re-run this exact sweep
+on the new agent to measure how far the solid range extends.
