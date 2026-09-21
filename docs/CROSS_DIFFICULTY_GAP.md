@@ -73,3 +73,26 @@ Axis found, corrected, and quantified. min_radius: solved (no gap once
 degenerate seeds excluded). width: real gradual gap starting ~width=28.
 Next: build a width-randomized trainer, retrain, re-run this exact sweep
 on the new agent to measure how far the solid range extends.
+
+
+## Addendum: failure mode confirmed visually (width=25, seed=9)
+
+Watched via sac.visualize (narrow25 config, seed 9 - the reward=31.0 case).
+The car does not crash and does not oscillate. It decelerates smoothly
+through a tight section, velocity reaches exactly 0, and then STAYS at 0
+for the remainder of the episode - action output frozen (same steering/
+throttle repeated every step). This is a stall/wedge, not a collision.
+
+Interpretation: v2 never stalls on width=70 (its trained regime), so it
+never learned any recovery behavior for near-zero-velocity states. When
+a narrow corridor forces it to slow enough to hit zero, there is nothing
+in its policy to un-stick it - it is an unvisited state, not a misjudged
+one.
+
+Implication for the randomized trainer: training on narrower widths alone
+may not be sufficient if the agent still eventually finds a width narrow
+enough to stall at. The trainer should also expose the agent to low/zero-
+velocity recovery during training (e.g. via demo-seeding laps that include
+tight, near-stall maneuvering, or simply enough steps at narrow widths for
+stalls to occur and be penalized/recovered from during exploration) rather
+than assuming narrower-width exposure alone teaches recovery.
