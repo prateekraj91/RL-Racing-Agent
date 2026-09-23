@@ -13,11 +13,18 @@ class RacingEnv(gym.Env):
     verbose=False,
     track_kwargs=None,
     grip_limit=False,
+    domain_randomize=False,
     ):
         super().__init__()
 
         self.track_kwargs = track_kwargs or {}
         self.grip_limit = grip_limit
+        self.domain_randomize = domain_randomize
+
+        self.dr_width_range = (20.0, 70.0) # width of track in pixel values
+        self.dr_min_radius_range = (50.0, 90.0)
+        self.dr_friction_range = (0.015, 0.05)
+        
 
         self.track = Track(
             **self.track_kwargs
@@ -63,13 +70,20 @@ class RacingEnv(gym.Env):
         else:
             track_seed = int(self.np_random.integers(0, 2**31))
 
+        track_kwargs = dict(self.track_kwargs)
+        if self.domain_randomize:
+            track_kwargs["width"] = float(self.np_random.uniform(*self.dr_width_range))
+            track_kwargs["min_radius"] = float(self.np_random.uniform(*self.dr_min_radius_range))
+
         self.track = Track(
             seed=track_seed,
-            **self.track_kwargs
+            **track_kwargs
         )
 
         self.car = Car()
         self.car.grip_limit = self.grip_limit
+        if self.domain_randomize:
+            self.car.friction = float(self.np_random.uniform(*self.dr_friction_range))
 
         self.step_count = 0
 

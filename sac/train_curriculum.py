@@ -31,6 +31,8 @@ from env.environment import RacingEnv
 from sac.agent import SACAgent
 from sac.curricula import CURRICULA, TARGETS
 from sac.demo_seed import collect_demos
+import random
+from sac.track_pools import TRAIN_SEEDS
 
 # ─── ACTION CONTRACT (verified against env/environment.py, env/car.py) ────────
 #   action = [steering, throttle], Box(-1, 1, (2,))
@@ -80,10 +82,20 @@ def build_parser():
                         "the default so every prior command keeps its meaning. "
                         "'tight' is the grip-experiment target (seed 24, "
                         "min_radius 60) where grip physics actually bite.")
+    p.add_argument("--domain_randomize", action="store_true", default=False,
+                    help="randomize track width/min_radius and car friction per episode (DR)")
     p.add_argument("--grip", action="store_true", default=False,
                    help="train under grip-limited physics: every RacingEnv "
                         "(target, tier training, tier eval) is built with "
                         "grip_limit=True. Default off = physics unchanged.")
+    p.add_argument("--train-pool", type=int, default=0,
+                   help="if >0, sample a random track seed from the first N TRAIN_SEEDS each "
+                        "episode (multi-track training). 0 = single fixed track (default).")
+    p.add_argument(
+        "--domain-randomize",
+        action="store_true",
+        help="randomize track width, min_radius, and friction each training episode"
+    )
     return p
 
 
@@ -166,6 +178,13 @@ def evaluate(agent, env, track_seed, max_steps):
         "grip_yaw_lost": float(getattr(env.car, "grip_yaw_lost", 0.0)),
     }
 
+def episode_seed(args, tier):
+    """Pick the track seed for this episode's reset.
+    Multi-track mode samples a random seed from the train pool each episode,
+    so the agent can't memorise one track and must learn a general skill."""
+    if args.train_pool > 0:
+        return random.choice(TRAIN_SEEDS[:args.train_pool])
+    return tier["track_seed"]     # default: fixed single track (unchanged)
 
 def main():
     args = build_parser().parse_args()
@@ -248,6 +267,7 @@ def main():
             "demo_clean_frac": args.demo_clean_frac,
             "clip_backward_DIAGNOSTIC": args.clip_backward,
             "grip": args.grip,
+            "domain_randomize": args.domain_randomize,
             "target": args.target,
             "demo_stats": demo_stats,
             "total_steps": global_step,
@@ -276,7 +296,7 @@ def main():
         tk = tier["track_kwargs"]
         ms = tier["max_steps"]
 
-        env = RacingEnv(max_steps=ms, track_kwargs=tk, grip_limit=args.grip)
+        env = RacingEnv(max_steps=ms, track_kwargs=tk, grip_limit=args.grip, domain_randomize=args.domain_randomize)
         env.action_space.seed(SEED + tier_idx)
         tier_eval_env = RacingEnv(max_steps=ms, track_kwargs=tk,
                                   grip_limit=args.grip)
@@ -290,7 +310,7 @@ def main():
               f"budget={budget}  buffer={len(agent.replay_buffer)}")
         print(f"{'-' * 96}")
 
-        obs, info = env.reset(options={"track_seed": tier["track_seed"]})
+        obs, info = env.reset(options={"track_seed": episode_seed(args, tier)})
         ep_prog = 0.0
 
         for _ in range(budget):
@@ -317,7 +337,7 @@ def main():
                 episodes += 1
                 if info["crashed"]:
                     crashes += 1
-                obs, info = env.reset(options={"track_seed": tier["track_seed"]})
+                obs, info = env.reset(options={"track_seed": episode_seed(args, tier)})
                 ep_prog = 0.0
 
             learn_after = 0 if args.demos > 0 else args.warmup
