@@ -258,11 +258,35 @@ class RacingEnv(gym.Env):
                 math.atan2(-self.car.vy, self.car.vx)
             )
             slip = velocity_angle - self.car.angle
+
+    # Keep slip in the range -180° to +180°
             slip = (slip + 180.0) % 360.0 - 180.0
         else:
             slip = 0.0
 
+        # Recalculate rays so the telemetry represents
+        # the car's state after this physics step.
         rays = self.car.cast_rays(self.track)
+
+        # Diagnostic information for us.
+        # This does NOT become part of the neural network's input.
+        info = {
+            "progress": progress,
+            "lap_progress": self.lap_progress,
+
+            "speed": speed,
+            "heading_err": err,
+            "signed_dist": dist,
+            "slip": slip,
+
+            "steering": steering_action,
+            "throttle": throttle_action,
+
+            "rays": rays,
+
+            "crashed": crashed,
+            "lap_completed": self.lap_completed,
+        }
 
         if self.verbose:
             print(
@@ -299,14 +323,6 @@ class RacingEnv(gym.Env):
             ],
             dtype=np.float32,
         )
-
-        info = {
-            "progress": progress,
-            "lap_progress": self.lap_progress,
-            "speed_reward": 0.0,
-            "crashed": crashed,
-            "lap_completed": self.lap_completed,
-        }
 
         return (
             observation,

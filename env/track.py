@@ -17,11 +17,12 @@ class Track:
     """
 
     def __init__(self, seed=None, width=70, base_r=210, n_ctrl=8,
-                 min_radius=70, cx=400, cy=300):
+                 min_radius=70, cx=400, cy=300, hairpin=False, hairpin_factor=0.35):
         self.width = width
         self.half = width / 2.0
         self.cx, self.cy = cx, cy
-        self.centerline = self._generate(seed, base_r, n_ctrl, min_radius)
+        self.centerline = self._generate(seed, base_r, n_ctrl, min_radius,
+                                          hairpin=hairpin, hairpin_factor=hairpin_factor)
         # precompute segment endpoints for the distance test
         self._a = self.centerline
         self._b = np.roll(self.centerline, -1, axis=0)
@@ -70,16 +71,23 @@ class Track:
         area = np.where(area < 1e-6, 1e-6, area)
         return ((a*b*c) / (4*area)).min()
 
-    def _generate(self, seed, base_r, n_ctrl, min_radius, max_tries=300):
+    def _generate(self, seed, base_r, n_ctrl, min_radius, max_tries=300,
+                   hairpin=False, hairpin_factor=0.35):
         rng = np.random.default_rng(seed)
         for _ in range(max_tries):
             angs = np.linspace(0, 2*np.pi, n_ctrl, endpoint=False)
             angs += rng.uniform(-0.08, 0.08, n_ctrl)
             radii = base_r * rng.uniform(0.90, 1.08, n_ctrl)
+            if hairpin:
+                # Pull one control point sharply inward to force a genuine
+                # tight switchback the smooth near-circular method can't
+                # otherwise produce (min_radius alone never binds below ~48px).
+                pinch_idx = rng.integers(0, n_ctrl)
+                radii[pinch_idx] *= hairpin_factor
             P = np.stack([self.cx + radii*np.cos(angs)*1.02,
                           self.cy + radii*np.sin(angs)*0.80], axis=1)
             C = self._catmull_rom_closed(P)
-            if self._min_curv_radius(C) >= min_radius:
+            if hairpin or self._min_curv_radius(C) >= min_radius:
                 return C
         raise RuntimeError("Track generator: no drivable track found in max_tries")
 

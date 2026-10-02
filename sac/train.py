@@ -75,6 +75,11 @@ parser.add_argument("--config", choices=list(CONFIGS), default="medium",
                     help="named training config (track params + seed + max_steps)")
 parser.add_argument("--seed", type=int, default=42,
                     help="master seed — seeds torch, numpy, random, AND the env action spaces")
+parser.add_argument(
+    "--domain-randomize",
+    action="store_true",
+    help="randomize track width, min_radius, and friction each training episode"
+)
 args = parser.parse_args()
 
 
@@ -96,6 +101,7 @@ env = RacingEnv(
     max_steps=max_steps,
     verbose=False,
     track_kwargs=track_kwargs,
+    domain_randomize=args.domain_randomize,
 )
 
 eval_env = RacingEnv(
@@ -157,6 +163,7 @@ if args.wandb:
             "action_dim": env.action_space.shape[0],
             "action_space": "Box(-1,1,(2,)) [steering, throttle]",
             "seed": 42,
+            "domain_randomize": args.domain_randomize,
         },
     )
     print(f"wandb: logging to project '{args.wandb_project}' (mode={os.environ.get('WANDB_MODE', 'online')})")

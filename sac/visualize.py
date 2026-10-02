@@ -46,6 +46,25 @@ CONFIGS = {
         "track_kwargs": TIGHT_TRACK_KWARGS,
         "max_steps": TIGHT_TARGET_CONFIG["max_steps"],
     },
+    "narrow28": {
+        "track_kwargs": {**MEDIUM_TRACK_KWARGS, "width": 28},
+        "max_steps": 500,
+    },
+    "narrow25": {
+        "track_kwargs": {**MEDIUM_TRACK_KWARGS, "width": 25},
+        "max_steps": 500,
+    },
+
+    "seed14test": {
+        "track_kwargs": {**MEDIUM_TRACK_KWARGS, "min_radius": 30},
+        "max_steps": 500,
+    },
+
+    "extreme8": {
+        "track_kwargs": {**MEDIUM_TRACK_KWARGS, "min_radius": 8},
+        "max_steps": 500,
+    },
+
 }
 
 
