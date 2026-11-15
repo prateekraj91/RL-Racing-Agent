@@ -1,0 +1,179 @@
+{
+  "summary_by_model": {
+    "5ray_d200 (Screening Control)": {
+      "0.5": {
+        "total": 20,
+        "completed": 1,
+        "crashes": 12,
+        "timeouts": 7,
+        "stationary": 2,
+        "completion_rate": 0.05,
+        "avg_lap_time": 419.0,
+        "avg_progress": 0.4259,
+        "median_progress": 0.3711
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 15,
+        "timeouts": 5,
+        "stationary": 3,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2413,
+        "median_progress": 0.2619
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 14,
+        "timeouts": 6,
+        "stationary": 3,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2322,
+        "median_progress": 0.2422
+      }
+    },
+    "9ray_d100 (Short Lookahead)": {
+      "0.5": {
+        "total": 20,
+        "completed": 3,
+        "crashes": 17,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.15,
+        "avg_lap_time": 408.67,
+        "avg_progress": 0.4801,
+        "median_progress": 0.4461
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 20,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2938,
+        "median_progress": 0.2814
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 20,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2395,
+        "median_progress": 0.2312
+      }
+    },
+    "9ray_d300 (Deep Lookahead)": {
+      "0.5": {
+        "total": 20,
+        "completed": 2,
+        "crashes": 18,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.1,
+        "avg_lap_time": 407.5,
+        "avg_progress": 0.5367,
+        "median_progress": 0.4748
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 20,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.3789,
+        "median_progress": 0.3146
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 20,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2432,
+        "median_progress": 0.2336
+      }
+    },
+    "7ray_fwd_d200 (Fwd-Focused 7-ray)": {
+      "0.5": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 1,
+        "timeouts": 19,
+        "stationary": 7,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.1929,
+        "median_progress": 0.0916
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 3,
+        "timeouts": 17,
+        "stationary": 9,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.1921,
+        "median_progress": 0.092
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 6,
+        "timeouts": 14,
+        "stationary": 8,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.1781,
+        "median_progress": 0.0974
+      }
+    },
+    "9ray_fwd_d200 (Fwd-Dense 9-ray)": {
+      "0.5": {
+        "total": 20,
+        "completed": 3,
+        "crashes": 9,
+        "timeouts": 8,
+        "stationary": 5,
+        "completion_rate": 0.15,
+        "avg_lap_time": 425.0,
+        "avg_progress": 0.3561,
+        "median_progress": 0.3749
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 8,
+        "timeouts": 12,
+        "stationary": 5,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2194,
+        "median_progress": 0.1682
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 6,
+        "timeouts": 14,
+        "stationary": 5,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2016,
+        "median_progress": 0.1726
+      }
+    }
+  }
+}

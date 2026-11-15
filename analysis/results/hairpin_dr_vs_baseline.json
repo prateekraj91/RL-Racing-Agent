@@ -1,0 +1,719 @@
+{
+  "metadata": {
+    "baseline": "models/best_single_track_v2.pth",
+    "candidate": "runs/dr_multitrack_s42_full/best_actor.pth",
+    "baseline_label": "Baseline (Single-Track v2)",
+    "candidate_label": "DR Full (Multi-Track)",
+    "factors": [
+      0.5,
+      0.35,
+      0.2
+    ],
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "max_steps": 500,
+    "track_kwargs": {
+      "width": 70,
+      "base_r": 250,
+      "n_ctrl": 10,
+      "min_radius": 80,
+      "cx": 400,
+      "cy": 300,
+      "hairpin": true
+    }
+  },
+  "aggregate_summary": {
+    "Baseline (Single-Track v2)": {
+      "0.5": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 14,
+        "timeouts": 6,
+        "stationary": 6,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2281,
+        "median_progress": 0.2128
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 12,
+        "timeouts": 8,
+        "stationary": 6,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.199,
+        "median_progress": 0.1522
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 12,
+        "timeouts": 8,
+        "stationary": 6,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.1864,
+        "median_progress": 0.0935
+      }
+    },
+    "DR Full (Multi-Track)": {
+      "0.5": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 18,
+        "timeouts": 2,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.4522,
+        "median_progress": 0.4068
+      },
+      "0.35": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 20,
+        "timeouts": 0,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.3715,
+        "median_progress": 0.3177
+      },
+      "0.2": {
+        "total": 20,
+        "completed": 0,
+        "crashes": 18,
+        "timeouts": 2,
+        "stationary": 0,
+        "completion_rate": 0.0,
+        "avg_lap_time": null,
+        "avg_progress": 0.2348,
+        "median_progress": 0.2647
+      }
+    }
+  },
+  "paired_per_seed": [
+    {
+      "hairpin_factor": 0.5,
+      "seed": 1,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0527,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.1499,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 2,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.3045,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.3115,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 3,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.9069,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 4,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2915,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2991,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 5,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.8937,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 6,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.546,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.545,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 7,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.386,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.3872,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 8,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0412,
+      "baseline_lap_time": null,
+      "candidate_outcome": "timeout",
+      "candidate_progress": 0.1136,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 9,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0614,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 10,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.7035,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.7108,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 11,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0005,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.911,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 12,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.6018,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.6037,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 13,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2917,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2994,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 14,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.5125,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 15,
+      "baseline_outcome": "timeout",
+      "baseline_progress": -0.001,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.9037,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 16,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0359,
+      "baseline_lap_time": null,
+      "candidate_outcome": "timeout",
+      "candidate_progress": 0.1144,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 17,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.4332,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.4264,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 18,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.4499,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.4491,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 19,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2127,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2236,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.5,
+      "seed": 20,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2129,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.222,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 1,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0364,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.1414,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 2,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2995,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.307,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 3,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.8328,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 4,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.285,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2918,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 5,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0365,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 6,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.4544,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.451,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 7,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.3227,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.3827,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 8,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0332,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0516,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 9,
+      "baseline_outcome": "timeout",
+      "baseline_progress": -0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0345,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 10,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.6978,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.7089,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 11,
+      "baseline_outcome": "timeout",
+      "baseline_progress": -0.0006,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.8213,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 12,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.4673,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.5029,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 13,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2908,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2952,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 14,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.4302,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 15,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.8817,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 16,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0307,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0455,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 17,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.3292,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.3285,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 18,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.43,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.4279,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 19,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2158,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2275,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.35,
+      "seed": 20,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0886,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2321,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 1,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0315,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0457,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 2,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2491,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.3096,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 3,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0502,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 4,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2959,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2949,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 5,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "timeout",
+      "candidate_progress": 0.0187,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 6,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.4302,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.4266,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 7,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.296,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2945,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 8,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0302,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0376,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 9,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "timeout",
+      "candidate_progress": 0.0156,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 10,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.6886,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.6994,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 11,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0548,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 12,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.478,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.478,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 13,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.2916,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.292,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 14,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.4039,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 15,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0452,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 16,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.0284,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.0371,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 17,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.3109,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.3098,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 18,
+      "baseline_outcome": "crash",
+      "baseline_progress": 0.4108,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.411,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 19,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.1015,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2345,
+      "candidate_lap_time": null
+    },
+    {
+      "hairpin_factor": 0.2,
+      "seed": 20,
+      "baseline_outcome": "timeout",
+      "baseline_progress": 0.0854,
+      "baseline_lap_time": null,
+      "candidate_outcome": "crash",
+      "candidate_progress": 0.2375,
+      "candidate_lap_time": null
+    }
+  ]
+}
