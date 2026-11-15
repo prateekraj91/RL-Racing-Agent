@@ -1,0 +1,90 @@
+{
+  "conditions": [
+    {
+      "condition": "B",
+      "run_name": "ablation_B_DR_look200_steerOff",
+      "dr": true,
+      "lookahead": 200,
+      "steer_penalty": 0.0,
+      "status": "completed",
+      "wall_minutes": 21.51,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_B_DR_look200_steerOff --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 200 --steer-penalty 0.0 --domain-randomize --dr-preset calibrated"
+    },
+    {
+      "condition": "C",
+      "run_name": "ablation_C_DR_look300_steerOn",
+      "dr": true,
+      "lookahead": 300,
+      "steer_penalty": 0.01,
+      "status": "completed",
+      "wall_minutes": 21.58,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_C_DR_look300_steerOn --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 300 --steer-penalty 0.01 --domain-randomize --dr-preset calibrated"
+    },
+    {
+      "condition": "D",
+      "run_name": "ablation_D_DR_look300_steerOff",
+      "dr": true,
+      "lookahead": 300,
+      "steer_penalty": 0.0,
+      "status": "completed",
+      "wall_minutes": 21.83,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_D_DR_look300_steerOff --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 300 --steer-penalty 0.0 --domain-randomize --dr-preset calibrated"
+    },
+    {
+      "condition": "E",
+      "run_name": "ablation_E_noDR_look200_steerOn",
+      "dr": false,
+      "lookahead": 200,
+      "steer_penalty": 0.01,
+      "status": "completed",
+      "wall_minutes": 25.75,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_E_noDR_look200_steerOn --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 200 --steer-penalty 0.01"
+    },
+    {
+      "condition": "F",
+      "run_name": "ablation_F_noDR_look200_steerOff",
+      "dr": false,
+      "lookahead": 200,
+      "steer_penalty": 0.0,
+      "status": "completed",
+      "wall_minutes": 28.19,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_F_noDR_look200_steerOff --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 200 --steer-penalty 0.0"
+    },
+    {
+      "condition": "G",
+      "run_name": "ablation_G_noDR_look300_steerOn",
+      "dr": false,
+      "lookahead": 300,
+      "steer_penalty": 0.01,
+      "status": "completed",
+      "wall_minutes": 28.41,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_G_noDR_look300_steerOn --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 300 --steer-penalty 0.01"
+    },
+    {
+      "condition": "H",
+      "run_name": "ablation_H_noDR_look300_steerOff",
+      "dr": false,
+      "lookahead": 300,
+      "steer_penalty": 0.0,
+      "status": "completed",
+      "wall_minutes": 28.41,
+      "command": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/venv/bin/python -m sac.train_curriculum --curriculum none --seed 42 --name ablation_H_noDR_look300_steerOff --demos 40 --train-pool 25 --target medium --obs-ray-max-dist 300 --steer-penalty 0.0"
+    }
+  ],
+  "steps_scale": 1.0,
+  "shared_args": {
+    "curriculum": "none",
+    "seed": 42,
+    "demos": 40,
+    "train_pool": 25,
+    "target": "medium",
+    "obs_ray_angles": [
+      -90,
+      -45,
+      0,
+      45,
+      90
+    ]
+  },
+  "total_wall_minutes": 50.24
+}

@@ -1,0 +1,102 @@
+{
+  "completion_rate": {
+    "main_effects": {
+      "DR": 0.0,
+      "Lookahead": 0.0,
+      "SteerPenalty": 0.0
+    },
+    "two_factor_interactions": {
+      "DR\u00d7Lookahead": 0.0,
+      "DR\u00d7SteerPenalty": 0.0,
+      "Lookahead\u00d7SteerPenalty": 0.0
+    },
+    "three_factor_interaction": {
+      "DR\u00d7Lookahead\u00d7SteerPenalty": 0.0
+    },
+    "responses": {
+      "A": 1.0,
+      "B": 1.0,
+      "C": 1.0,
+      "D": 1.0,
+      "E": 1.0,
+      "F": 1.0,
+      "G": 1.0,
+      "H": 1.0
+    }
+  },
+  "avg_progress": {
+    "main_effects": {
+      "DR": -0.0,
+      "Lookahead": -0.0,
+      "SteerPenalty": -0.0
+    },
+    "two_factor_interactions": {
+      "DR\u00d7Lookahead": -0.0002,
+      "DR\u00d7SteerPenalty": 0.0,
+      "Lookahead\u00d7SteerPenalty": 0.0
+    },
+    "three_factor_interaction": {
+      "DR\u00d7Lookahead\u00d7SteerPenalty": 0.0
+    },
+    "responses": {
+      "A": 1.0014,
+      "B": 1.0015,
+      "C": 1.0012,
+      "D": 1.0012,
+      "E": 1.0012,
+      "F": 1.0013,
+      "G": 1.0014,
+      "H": 1.0014
+    }
+  },
+  "crash_rate": {
+    "main_effects": {
+      "DR": 0.0,
+      "Lookahead": 0.0,
+      "SteerPenalty": 0.0
+    },
+    "two_factor_interactions": {
+      "DR\u00d7Lookahead": 0.0,
+      "DR\u00d7SteerPenalty": 0.0,
+      "Lookahead\u00d7SteerPenalty": 0.0
+    },
+    "three_factor_interaction": {
+      "DR\u00d7Lookahead\u00d7SteerPenalty": 0.0
+    },
+    "responses": {
+      "A": 0.0,
+      "B": 0.0,
+      "C": 0.0,
+      "D": 0.0,
+      "E": 0.0,
+      "F": 0.0,
+      "G": 0.0,
+      "H": 0.0
+    }
+  },
+  "avg_lap_time": {
+    "main_effects": {
+      "DR": 1.75,
+      "Lookahead": 1.3,
+      "SteerPenalty": -1.95
+    },
+    "two_factor_interactions": {
+      "DR\u00d7Lookahead": -0.95,
+      "DR\u00d7SteerPenalty": 2.0,
+      "Lookahead\u00d7SteerPenalty": -2.25
+    },
+    "three_factor_interaction": {
+      "DR\u00d7Lookahead\u00d7SteerPenalty": 1.5
+    },
+    "responses": {
+      "A": 398.2,
+      "B": 397.4,
+      "C": 397.8,
+      "D": 398.5,
+      "E": 395.0,
+      "F": 395.2,
+      "G": 393.5,
+      "H": 401.2
+    }
+  }
+}
