@@ -3,6 +3,7 @@ import gymnasium as gym
 
 from env.car import Car
 from env.track import Track
+from env.domain_randomizer import DomainRandomizer
 import math
 
 class RacingEnv(gym.Env):
@@ -14,17 +15,35 @@ class RacingEnv(gym.Env):
     track_kwargs=None,
     grip_limit=False,
     domain_randomize=False,
+    obs_ray_angles=(-90, -45, 0, 45, 90),
+    obs_ray_max_dist=200,
+    steer_penalty_coeff=0.01,
     ):
         super().__init__()
 
         self.track_kwargs = track_kwargs or {}
         self.grip_limit = grip_limit
-        self.domain_randomize = domain_randomize
+        self.obs_ray_angles = tuple(obs_ray_angles)
+        self.obs_ray_max_dist = obs_ray_max_dist
+        self.steer_penalty_coeff = steer_penalty_coeff
 
-        self.dr_width_range = (20.0, 70.0) # width of track in pixel values
-        self.dr_min_radius_range = (50.0, 90.0)
-        self.dr_friction_range = (0.015, 0.05)
-        
+        # Configure Domain Randomizer
+        if isinstance(domain_randomize, DomainRandomizer):
+            self.randomizer = domain_randomize
+        elif isinstance(domain_randomize, dict):
+            self.randomizer = DomainRandomizer.from_dict(domain_randomize)
+        elif isinstance(domain_randomize, str):
+            self.randomizer = DomainRandomizer(enabled=True, preset=domain_randomize)
+        elif domain_randomize is True:
+            self.randomizer = DomainRandomizer(enabled=True)
+        else:
+            self.randomizer = DomainRandomizer(enabled=False)
+
+        self.domain_randomize = self.randomizer.enabled
+        self.dr_width_range = self.randomizer.ranges.get("width", (20.0, 70.0))
+        self.dr_min_radius_range = self.randomizer.ranges.get("min_radius", (50.0, 90.0))
+        self.dr_friction_range = self.randomizer.ranges.get("friction", (0.015, 0.05))
+        self.current_dr_params = {"enabled": self.domain_randomize}
 
         self.track = Track(
             **self.track_kwargs
@@ -51,7 +70,7 @@ class RacingEnv(gym.Env):
         self.observation_space = gym.spaces.Box(
             low=-1000,
             high=1000,
-            shape=(9,),
+            shape=(4 + len(self.obs_ray_angles),),
             dtype=np.float32,
         )
 
@@ -60,30 +79,41 @@ class RacingEnv(gym.Env):
 
         # Derive a deterministic track seed from Gymnasium's RNG.
         # self.np_random was seeded by super().reset(seed=seed) above.
-        # If seed=None was passed, self.np_random is random → random track (same as before).
-        # If seed=N was passed, self.np_random is deterministic → same track every time.
-
-
+        # If seed=None was passed, self.np_random is random -> random track (same as before).
+        # If seed=N was passed, self.np_random is deterministic -> same track every time.
 
         if options is not None and "track_seed" in options:
             track_seed = options["track_seed"]
         else:
             track_seed = int(self.np_random.integers(0, 2**31))
 
-        track_kwargs = dict(self.track_kwargs)
-        if self.domain_randomize:
-            track_kwargs["width"] = float(self.np_random.uniform(*self.dr_width_range))
-            track_kwargs["min_radius"] = float(self.np_random.uniform(*self.dr_min_radius_range))
-
-        self.track = Track(
-            seed=track_seed,
-            **track_kwargs
+        base_car_params = {"grip_limit": self.grip_limit}
+        track_kwargs, car_params, dr_manifest = self.randomizer.sample(
+            np_random=self.np_random,
+            base_track_kwargs=self.track_kwargs,
+            base_car_params=base_car_params,
         )
+        self.current_dr_params = dr_manifest
+
+        try:
+            self.track = Track(
+                seed=track_seed,
+                **track_kwargs
+            )
+        except Exception:
+            self.track = Track(
+                seed=track_seed,
+                **self.track_kwargs
+            )
 
         self.car = Car()
-        self.car.grip_limit = self.grip_limit
-        if self.domain_randomize:
-            self.car.friction = float(self.np_random.uniform(*self.dr_friction_range))
+        self.car.grip_limit = car_params.get("grip_limit", self.grip_limit)
+        if "friction" in car_params:
+            self.car.friction = car_params["friction"]
+        if "acceleration" in car_params:
+            self.car.acceleration = car_params["acceleration"]
+        if "max_grip" in car_params:
+            self.car.max_grip = car_params["max_grip"]
 
         self.step_count = 0
 
@@ -114,7 +144,11 @@ class RacingEnv(gym.Env):
 
         slip = 0.0
 
-        rays = self.car.cast_rays(self.track)
+        rays = self.car.cast_rays(
+            self.track,
+            ray_angles=self.obs_ray_angles,
+            max_dist=self.obs_ray_max_dist,
+            )
 
         observation = np.array(
             [
@@ -127,7 +161,9 @@ class RacingEnv(gym.Env):
             dtype=np.float32,
         )
 
-        info = {}
+        info = {
+            "dr_params": dict(self.current_dr_params),
+        }
 
         return observation, info
 
@@ -212,7 +248,7 @@ class RacingEnv(gym.Env):
         # reward v2 — steering-smoothness penalty:
         # discourage jerky steering by penalising the change from last step's steering.
         steer_change = abs(steering_action - self.prev_steering)
-        reward -= 0.01 * steer_change
+        reward -= self.steer_penalty_coeff * steer_change
         self.prev_steering = steering_action
 
 
@@ -266,7 +302,11 @@ class RacingEnv(gym.Env):
 
         # Recalculate rays so the telemetry represents
         # the car's state after this physics step.
-        rays = self.car.cast_rays(self.track)
+        rays = self.car.cast_rays(
+            self.track,
+            ray_angles=self.obs_ray_angles,
+            max_dist=self.obs_ray_max_dist,
+            )
 
         # Diagnostic information for us.
         # This does NOT become part of the neural network's input.
@@ -286,6 +326,7 @@ class RacingEnv(gym.Env):
 
             "crashed": crashed,
             "lap_completed": self.lap_completed,
+            "dr_params": dict(self.current_dr_params),
         }
 
         if self.verbose:

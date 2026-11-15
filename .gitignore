@@ -10,3 +10,9 @@ wandb/
 runs/*
 !runs/exp2_demos_s42/
 !runs/sweep_results.json
+
+# Local backup directories and intermediate single-seed diagnostic traces
+analysis/results/backup_*/
+analysis/results/diagnostic_*.csv
+analysis/results/hairpin_smoke.*
+analysis/results/hairpin_candidate_*.csv

@@ -74,6 +74,8 @@ class Track:
     def _generate(self, seed, base_r, n_ctrl, min_radius, max_tries=300,
                    hairpin=False, hairpin_factor=0.35):
         rng = np.random.default_rng(seed)
+        best_C = None
+        best_r = -1.0
         for _ in range(max_tries):
             angs = np.linspace(0, 2*np.pi, n_ctrl, endpoint=False)
             angs += rng.uniform(-0.08, 0.08, n_ctrl)
@@ -87,8 +89,14 @@ class Track:
             P = np.stack([self.cx + radii*np.cos(angs)*1.02,
                           self.cy + radii*np.sin(angs)*0.80], axis=1)
             C = self._catmull_rom_closed(P)
-            if hairpin or self._min_curv_radius(C) >= min_radius:
+            curv_r = self._min_curv_radius(C)
+            if hairpin or curv_r >= min_radius:
                 return C
+            if curv_r > best_r:
+                best_r = curv_r
+                best_C = C
+        if best_C is not None:
+            return best_C
         raise RuntimeError("Track generator: no drivable track found in max_tries")
 
     # ---------- queries ----------
