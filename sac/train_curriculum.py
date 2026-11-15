@@ -28,6 +28,7 @@ import numpy as np
 import torch
 
 from env.environment import RacingEnv
+from env.domain_randomizer import DomainRandomizer, DR_PRESETS
 from sac.agent import SACAgent
 from sac.curricula import CURRICULA, TARGETS
 from sac.demo_seed import collect_demos
@@ -38,7 +39,8 @@ from sac.track_pools import TRAIN_SEEDS
 #   action = [steering, throttle], Box(-1, 1, (2,))
 #   action[0] +1 = full LEFT, -1 = full RIGHT   (x car.max_steering = 30 deg)
 #   action[1] +1 = accelerate, -1 = brake       (x car.acceleration = 0.08)
-#   Observation: [velocity, heading_err, signed_dist, slip, *5 rays]
+#   Observation: [velocity, heading_err, signed_dist, slip, *N rays]
+#   N = len(obs_ray_angles); default 5, configurable via --obs-ray-angles.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -82,8 +84,24 @@ def build_parser():
                         "the default so every prior command keeps its meaning. "
                         "'tight' is the grip-experiment target (seed 24, "
                         "min_radius 60) where grip physics actually bite.")
-    p.add_argument("--domain_randomize", action="store_true", default=False,
-                    help="randomize track width/min_radius and car friction per episode (DR)")
+    p.add_argument(
+        "--domain_randomize", "--domain-randomize",
+        dest="domain_randomize",
+        action="store_true",
+        default=False,
+        help="randomize track and vehicle parameters per training episode (DR)"
+    )
+    p.add_argument(
+        "--dr-preset",
+        choices=list(DR_PRESETS.keys()),
+        default=None,
+        help="domain randomization preset (default: 'default' when --domain-randomize is passed)"
+    )
+    p.add_argument(
+        "--dr-config",
+        default=None,
+        help="path to JSON file specifying domain randomization ranges"
+    )
     p.add_argument("--grip", action="store_true", default=False,
                    help="train under grip-limited physics: every RacingEnv "
                         "(target, tier training, tier eval) is built with "
@@ -91,10 +109,26 @@ def build_parser():
     p.add_argument("--train-pool", type=int, default=0,
                    help="if >0, sample a random track seed from the first N TRAIN_SEEDS each "
                         "episode (multi-track training). 0 = single fixed track (default).")
+    p.add_argument("--wandb", action="store_true", default=False,
+                   help="enable Weights & Biases logging (default: off)")
+    p.add_argument("--wandb-project", default="rl-racing-agent",
+                   help="wandb project name")
+    p.add_argument("--wandb-run-name", default=None,
+                   help="optional wandb run name")
     p.add_argument(
-        "--domain-randomize",
-        action="store_true",
-        help="randomize track width, min_radius, and friction each training episode"
+        "--obs-ray-angles", type=float, nargs="+",
+        default=[-90, -45, 0, 45, 90],
+        help="ray-cast angles (degrees) for the observation vector. "
+             "Default: -90 -45 0 45 90 (5 rays, obs_dim=9). "
+             "Use e.g. -90 -67.5 -45 -22.5 0 22.5 45 67.5 90 for 9 rays (obs_dim=13)."
+    )
+    p.add_argument(
+        "--obs-ray-max-dist", type=float, default=200,
+        help="maximum ray-cast distance in pixels (default: 200)"
+    )
+    p.add_argument(
+        "--steer-penalty", type=float, default=0.01,
+        help="steering-smoothness penalty coefficient (default: 0.01, set to 0 to disable)"
     )
     return p
 
@@ -199,13 +233,20 @@ def main():
     out_dir = os.path.join("runs", args.name)
     os.makedirs(out_dir, exist_ok=True)
 
+    obs_ray_angles = tuple(args.obs_ray_angles)
+    obs_ray_max_dist = args.obs_ray_max_dist
+
     # The fixed target env -- never changes, defines success.
     target_env = RacingEnv(max_steps=target_cfg["max_steps"],
                            track_kwargs=target_cfg["track_kwargs"],
-                           grip_limit=args.grip)
+                           grip_limit=args.grip,
+                           obs_ray_angles=obs_ray_angles,
+                           obs_ray_max_dist=obs_ray_max_dist,
+                           steer_penalty_coeff=args.steer_penalty)
     target_env.action_space.seed(SEED + 999)
 
-    agent = SACAgent(lr=args.lr, target_entropy=args.entropy_target)
+    agent = SACAgent(obs_dim=target_env.observation_space.shape[0],
+                     lr=args.lr, target_entropy=args.entropy_target)
 
     # ---- Approach 2: demonstration seeding ----------------------------------
     demo_stats = None
@@ -219,6 +260,8 @@ def main():
             # under, or the buffer teaches a car that corners better than the
             # one it drives.
             grip_limit=args.grip,
+            obs_ray_angles=obs_ray_angles,
+            obs_ray_max_dist=obs_ray_max_dist,
         )
         # The run pushes more transitions than the buffer holds, so without
         # protection the demos are evicted mid-run -- exactly when the agent
@@ -241,12 +284,57 @@ def main():
     episodes = 0
     crashes = 0
     history = []
+    sampled_track_seeds = set()
 
     best_target_progress = -float("inf")
     best_path = os.path.join(out_dir, "best_actor.pth")
     solved_at = None
     solved_eval = None
     t_start = time.time()
+
+    # Initialize Domain Randomizer
+    if args.dr_config:
+        dr = DomainRandomizer.from_json(args.dr_config)
+    elif args.dr_preset or args.domain_randomize:
+        dr = DomainRandomizer(enabled=True, preset=args.dr_preset or "default")
+    else:
+        dr = DomainRandomizer(enabled=False)
+
+    if dr.enabled:
+        print(f"Domain Randomization ENABLED with ranges: {dr.ranges}")
+    else:
+        print("Domain Randomization DISABLED (fixed baseline environment)")
+
+    # Optional wandb logging
+    run = None
+    if args.wandb:
+        import wandb
+        run = wandb.init(
+            project=args.wandb_project,
+            name=args.wandb_run_name or args.name,
+            config={
+                "run_name": args.name,
+                "curriculum": args.curriculum,
+                "seed": SEED,
+                "warmup": args.warmup,
+                "eval_every": args.eval_every,
+                "batch_size": args.batch_size,
+                "demos": args.demos,
+                "train_pool": args.train_pool,
+                "dr_preset": args.dr_preset,
+                "domain_randomize": dr.to_dict(),
+                "target": args.target,
+                "obs_ray_angles": list(obs_ray_angles),
+                "obs_ray_max_dist": obs_ray_max_dist,
+                "obs_dim": target_env.observation_space.shape[0],
+            },
+        )
+        print(f"wandb: logging to project '{args.wandb_project}' (run={run.name}, url={run.url})")
+
+    def wlog(payload, step=None):
+        """Log to wandb if enabled; no-op otherwise."""
+        if run is not None:
+            run.log(payload, step=step)
 
     def write_record(final_best=None):
         """Persist manifest + history. Called at EVERY eval, not just at the
@@ -265,14 +353,22 @@ def main():
             "demos": args.demos,
             "demo_noise": args.demo_noise,
             "demo_clean_frac": args.demo_clean_frac,
+            "train_pool": args.train_pool,
+            "train_pool_seeds": TRAIN_SEEDS[:args.train_pool] if args.train_pool > 0 else None,
             "clip_backward_DIAGNOSTIC": args.clip_backward,
             "grip": args.grip,
-            "domain_randomize": args.domain_randomize,
+            "domain_randomize": dr.to_dict(),
             "target": args.target,
+            "obs_ray_angles": list(obs_ray_angles),
+            "obs_ray_max_dist": obs_ray_max_dist,
+            "obs_dim": target_env.observation_space.shape[0],
+            "steer_penalty": args.steer_penalty,
             "demo_stats": demo_stats,
             "total_steps": global_step,
             "episodes": episodes,
             "crashes": crashes,
+            "sampled_track_seeds": sorted(list(sampled_track_seeds)),
+            "sampled_seed_count": len(sampled_track_seeds),
             "target_config": target_cfg,
             "best_target_progress": best_target_progress,
             "solved_at_step": solved_at,
@@ -280,11 +376,23 @@ def main():
             "final_best_target_eval": final_best,
             "completed_run": final_best is not None,
             "wall_minutes": round((time.time() - t_start) / 60.0, 2),
+            "wandb_run_url": run.url if run is not None else None,
             "command": (f"python -m sac.train_curriculum "
                         f"--curriculum {args.curriculum} --seed {SEED} "
                         f"--name {args.name} --demos {args.demos} "
                         f"--target {args.target}"
-                        + (" --grip" if args.grip else "")),
+                        + (" --grip" if args.grip else "")
+                        + (" --domain-randomize" if dr.enabled else "")
+                        + (f" --dr-preset {args.dr_preset}" if args.dr_preset else "")
+                        + (f" --dr-config {args.dr_config}" if args.dr_config else "")
+                        + (f" --train-pool {args.train_pool}" if args.train_pool > 0 else "")
+                        + (" --wandb" if args.wandb else "")
+                        + (f" --obs-ray-angles {' '.join(str(a) for a in args.obs_ray_angles)}"
+                           if list(args.obs_ray_angles) != [-90.0, -45.0, 0.0, 45.0, 90.0] and list(args.obs_ray_angles) != [-90, -45, 0, 45, 90] else "")
+                        + (f" --obs-ray-max-dist {args.obs_ray_max_dist}"
+                           if args.obs_ray_max_dist != 200 else "")
+                        + (f" --steer-penalty {args.steer_penalty}"
+                           if args.steer_penalty != 0.01 else "")),
         }
         with open(os.path.join(out_dir, "run_config.json"), "w") as f:
             json.dump(manifest, f, indent=2)
@@ -296,10 +404,18 @@ def main():
         tk = tier["track_kwargs"]
         ms = tier["max_steps"]
 
-        env = RacingEnv(max_steps=ms, track_kwargs=tk, grip_limit=args.grip, domain_randomize=args.domain_randomize)
+        env = RacingEnv(max_steps=ms, track_kwargs=tk, grip_limit=args.grip,
+                       domain_randomize=dr,
+                       obs_ray_angles=obs_ray_angles,
+                       obs_ray_max_dist=obs_ray_max_dist,
+                       steer_penalty_coeff=args.steer_penalty)
         env.action_space.seed(SEED + tier_idx)
         tier_eval_env = RacingEnv(max_steps=ms, track_kwargs=tk,
-                                  grip_limit=args.grip)
+                                  grip_limit=args.grip,
+                                  domain_randomize=False,
+                                  obs_ray_angles=obs_ray_angles,
+                                  obs_ray_max_dist=obs_ray_max_dist,
+                                  steer_penalty_coeff=args.steer_penalty)
 
         if args.reset_buffer_per_tier and tier_idx > 0:
             agent.replay_buffer.buffer = []
@@ -310,8 +426,14 @@ def main():
               f"budget={budget}  buffer={len(agent.replay_buffer)}")
         print(f"{'-' * 96}")
 
-        obs, info = env.reset(options={"track_seed": episode_seed(args, tier)})
+        curr_seed = episode_seed(args, tier)
+        sampled_track_seeds.add(curr_seed)
+        obs, info = env.reset(options={"track_seed": curr_seed})
         ep_prog = 0.0
+        ep_reward = 0.0
+        ep_len = 0
+        ep_speeds = []
+        ep_steers = []
 
         for _ in range(budget):
             # Warmup only at the very start of the whole run; later tiers keep
@@ -324,6 +446,11 @@ def main():
                 action = act_t.detach().numpy()[0]
 
             next_obs, reward, terminated, truncated, info = env.step(action)
+            ep_reward += reward
+            ep_len += 1
+            ep_speeds.append(float(next_obs[0]))
+            ep_steers.append(abs(float(action[0])))
+
             if args.clip_backward and info["progress"] < 0.0:
                 # reward-v2 contributes progress * 20.0, then scales by 100.
                 # Subtracting that term back out zeroes the backward penalty
@@ -337,12 +464,51 @@ def main():
                 episodes += 1
                 if info["crashed"]:
                     crashes += 1
-                obs, info = env.reset(options={"track_seed": episode_seed(args, tier)})
+
+                dr_data = {
+                    f"dr/{k}": v
+                    for k, v in info.get("dr_params", {}).items()
+                    if isinstance(v, (int, float))
+                }
+                wlog({
+                    "episode/reward": ep_reward,
+                    "episode/length": ep_len,
+                    "episode/lap_progress": info["lap_progress"],
+                    "episode/lap_completed": int(info["lap_completed"]),
+                    "episode/lap_time": ep_len if info["lap_completed"] else None,
+                    "episode/crashed": int(info["crashed"]),
+                    "episode/index": episodes,
+                    "episode/mean_speed": float(np.mean(ep_speeds)) if ep_speeds else 0.0,
+                    "episode/mean_abs_steering": float(np.mean(ep_steers)) if ep_steers else 0.0,
+                    "episode/track_seed": curr_seed,
+                    "progress/total_episodes": episodes,
+                    "progress/total_crashes": crashes,
+                    **dr_data,
+                }, step=global_step)
+
+                ep_reward = 0.0
+                ep_len = 0
+                ep_speeds = []
+                ep_steers = []
+
+                curr_seed = episode_seed(args, tier)
+                sampled_track_seeds.add(curr_seed)
+                obs, info = env.reset(options={"track_seed": curr_seed})
                 ep_prog = 0.0
 
             learn_after = 0 if args.demos > 0 else args.warmup
             if global_step >= learn_after and len(agent.replay_buffer) >= args.batch_size:
-                agent.update(batch_size=args.batch_size)
+                update_result = agent.update(batch_size=args.batch_size)
+                if global_step % 100 == 0 and update_result:
+                    wlog({
+                        "train/actor_loss": update_result["actor_loss"],
+                        "train/critic1_loss": update_result["critic1_loss"],
+                        "train/critic2_loss": update_result["critic2_loss"],
+                        "train/alpha_loss": update_result["alpha_loss"],
+                        "train/alpha": update_result["alpha"],
+                        "train/buffer_size": len(agent.replay_buffer),
+                        "train/step_reward": reward,
+                    }, step=global_step)
 
             global_step += 1
 
@@ -363,6 +529,19 @@ def main():
                     f"drop={tgt_r['speed_drop']:+5.2f}) grip={tgt_r['grip_events']:4d} "
                     f"R={tgt_r['reward']:9.2f} | {mins:5.1f}m"
                 )
+
+                wlog({
+                    "eval/target_reward": tgt_r["reward"],
+                    "eval/target_progress": tgt_r["progress"],
+                    "eval/target_lap_completed": int(tgt_r["completed"]),
+                    "eval/target_lap_time": tgt_r["lap_time"] if tgt_r["completed"] else None,
+                    "eval/target_crashed": int(tgt_r["crashed"]),
+                    "eval/target_mean_speed": tgt_r["mean_speed"],
+                    "eval/target_corner_speed": tgt_r["corner_speed"],
+                    "eval/target_straight_speed": tgt_r["straight_speed"],
+                    "eval/target_speed_drop": tgt_r["speed_drop"],
+                    "eval/target_best_progress": best_target_progress,
+                }, step=global_step)
 
                 history.append({
                     "step": global_step, "tier": tier["name"],
@@ -396,6 +575,12 @@ def main():
         print(f"\nFINAL TARGET EVAL (best-on-target checkpoint): {final_best}")
 
     write_record(final_best)
+
+    if run is not None:
+        run.summary["final/best_target_progress"] = best_target_progress
+        run.summary["final/solved_at_step"] = solved_at
+        run.summary["final/completed_run"] = (final_best is not None)
+        run.finish()
 
     print(f"\nSaved to {out_dir}/  (best_target_progress={best_target_progress:.4f}, "
           f"solved_at={solved_at})")

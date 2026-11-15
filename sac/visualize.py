@@ -35,6 +35,12 @@ CONFIGS = {
         "track_kwargs": MEDIUM_TRACK_KWARGS,
         "max_steps": 500,
     },
+    "medium_9ray": {
+        "track_kwargs": MEDIUM_TRACK_KWARGS,
+        "max_steps": 500,
+        "obs_ray_angles": (-90, -67.5, -45, -22.5, 0, 22.5, 45, 67.5, 90),
+        "obs_ray_max_dist": 200,
+    },
     "default": {
         "track_kwargs": {},          # env built-in defaults (base_r=210, min_radius=70)
         "max_steps": 500,
@@ -79,6 +85,10 @@ parser.add_argument("--grip", action="store_true", default=False,
                     help="enable grip-limited cornering physics (default: off)")
 parser.add_argument("--random-start", action="store_true", default=False,
                     help="spawn the car at a random position/speed/heading each episode")
+parser.add_argument("--obs-ray-angles", type=float, nargs="+", default=None,
+                    help="ray-cast angles (degrees); auto-detected from checkpoint if omitted")
+parser.add_argument("--obs-ray-max-dist", type=float, default=200,
+                    help="maximum ray distance (default: 200)")
 args = parser.parse_args()
 
 
@@ -87,28 +97,38 @@ TRACK_SEED = args.seed
 track_kwargs = cfg["track_kwargs"]
 max_steps = cfg["max_steps"]
 
+# -------------------------
+# Load trained actor & detect observation dimension
+# -------------------------
+state_dict = torch.load(
+    args.checkpoint,
+    map_location="cpu",
+)
+first_weight = state_dict.get("network.0.weight", state_dict.get("fc1.weight"))
+ckpt_obs_dim = first_weight.shape[1] if first_weight is not None else 9
+
+if args.obs_ray_angles is not None:
+    obs_ray_angles = tuple(args.obs_ray_angles)
+elif "obs_ray_angles" in cfg:
+    obs_ray_angles = tuple(cfg["obs_ray_angles"])
+elif ckpt_obs_dim == 13:
+    obs_ray_angles = (-90, -67.5, -45, -22.5, 0, 22.5, 45, 67.5, 90)
+else:
+    obs_ray_angles = (-90, -45, 0, 45, 90)
+
+obs_ray_max_dist = cfg.get("obs_ray_max_dist", args.obs_ray_max_dist)
 
 env = RacingEnv(
     max_steps=max_steps,
     verbose=False,
     track_kwargs=track_kwargs,
     grip_limit=args.grip,
+    obs_ray_angles=obs_ray_angles,
+    obs_ray_max_dist=obs_ray_max_dist,
 )
 
-agent = SACAgent()
-
-
-# -------------------------
-# Load trained actor
-# -------------------------
-
-agent.actor.load_state_dict(
-    torch.load(
-        args.checkpoint,
-        map_location="cpu",
-    )
-)
-
+agent = SACAgent(obs_dim=env.observation_space.shape[0])
+agent.actor.load_state_dict(state_dict)
 agent.actor.eval()
 
 print(f"Loaded trained actor from {args.checkpoint}")

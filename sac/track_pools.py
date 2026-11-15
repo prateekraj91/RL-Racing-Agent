@@ -17,10 +17,11 @@ POOL_CONFIG = {
 }
 
 # Training tracks: the agent sees these during training.
-TRAIN_SEEDS = list(range(1, 21))          # 20 tracks: seeds 1..20
+TRAIN_SEEDS = list(range(1, 26))          # 25 tracks: seeds 1..25
 
 # Held-out test tracks: the agent NEVER trains on these.
 TEST_SEEDS = list(range(1001, 1011))      # 10 tracks: seeds 1001..1010
 
 # Safety: the two pools must never overlap, or the generalization test is a lie.
 assert set(TRAIN_SEEDS).isdisjoint(TEST_SEEDS), "TRAIN and TEST seeds overlap!"
+assert len(TRAIN_SEEDS) == 25, f"Expected 25 training seeds, got {len(TRAIN_SEEDS)}"

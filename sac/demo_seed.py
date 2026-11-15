@@ -72,7 +72,9 @@ def _jitter_start(env, rng, max_lateral, max_heading_deg):
 def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
                   seed=0, clean_frac=0.30, noise_std=0.70,
                   jitter_lateral=None, jitter_heading=12.0, verbose=True,
-                  grip_limit=False):
+                  grip_limit=False,
+                  obs_ray_angles=(-90, -45, 0, 45, 90),
+                  obs_ray_max_dist=200):
     """Run `n_episodes` pure-pursuit episodes and push every transition into
     `buffer`. Returns a stats dict.
 
@@ -92,6 +94,10 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
                    turns tighter than the one the agent drives, so the critic is
                    fit to corner exits that never happen. (This defaulted to
                    ungripped physics and silently mismatched the --grip runs.)
+    obs_ray_angles -- ray-cast angles for the observation vector. MUST match the
+                   angles the agent's environment uses, or demo transitions will
+                   have the wrong observation dimension.
+    obs_ray_max_dist -- maximum ray distance (px). Must match the agent's env.
     """
     _apply_gains(FAST_GAINS)
     rng = np.random.default_rng(seed)
@@ -101,7 +107,9 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
         jitter_lateral = 0.6 * half
 
     env = RacingEnv(max_steps=max_steps, track_kwargs=track_kwargs,
-                    grip_limit=grip_limit)
+                    grip_limit=grip_limit,
+                    obs_ray_angles=obs_ray_angles,
+                    obs_ray_max_dist=obs_ray_max_dist)
 
     n_clean = max(1, int(round(n_episodes * clean_frac)))
     stats = {"episodes": 0, "transitions": 0, "laps": 0, "crashes": 0,
@@ -164,11 +172,16 @@ def collect_demos(buffer, n_episodes, track_kwargs, track_seed, max_steps,
 
 
 def _observe(env):
-    """Rebuild the 9-d observation from current env state (post-jitter)."""
+    """Rebuild observation from current env state (post-jitter).
+
+    Uses env.obs_ray_angles / env.obs_ray_max_dist so the reconstructed
+    observation has the same dimension as env.observation_space.
+    """
     err = env.car.angle - env.track.track_heading(env.car.x, env.car.y)
     err = (err + 180.0) % 360.0 - 180.0
     dist = env.track.signed_distance(env.car.x, env.car.y)
-    rays = env.car.cast_rays(env.track)
+    rays = env.car.cast_rays(env.track, ray_angles=env.obs_ray_angles,
+                             max_dist=env.obs_ray_max_dist)
     return np.array([env.car.velocity, err, dist, 0.0, *rays], dtype=np.float32)
 
 

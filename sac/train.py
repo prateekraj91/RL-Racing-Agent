@@ -32,6 +32,7 @@ import os
 import torch
 
 from env.environment import RacingEnv
+from env.domain_randomizer import DomainRandomizer, DR_PRESETS
 from sac.agent import SACAgent
 import random
 
@@ -47,6 +48,15 @@ CONFIGS = {
                          "min_radius": 80, "cx": 400, "cy": 300},
         "track_seed": 101,
         "max_steps": 500,
+    },
+    "medium_9ray": {
+        "track_kwargs": {"width": 70, "base_r": 250, "n_ctrl": 10,
+                         "min_radius": 80, "cx": 400, "cy": 300},
+        "track_seed": 101,
+        "max_steps": 500,
+        "obs_ray_angles": (-90, -67.5, -45, -22.5, 0,
+                           22.5, 45, 67.5, 90),
+        "obs_ray_max_dist": 200,
     },
     "default": {
         "track_kwargs": {},          # env built-in defaults (base_r=210, min_radius=70)
@@ -76,9 +86,22 @@ parser.add_argument("--config", choices=list(CONFIGS), default="medium",
 parser.add_argument("--seed", type=int, default=42,
                     help="master seed — seeds torch, numpy, random, AND the env action spaces")
 parser.add_argument(
-    "--domain-randomize",
+    "--domain-randomize", "--domain_randomize",
+    dest="domain_randomize",
     action="store_true",
-    help="randomize track width, min_radius, and friction each training episode"
+    default=False,
+    help="randomize track and vehicle parameters each training episode (DR)"
+)
+parser.add_argument(
+    "--dr-preset",
+    choices=list(DR_PRESETS.keys()),
+    default=None,
+    help="domain randomization preset (default: 'default' when --domain-randomize is passed)"
+)
+parser.add_argument(
+    "--dr-config",
+    default=None,
+    help="path to JSON file specifying domain randomization ranges"
 )
 args = parser.parse_args()
 
@@ -93,21 +116,41 @@ cfg = CONFIGS[args.config]
 TRACK_SEED = cfg["track_seed"]
 track_kwargs = cfg["track_kwargs"]
 max_steps = cfg["max_steps"]
+obs_ray_angles = cfg.get("obs_ray_angles", (-90, -45, 0, 45, 90))
+obs_ray_max_dist = cfg.get("obs_ray_max_dist", 200)
 
 print(f"config: {args.config}  |  track_seed={TRACK_SEED}  |  max_steps={max_steps}")
 print(f"track_kwargs: {track_kwargs}")
+
+# Initialize Domain Randomizer
+if args.dr_config:
+    dr = DomainRandomizer.from_json(args.dr_config)
+elif args.dr_preset or args.domain_randomize:
+    dr = DomainRandomizer(enabled=True, preset=args.dr_preset or "default")
+else:
+    dr = DomainRandomizer(enabled=False)
+
+if dr.enabled:
+    print(f"Domain Randomization ENABLED with ranges: {dr.ranges}")
+else:
+    print("Domain Randomization DISABLED (fixed baseline environment)")
 
 env = RacingEnv(
     max_steps=max_steps,
     verbose=False,
     track_kwargs=track_kwargs,
-    domain_randomize=args.domain_randomize,
+    domain_randomize=dr,
+    obs_ray_angles=obs_ray_angles,
+    obs_ray_max_dist=obs_ray_max_dist,
 )
 
 eval_env = RacingEnv(
     max_steps=max_steps,
     verbose=False,
     track_kwargs=track_kwargs,
+    domain_randomize=False,
+    obs_ray_angles=obs_ray_angles,
+    obs_ray_max_dist=obs_ray_max_dist,
 )
 
 # Seed the action-space RNGs — this is the one np.random.seed does NOT cover.
@@ -115,7 +158,7 @@ eval_env = RacingEnv(
 env.action_space.seed(SEED)
 eval_env.action_space.seed(SEED + 1)   # different stream so eval != train warmup
 
-agent = SACAgent()
+agent = SACAgent(obs_dim=env.observation_space.shape[0])
 
 episodes = 0
 crashes = 0
@@ -506,6 +549,7 @@ manifest = {
     "eval_every": args.eval_every,
     "best_progress": best_progress,
     "best_step": best_step,
+    "domain_randomize": dr.to_dict(),
     "command": f"python -m sac.train --config {args.config} --seed {SEED} "
                f"--steps {args.steps} --warmup {args.warmup} --eval-every {args.eval_every}",
 }
