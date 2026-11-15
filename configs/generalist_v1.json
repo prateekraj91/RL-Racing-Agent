@@ -1,0 +1,193 @@
+{
+  "model_name": "generalist_v1",
+  "version": "1.0.0",
+  "original_checkpoint_path": "runs/ablation_A_DR_look200_steerOn/best_actor.pth",
+  "equivalent_checkpoint_path": "runs/dr_multitrack_s42_calibrated_25tracks/best_actor.pth",
+  "frozen_weights_path": "models/generalist_v1.pth",
+  "frozen_weights_sha256": "0d40dc47b70463b99dc2c65b9f034317ab527cf94b756065a8205284f3b76784",
+  "network_architecture": {
+    "type": "SACActor",
+    "framework": "PyTorch",
+    "observation_dim": 9,
+    "action_dim": 2,
+    "hidden_layers": [128, 128],
+    "activation": "ReLU",
+    "action_squashing": "tanh",
+    "log_std_clamp": [-20, 2],
+    "parameter_count": 18310
+  },
+  "observation_space": {
+    "dimensions": 9,
+    "features": [
+      {
+        "index": 0,
+        "name": "velocity",
+        "description": "Forward velocity of the vehicle",
+        "units": "pixels/step",
+        "range": [-2.0, 4.0]
+      },
+      {
+        "index": 1,
+        "name": "heading_error",
+        "description": "Angle error between vehicle heading and track tangent",
+        "units": "degrees",
+        "range": [-180.0, 180.0]
+      },
+      {
+        "index": 2,
+        "name": "signed_distance",
+        "description": "Perpendicular distance from vehicle center to track centerline",
+        "units": "pixels",
+        "range": [-Infinity, Infinity]
+      },
+      {
+        "index": 3,
+        "name": "slip",
+        "description": "Tire slip angle/indicator",
+        "units": "scalar",
+        "range": [-1.0, 1.0]
+      },
+      {
+        "index": 4,
+        "name": "ray_minus_90",
+        "description": "Normalized rangefinder distance at -90 deg (left lateral)",
+        "units": "normalized [0, 1]",
+        "range": [0.0, 1.0]
+      },
+      {
+        "index": 5,
+        "name": "ray_minus_45",
+        "description": "Normalized rangefinder distance at -45 deg (left diagonal)",
+        "units": "normalized [0, 1]",
+        "range": [0.0, 1.0]
+      },
+      {
+        "index": 6,
+        "name": "ray_0",
+        "description": "Normalized rangefinder distance at 0 deg (center forward)",
+        "units": "normalized [0, 1]",
+        "range": [0.0, 1.0]
+      },
+      {
+        "index": 7,
+        "name": "ray_plus_45",
+        "description": "Normalized rangefinder distance at +45 deg (right diagonal)",
+        "units": "normalized [0, 1]",
+        "range": [0.0, 1.0]
+      },
+      {
+        "index": 8,
+        "name": "ray_plus_90",
+        "description": "Normalized rangefinder distance at +90 deg (right lateral)",
+        "units": "normalized [0, 1]",
+        "range": [0.0, 1.0]
+      }
+    ],
+    "sensor_configuration": {
+      "obs_ray_angles": [-90.0, -45.0, 0.0, 45.0, 90.0],
+      "obs_ray_max_dist": 200.0
+    }
+  },
+  "action_space": {
+    "dimensions": 2,
+    "actions": [
+      {
+        "index": 0,
+        "name": "steering",
+        "range": [-1.0, 1.0],
+        "mapping": "continuous steering angle in [-30.0, 30.0] degrees"
+      },
+      {
+        "index": 1,
+        "name": "throttle",
+        "range": [-1.0, 1.0],
+        "mapping": "continuous throttle [-1.0 (max braking) to +1.0 (max acceleration)]"
+      }
+    ]
+  },
+  "reward_configuration": {
+    "version": "v2",
+    "progress_multiplier": 20.0,
+    "corner_threshold": 120.0,
+    "straight_speed_reward": 0.01,
+    "corner_speed_penalty": 0.02,
+    "steering_smoothness_penalty": 0.01,
+    "crash_penalty": -0.2,
+    "overall_scale": 100.0
+  },
+  "domain_randomization": {
+    "enabled": true,
+    "preset": "calibrated",
+    "ranges": {
+      "width": [25.0, 70.0],
+      "min_radius": [65.0, 95.0],
+      "base_r": [200.0, 260.0],
+      "n_ctrl": [7, 11],
+      "friction": [0.02, 0.045],
+      "acceleration": [0.075, 0.095]
+    }
+  },
+  "nominal_track_parameters": {
+    "base_r": 250.0,
+    "n_ctrl": 10,
+    "min_radius": 80.0,
+    "cx": 400.0,
+    "cy": 300.0,
+    "width": 70.0
+  },
+  "vehicle_physics_parameters": {
+    "dt": 0.016666666666666666,
+    "wheelbase": 50.0,
+    "max_steer_angle_deg": 30.0,
+    "nominal_acceleration": 0.08,
+    "nominal_friction": 0.03,
+    "max_velocity": 4.0,
+    "min_velocity": -2.0,
+    "min_turning_radius": 86.60254037844386
+  },
+  "training_parameters": {
+    "algorithm": "Soft Actor-Critic (SAC)",
+    "training_seed": 42,
+    "total_environment_steps": 200000,
+    "batch_size": 64,
+    "learning_rate": 0.0003,
+    "target_entropy": -2.0,
+    "demonstrations": 40,
+    "demo_transitions": 17014,
+    "train_pool_size": 25,
+    "train_pool_seeds": [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+      11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+      21, 22, 23, 24, 25
+    ]
+  },
+  "evaluation_protocol": {
+    "policy_inference": "deterministic (tanh(mean))",
+    "max_steps_per_episode": 700,
+    "heldout_test_seeds": [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010],
+    "benchmarks": [
+      {
+        "name": "standard_heldout",
+        "description": "Nominal width 70 px circuits across 10 held-out seeds",
+        "track_kwargs": {
+          "width": 70,
+          "base_r": 250,
+          "n_ctrl": 10,
+          "min_radius": 80,
+          "cx": 400,
+          "cy": 300
+        }
+      },
+      {
+        "name": "narrow_corridor",
+        "description": "Stress testing corridor constriction across widths [70, 40, 36, 32, 28, 25, 20] px",
+        "width_levels": [70, 40, 36, 32, 28, 25, 20]
+      },
+      {
+        "name": "hairpin",
+        "description": "Acute curvature stress testing across pinch factors [0.50, 0.35, 0.20]",
+        "hairpin_factors": [0.50, 0.35, 0.20]
+      }
+    ]
+  }
+}
