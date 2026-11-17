@@ -1,0 +1,11 @@
+# RL Racing Agent Dependencies
+torch>=2.0.0
+gymnasium>=1.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+pygame>=2.5.0
+pytest>=7.0.0
+
+# Gemini Telemetry Commentary Pipeline
+google-genai==3.4.0
+python-dotenv==1.2.4

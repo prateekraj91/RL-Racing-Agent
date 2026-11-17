@@ -16,3 +16,8 @@ analysis/results/backup_*/
 analysis/results/diagnostic_*.csv
 analysis/results/hairpin_smoke.*
 analysis/results/hairpin_candidate_*.csv
+
+# Local API credentials
+.env
+.env.*
+!.env.example

@@ -1,0 +1,105 @@
+{
+  "pipeline_name": "gemini_telemetry_commentary",
+  "version": "1.0.0",
+  "model_config": {
+    "default_model": "gemini-3.8-flash",
+    "env_model_var": "GEMINI_MODEL",
+    "env_api_key_var": "GEMINI_API_KEY",
+    "temperature": 0.2,
+    "max_output_tokens": 2048,
+    "max_api_calls_limit": 5,
+    "response_mime_type": "application/json"
+  },
+  "dataset_sources": {
+    "policy_saliency_timesteps": "analysis/results/policy_saliency_timesteps.csv",
+    "policy_saliency_summary": "analysis/results/policy_saliency_summary.json",
+    "corner_saliency_phases": "analysis/results/corner_saliency_phases.csv",
+    "corner_saliency_summary": "analysis/results/corner_saliency_summary.json"
+  },
+  "selected_laps": [
+    {
+      "lap_id": "lap_1_std_1001",
+      "episode_id": "std_w70_s1001",
+      "track_seed": 1001,
+      "benchmark": "standard_heldout",
+      "description": "Standard width (70px) balanced geometry with sweeping turns"
+    },
+    {
+      "lap_id": "lap_2_fast_1002",
+      "episode_id": "std_w70_s1002",
+      "track_seed": 1002,
+      "benchmark": "standard_heldout",
+      "description": "Long high-speed straightaways terminating in sharp 90-degree corners"
+    },
+    {
+      "lap_id": "lap_3_narrow_1005",
+      "episode_id": "narrow_w20_s1005",
+      "track_seed": 1005,
+      "benchmark": "narrow_corridor",
+      "description": "Constricted 20px corridor with extreme lateral wall proximity"
+    },
+    {
+      "lap_id": "lap_4_hairpin_1003",
+      "episode_id": "hairpin_f0.5_s1003",
+      "track_seed": 1003,
+      "benchmark": "hairpin",
+      "description": "Acute pinched hairpin geometry (f=0.50) with high lookahead beam penetration"
+    },
+    {
+      "lap_id": "lap_5_acute_1007",
+      "episode_id": "hairpin_f0.35_s1007",
+      "track_seed": 1007,
+      "benchmark": "hairpin",
+      "description": "Severe acute hairpin pinch (f=0.35) requiring maximum threshold braking"
+    }
+  ],
+  "event_detection_thresholds": {
+    "braking_onset": {
+      "longitudinal_action_max": -0.01,
+      "description": "Transition from positive throttle or coasting to active negative braking"
+    },
+    "sustained_braking": {
+      "longitudinal_action_max": -0.10,
+      "min_consecutive_steps": 2,
+      "description": "Multiple consecutive steps of heavy longitudinal braking"
+    },
+    "high_steering_demand": {
+      "steering_abs_min": 0.50,
+      "description": "High front wheel steering deflection (>15.0 degrees)"
+    },
+    "strong_diagonal_sensitivity": {
+      "scaled_saliency_min": 1.50,
+      "rays": ["ray_minus_45", "ray_plus_45"],
+      "description": "Strong anticipation cue on diagonal rangefinder beams"
+    },
+    "lateral_wall_proximity": {
+      "min_lateral_distance_px": 15.0,
+      "rays": ["ray_minus_90", "ray_plus_90"],
+      "description": "Vehicle within 15px of boundary wall in narrow corridors"
+    },
+    "corner_approach": {
+      "max_corner_radius_px": 145.0,
+      "phase": "entry",
+      "description": "Approaching corner entry as road curvature begins increasing"
+    },
+    "corner_apex": {
+      "phase": "apex",
+      "description": "Vehicle traversing the minimum radius apex of a corner"
+    },
+    "corner_exit": {
+      "phase": "exit",
+      "description": "Vehicle exiting corner as curvature unwinds onto following straight"
+    },
+    "throttle_reapplication": {
+      "longitudinal_action_min": 0.50,
+      "phase_context": ["apex", "exit", "straight"],
+      "description": "Aggressive throttle application coming out of a corner or braking sequence"
+    },
+    "straight_line_cruising": {
+      "min_velocity_px": 3.80,
+      "max_steering_abs": 0.10,
+      "min_radius_px": 200.0,
+      "description": "Flat-out high-speed cruising along straight sections of track"
+    }
+  }
+}

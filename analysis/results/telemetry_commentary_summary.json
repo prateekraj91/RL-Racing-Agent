@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "pipeline_name": "gemini_telemetry_commentary",
+    "model_id": "gemini-3.8-flash",
+    "execution_mode": "MOCK",
+    "weights_path": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/models/generalist_v1.pth",
+    "config_path": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/configs/generalist_v1.json",
+    "sha256_before_analysis": "0d40dc47b70463b99dc2c65b9f034317ab527cf94b756065a8205284f3b76784",
+    "sha256_after_analysis": "0d40dc47b70463b99dc2c65b9f034317ab527cf94b756065a8205284f3b76784",
+    "weights_unaltered": true
+  },
+  "api_usage_metrics": {
+    "total_requests": 5,
+    "max_api_calls_limit": 5,
+    "total_prompt_tokens": 3250,
+    "total_candidate_tokens": 1400,
+    "total_tokens": 4650,
+    "total_latency_ms": 60.0,
+    "mean_latency_per_request_ms": 12.0,
+    "request_logs": [
+      {
+        "lap_id": "lap_1_std_1001",
+        "status": "success",
+        "latency_ms": 12.0,
+        "prompt_tokens": 650,
+        "candidate_tokens": 280,
+        "events_processed": 5,
+        "model_id": "gemini-3.8-flash"
+      },
+      {
+        "lap_id": "lap_2_fast_1002",
+        "status": "success",
+        "latency_ms": 12.0,
+        "prompt_tokens": 650,
+        "candidate_tokens": 280,
+        "events_processed": 5,
+        "model_id": "gemini-3.8-flash"
+      },
+      {
+        "lap_id": "lap_3_narrow_1005",
+        "status": "success",
+        "latency_ms": 12.0,
+        "prompt_tokens": 650,
+        "candidate_tokens": 280,
+        "events_processed": 5,
+        "model_id": "gemini-3.8-flash"
+      },
+      {
+        "lap_id": "lap_4_hairpin_1003",
+        "status": "success",
+        "latency_ms": 12.0,
+        "prompt_tokens": 650,
+        "candidate_tokens": 280,
+        "events_processed": 5,
+        "model_id": "gemini-3.8-flash"
+      },
+      {
+        "lap_id": "lap_5_acute_1007",
+        "status": "success",
+        "latency_ms": 12.0,
+        "prompt_tokens": 650,
+        "candidate_tokens": 280,
+        "events_processed": 5,
+        "model_id": "gemini-3.8-flash"
+      }
+    ]
+  },
+  "grounding_validation_metrics": {
+    "total_commentaries": 25,
+    "passed_validation_count": 25,
+    "pass_rate": 1.0,
+    "verdict_distribution": {
+      "CORRECT_GROUNDED": 25,
+      "UNCERTAIN_INTERPRETATION": 0,
+      "UNSUPPORTED_REJECTED": 0
+    }
+  },
+  "laps_processed_count": 5
+}
