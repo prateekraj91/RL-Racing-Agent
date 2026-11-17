@@ -1,0 +1,1648 @@
+{
+  "metadata": {
+    "model_name": "generalist_v1",
+    "weights_path": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/models/generalist_v1.pth",
+    "config_path": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/configs/generalist_v1.json",
+    "sha256_before_analysis": "0d40dc47b70463b99dc2c65b9f034317ab527cf94b756065a8205284f3b76784",
+    "sha256_after_analysis": "0d40dc47b70463b99dc2c65b9f034317ab527cf94b756065a8205284f3b76784",
+    "weights_unaltered": true,
+    "source_dataset": "/Users/prateekraj/Desktop/Ideas/RL Racing Agent/analysis/results/policy_saliency_timesteps.csv",
+    "selected_tracks_count": 5,
+    "total_timesteps_analyzed": 2012
+  },
+  "answers_to_research_questions": {
+    "q1_corner_entry_dominant_beams": {
+      "steering_top_ray": "ray_minus_45",
+      "steering_top_scaled_val": 1.1444980506580715,
+      "longitudinal_top_ray": "ray_0",
+      "longitudinal_top_scaled_val": 0.1006835126938785,
+      "conclusion": "During corner entry, ray_minus_45 dominates steering to anticipate curvature, while ray_0 dominates longitudinal control for turn-in deceleration."
+    },
+    "q2_apex_dominant_beams": {
+      "steering_top_ray": "ray_minus_45",
+      "steering_top_scaled_val": 0.5967534538501496,
+      "longitudinal_top_ray": "ray_0",
+      "longitudinal_top_scaled_val": 0.05723415177076224,
+      "conclusion": "Around the apex, ray_minus_45 and ray_plus_45 dominate steering, while ray_0 governs minimal throttle holding. Sensitivities reach a local minimum due to steering lock saturation."
+    },
+    "q3_straight_exit_dominant_beams": {
+      "steering_top_ray": "ray_minus_45",
+      "steering_top_scaled_val": 2.0909601310760846,
+      "longitudinal_top_ray": "ray_0",
+      "longitudinal_top_scaled_val": 0.08254176473283457,
+      "conclusion": "During straight exit, steering sensitivity rebounds sharply (ray_minus_45 reaches 2.091) as wheels unwind, while ray_0 and diagonal rays guide throttle application."
+    },
+    "q4_steering_sensitivity_change_across_phases": "Yes. Steering sensitivity dips at the apex (0.597) due to steering lock saturation, and surges upon straight exit (2.091) as the policy unwinds steering onto the straight.",
+    "q5_braking_sensitivity_before_apex": "Yes. Active braking events occur almost exclusively on corner entry and apex approach (9 events on entry, 9 at apex, 0 on straights). Longitudinal ray_0 sensitivity peaks on corner entry (0.101 vs 0.040 on straights).",
+    "q6_throttle_sensitivity_after_apex": "Yes. After the apex, longitudinal sensitivity increases from 0.057 at apex to 0.083 at straight exit as the car accelerates out of the turn.",
+    "q7_consistency_across_tracks": "Highly consistent. Across all five tracks, diagonal lookahead beams (ray_minus_45 and ray_plus_45) dominate steering guidance, and center forward beam ray_0 governs longitudinal deceleration.",
+    "q8_geometric_differences": "Narrow corridors (Track 3) elevate lateral beam sensitivity (+90 deg) relative to open tracks due to wall proximity. Hairpins (Tracks 4 and 5) produce extreme ray_0 braking spikes (>0.025 act/px) not seen on gentle curves."
+  },
+  "cross_track_phase_means": {
+    "entry": {
+      "steer_scaled": {
+        "ray_minus_90": 0.45794666969587855,
+        "ray_minus_45": 1.1444980506580715,
+        "ray_0": 0.4796503862107493,
+        "ray_plus_45": 0.4967754355414312,
+        "ray_plus_90": 0.4747861093852903
+      },
+      "long_scaled": {
+        "ray_minus_90": 0.017093720294172225,
+        "ray_minus_45": 0.04656707671958488,
+        "ray_0": 0.1006835126938785,
+        "ray_plus_45": 0.05075405924362265,
+        "ray_plus_90": 0.01912624175078323
+      },
+      "sample_count": 249
+    },
+    "apex": {
+      "steer_scaled": {
+        "ray_minus_90": 0.16207553225158536,
+        "ray_minus_45": 0.5967534538501496,
+        "ray_0": 0.3166843471261005,
+        "ray_plus_45": 0.3381484760937373,
+        "ray_plus_90": 0.23801235700272613
+      },
+      "long_scaled": {
+        "ray_minus_90": 0.01742608722647894,
+        "ray_minus_45": 0.05252175117976919,
+        "ray_0": 0.05723415177076224,
+        "ray_plus_45": 0.03017046719305568,
+        "ray_plus_90": 0.014363005423177965
+      },
+      "sample_count": 189
+    },
+    "exit": {
+      "steer_scaled": {
+        "ray_minus_90": 0.38032137882454853,
+        "ray_minus_45": 2.0909601310760846,
+        "ray_0": 0.856799032142768,
+        "ray_plus_45": 0.7864199455054507,
+        "ray_plus_90": 0.3949889998754211
+      },
+      "long_scaled": {
+        "ray_minus_90": 0.022260236603864784,
+        "ray_minus_45": 0.043910467132270294,
+        "ray_0": 0.08254176473283457,
+        "ray_plus_45": 0.04658799905646656,
+        "ray_plus_90": 0.021454971835608228
+      },
+      "sample_count": 252
+    },
+    "straight": {
+      "steer_scaled": {
+        "ray_minus_90": 0.5687998872643664,
+        "ray_minus_45": 2.999417928302126,
+        "ray_0": 1.0821263906071477,
+        "ray_plus_45": 1.198271522098836,
+        "ray_plus_90": 0.724030608525076
+      },
+      "long_scaled": {
+        "ray_minus_90": 0.013524056807822466,
+        "ray_minus_45": 0.029066673992801405,
+        "ray_0": 0.040072057413772996,
+        "ray_plus_45": 0.032651331929017445,
+        "ray_plus_90": 0.013826995332084856
+      },
+      "sample_count": 1322
+    }
+  },
+  "track_summaries": {
+    "track_1_std_1001": {
+      "track_config": {
+        "track_id": "track_1_std_1001",
+        "episode_id": "std_w70_s1001",
+        "seed": 1001,
+        "benchmark": "standard_heldout",
+        "width": 70,
+        "hairpin": false,
+        "hairpin_factor": null,
+        "title": "Track 1: Standard Balanced (Seed 1001, W=70)",
+        "rationale": "Nominal width standard circuit with balanced curvature transitions (R_min=83.6 px) and 3 smooth corners. Baseline reference."
+      },
+      "timesteps_count": 387,
+      "n_corners": 3,
+      "corners_metadata": [
+        {
+          "corner_id": "corner_1",
+          "apex_step": 79,
+          "apex_idx": 79,
+          "apex_radius": 140.4,
+          "apex_x": 586.45,
+          "apex_y": 428.45,
+          "entry_range": [
+            63,
+            74
+          ],
+          "apex_range": [
+            75,
+            83
+          ],
+          "exit_range": [
+            84,
+            95
+          ]
+        },
+        {
+          "corner_id": "corner_2",
+          "apex_step": 193,
+          "apex_idx": 193,
+          "apex_radius": 88.15,
+          "apex_x": 178.15,
+          "apex_y": 383.15,
+          "entry_range": [
+            177,
+            188
+          ],
+          "apex_range": [
+            189,
+            197
+          ],
+          "exit_range": [
+            198,
+            209
+          ]
+        },
+        {
+          "corner_id": "corner_3",
+          "apex_step": 368,
+          "apex_idx": 368,
+          "apex_radius": 84.57,
+          "apex_x": 641.53,
+          "apex_y": 221.11,
+          "entry_range": [
+            352,
+            363
+          ],
+          "apex_range": [
+            364,
+            372
+          ],
+          "exit_range": [
+            373,
+            384
+          ]
+        }
+      ],
+      "phase_statistics": {
+        "entry": {
+          "count": 36,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.03935881707325785,
+            "ray_minus_45": 0.041691565226453044,
+            "ray_0": 0.010477577670018137,
+            "ray_plus_45": 0.04155446685197401,
+            "ray_plus_90": 0.059579591877991334
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.5023656111432682,
+            "ray_minus_45": 1.4952135299068827,
+            "ray_0": 0.35284898582402474,
+            "ray_plus_45": 0.8133769815694237,
+            "ray_plus_90": 0.5976283065817573
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 1.4952135299068827,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0006682486022732013,
+            "ray_minus_45": 0.0007635171443527926,
+            "ray_0": 0.0007128099166746122,
+            "ray_plus_45": 0.0013053451613005665,
+            "ray_plus_90": 0.0009399125736106524
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.00852934977318474,
+            "ray_minus_45": 0.02738254508678917,
+            "ray_0": 0.024005000402302825,
+            "ray_plus_45": 0.02555050726524892,
+            "ray_plus_90": 0.009428033022652072
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.02738254508678917,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "apex": {
+          "count": 27,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.022489049847030804,
+            "ray_minus_45": 0.03492201642236776,
+            "ray_0": 0.015525640005728713,
+            "ray_plus_45": 0.03852692274031816,
+            "ray_plus_90": 0.03410523928080996
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.28704432984880623,
+            "ray_minus_45": 1.2524325043384068,
+            "ray_0": 0.5228504624657961,
+            "ray_plus_45": 0.7541165728177245,
+            "ray_plus_90": 0.34210130943319333
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 1.2524325043384068,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0019442995221147107,
+            "ray_minus_45": 0.0016191546757774497,
+            "ray_0": 0.0015276816729628653,
+            "ray_plus_45": 0.0017589352231610705,
+            "ray_plus_90": 0.001217519859589326
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.024816528806105007,
+            "ray_minus_45": 0.058068867529548554,
+            "ray_0": 0.0514470945426037,
+            "ray_plus_45": 0.03442896831494131,
+            "ray_plus_90": 0.01221264377584318
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.058068867529548554,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "exit": {
+          "count": 36,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.022752107101647805,
+            "ray_minus_45": 0.0701782528647325,
+            "ray_0": 0.03409802619393708,
+            "ray_plus_45": 0.051787081746927775,
+            "ray_plus_90": 0.03091756674176496
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.2904019236056351,
+            "ray_minus_45": 2.516851373140486,
+            "ray_0": 1.148304917419992,
+            "ray_plus_45": 1.013667685489848,
+            "ray_plus_90": 0.3101265462399873
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 2.516851373140486,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0023391841419248115,
+            "ray_minus_45": 0.0020917639210690847,
+            "ray_0": 0.0028844936152583817,
+            "ray_plus_45": 0.0037185271341715837,
+            "ray_plus_90": 0.003472452039810984
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.029856732453301615,
+            "ray_minus_45": 0.0750183807963416,
+            "ray_0": 0.09713988087840467,
+            "ray_plus_45": 0.07278554161338742,
+            "ray_plus_90": 0.03483131667783709
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.09713988087840467,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "straight": {
+          "count": 288,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.03788832174258358,
+            "ray_minus_45": 0.09224010610746013,
+            "ray_0": 0.033055616454577025,
+            "ray_plus_45": 0.06643770910644282,
+            "ray_plus_90": 0.08978434984843868
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.48359659468369004,
+            "ray_minus_45": 3.308070922806523,
+            "ray_0": 1.1132001221199497,
+            "ray_plus_45": 1.3004354859823886,
+            "ray_plus_90": 0.9006048424659917
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 3.308070922806523,
+          "long_raw_mean": {
+            "ray_minus_90": 0.001726636832554757,
+            "ray_minus_45": 0.001086946059887042,
+            "ray_0": 0.0018244364836795689,
+            "ray_plus_45": 0.002449940903918307,
+            "ray_plus_90": 0.0019058217584541934
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.022038339363562833,
+            "ray_minus_45": 0.0389819006840955,
+            "ray_0": 0.06144078175710353,
+            "ray_plus_45": 0.04795454468351277,
+            "ray_plus_90": 0.019116831691027115
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.06144078175710353,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        }
+      }
+    },
+    "track_2_fast_1002": {
+      "track_config": {
+        "track_id": "track_2_fast_1002",
+        "episode_id": "std_w70_s1002",
+        "seed": 1002,
+        "benchmark": "standard_heldout",
+        "width": 70,
+        "hairpin": false,
+        "hairpin_factor": null,
+        "title": "Track 2: High-Speed Straights & Sharp Bends (Seed 1002, W=70)",
+        "rationale": "Long fast straights (R_mean=1284.4 px) terminating in 4 sharp 90-degree corners (R_min=88.9 px), testing high-speed deceleration."
+      },
+      "timesteps_count": 399,
+      "n_corners": 4,
+      "corners_metadata": [
+        {
+          "corner_id": "corner_1",
+          "apex_step": 82,
+          "apex_idx": 82,
+          "apex_radius": 91.96,
+          "apex_x": 605.74,
+          "apex_y": 439.62,
+          "entry_range": [
+            66,
+            77
+          ],
+          "apex_range": [
+            78,
+            86
+          ],
+          "exit_range": [
+            87,
+            98
+          ]
+        },
+        {
+          "corner_id": "corner_2",
+          "apex_step": 191,
+          "apex_idx": 191,
+          "apex_radius": 95.19,
+          "apex_x": 196.95,
+          "apex_y": 423.92,
+          "entry_range": [
+            175,
+            186
+          ],
+          "apex_range": [
+            187,
+            195
+          ],
+          "exit_range": [
+            196,
+            207
+          ]
+        },
+        {
+          "corner_id": "corner_3",
+          "apex_step": 239,
+          "apex_idx": 239,
+          "apex_radius": 120.63,
+          "apex_x": 169.81,
+          "apex_y": 239.22,
+          "entry_range": [
+            223,
+            234
+          ],
+          "apex_range": [
+            235,
+            243
+          ],
+          "exit_range": [
+            244,
+            255
+          ]
+        },
+        {
+          "corner_id": "corner_4",
+          "apex_step": 288,
+          "apex_idx": 288,
+          "apex_radius": 134.25,
+          "apex_x": 306.43,
+          "apex_y": 105.55,
+          "entry_range": [
+            272,
+            283
+          ],
+          "apex_range": [
+            284,
+            292
+          ],
+          "exit_range": [
+            293,
+            304
+          ]
+        }
+      ],
+      "phase_statistics": {
+        "entry": {
+          "count": 48,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.05111600061839757,
+            "ray_minus_45": 0.03952425663980345,
+            "ray_0": 0.017006798506675597,
+            "ray_plus_45": 0.02841446556461354,
+            "ray_plus_90": 0.0798508664399075
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.652431216163465,
+            "ray_minus_45": 1.4174858383548825,
+            "ray_0": 0.5727308156698814,
+            "ray_plus_45": 0.5561778067369378,
+            "ray_plus_90": 0.8009645011884708
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 1.4174858383548825,
+          "long_raw_mean": {
+            "ray_minus_90": 0.001701216690586686,
+            "ray_minus_45": 0.001628732614335604,
+            "ray_0": 0.0018401843663014006,
+            "ray_plus_45": 0.0011929147876799107,
+            "ray_plus_90": 0.0011461277633012894
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.021713883343165426,
+            "ray_minus_45": 0.058412367785367264,
+            "ray_0": 0.061971116590878096,
+            "ray_plus_45": 0.023349822600997296,
+            "ray_plus_90": 0.011496527128127407
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.061971116590878096,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "apex": {
+          "count": 36,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.01694014221559175,
+            "ray_minus_45": 0.01836680311114631,
+            "ray_0": 0.013799992735989185,
+            "ray_plus_45": 0.01851493192306306,
+            "ray_plus_90": 0.03918683407310811
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.21621952918833534,
+            "ray_minus_45": 0.6587014031197161,
+            "ray_0": 0.4647365636053799,
+            "ray_plus_45": 0.3624067538921872,
+            "ray_plus_90": 0.3930735432926476
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.6587014031197161,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0018290100488229655,
+            "ray_minus_45": 0.0023512229543282753,
+            "ray_0": 0.0023174072961814497,
+            "ray_plus_45": 0.0018353442287156617,
+            "ray_plus_90": 0.0017782010723345189
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.02334500422748791,
+            "ray_minus_45": 0.08432354012241919,
+            "ray_0": 0.07804235291318097,
+            "ray_plus_45": 0.035924579521411704,
+            "ray_plus_90": 0.017836699818242718
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.08432354012241919,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "exit": {
+          "count": 48,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.03750417755024197,
+            "ray_minus_45": 0.1031138012331212,
+            "ray_0": 0.043762076031271135,
+            "ray_plus_45": 0.06504283240792574,
+            "ray_plus_90": 0.05580677425799271
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.4786934790338056,
+            "ray_minus_45": 3.6980417954197446,
+            "ray_0": 1.4737570678548977,
+            "ray_plus_45": 1.273132510282017,
+            "ray_plus_90": 0.559784096270634
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 3.6980417954197446,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0008013448283842687,
+            "ray_minus_45": 0.0009926106646768555,
+            "ray_0": 0.0017390670655004214,
+            "ray_plus_45": 0.0027948871053619464,
+            "ray_plus_90": 0.0028337886002797554
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.010228155071288547,
+            "ray_minus_45": 0.03559868495445704,
+            "ray_0": 0.05856583169005745,
+            "ray_plus_45": 0.0547064373532833,
+            "ray_plus_90": 0.02842504000134777
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.05856583169005745,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "straight": {
+          "count": 267,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.037316241965643114,
+            "ray_minus_45": 0.08748421492927083,
+            "ray_0": 0.0364596668791291,
+            "ray_plus_45": 0.061610080998073496,
+            "ray_plus_90": 0.09234391227961877
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.47629471855691313,
+            "ray_minus_45": 3.137507097779357,
+            "ray_0": 1.2278368996104247,
+            "ray_plus_45": 1.2059406728757054,
+            "ray_plus_90": 0.9262791868701785
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 3.137507097779357,
+          "long_raw_mean": {
+            "ray_minus_90": 0.000908211667078337,
+            "ray_minus_45": 0.0010072547309950307,
+            "ray_0": 0.001323834220671783,
+            "ray_plus_45": 0.0020359374969129013,
+            "ray_plus_90": 0.0019069320878089399
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.01159217535247661,
+            "ray_minus_45": 0.03612387526508362,
+            "ray_0": 0.0445822094452074,
+            "ray_plus_45": 0.039850943144138964,
+            "ray_plus_90": 0.019127969133079153
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.0445822094452074,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        }
+      }
+    },
+    "track_3_narrow_1005": {
+      "track_config": {
+        "track_id": "track_3_narrow_1005",
+        "episode_id": "narrow_w20_s1005",
+        "seed": 1005,
+        "benchmark": "narrow_corridor",
+        "width": 20,
+        "hairpin": false,
+        "hairpin_factor": null,
+        "title": "Track 3: Extreme Narrow Corridor (Seed 1005, W=20)",
+        "rationale": "Constricted 20 px corridor (barely wider than car wheelbase) with 3 tight corners, testing severe lateral boundary confinement."
+      },
+      "timesteps_count": 395,
+      "n_corners": 3,
+      "corners_metadata": [
+        {
+          "corner_id": "corner_1",
+          "apex_step": 56,
+          "apex_idx": 56,
+          "apex_radius": 95.39,
+          "apex_x": 646.24,
+          "apex_y": 385.45,
+          "entry_range": [
+            40,
+            51
+          ],
+          "apex_range": [
+            52,
+            60
+          ],
+          "exit_range": [
+            61,
+            72
+          ]
+        },
+        {
+          "corner_id": "corner_2",
+          "apex_step": 213,
+          "apex_idx": 213,
+          "apex_radius": 92.06,
+          "apex_x": 158.37,
+          "apex_y": 316.24,
+          "entry_range": [
+            197,
+            208
+          ],
+          "apex_range": [
+            209,
+            217
+          ],
+          "exit_range": [
+            218,
+            229
+          ]
+        },
+        {
+          "corner_id": "corner_3",
+          "apex_step": 355,
+          "apex_idx": 355,
+          "apex_radius": 108.36,
+          "apex_x": 604.28,
+          "apex_y": 163.01,
+          "entry_range": [
+            339,
+            350
+          ],
+          "apex_range": [
+            351,
+            359
+          ],
+          "exit_range": [
+            360,
+            371
+          ]
+        }
+      ],
+      "phase_statistics": {
+        "entry": {
+          "count": 36,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.06631545227072719,
+            "ray_minus_45": 0.058496107450789876,
+            "ray_0": 0.034340335981040776,
+            "ray_plus_45": 0.04940944420458335,
+            "ray_plus_90": 0.04118248103703889
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.8464330278579825,
+            "ray_minus_45": 2.0978864869245144,
+            "ray_0": 1.1564650824244884,
+            "ray_plus_45": 0.9671283891406186,
+            "ray_plus_90": 0.4130913896389491
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 2.0978864869245144,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0009156851558347828,
+            "ray_minus_45": 0.001524021104059001,
+            "ray_0": 0.0013912903030157192,
+            "ray_plus_45": 0.0016790755705895005,
+            "ray_plus_90": 0.0019078125846539882
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.01168756500149772,
+            "ray_minus_45": 0.05465702624200827,
+            "ray_0": 0.046853899619438165,
+            "ray_plus_45": 0.03286581498682297,
+            "ray_plus_90": 0.019136801181468044
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.05465702624200827,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "apex": {
+          "count": 27,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.015319052540386716,
+            "ray_minus_45": 0.022147129677856963,
+            "ray_0": 0.01137002447568294,
+            "ray_plus_45": 0.025192829883760877,
+            "ray_plus_90": 0.014561327398513202
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.19552836603964038,
+            "ray_minus_45": 0.7942778776250627,
+            "ray_0": 0.382903542344451,
+            "ray_plus_45": 0.49311829703025,
+            "ray_plus_90": 0.146061111874964
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.7942778776250627,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0010003776451749556,
+            "ray_minus_45": 0.0012660855793877057,
+            "ray_0": 0.000862380233970557,
+            "ray_plus_45": 0.0013075488456740492,
+            "ray_plus_90": 0.0011442498254365528
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.012768557707336146,
+            "ray_minus_45": 0.04540650556144992,
+            "ray_0": 0.029042017204217913,
+            "ray_plus_45": 0.0255936416447711,
+            "ray_plus_90": 0.011477689992950875
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.04540650556144992,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "exit": {
+          "count": 36,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.07187295134644955,
+            "ray_minus_45": 0.06689828589636211,
+            "ray_0": 0.028970455657044012,
+            "ray_plus_45": 0.04714798356872052,
+            "ray_plus_90": 0.037480051160148124
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.9173674874584046,
+            "ray_minus_45": 2.3992196420668983,
+            "ray_0": 0.9756258764560574,
+            "ray_plus_45": 0.9228631111745076,
+            "ray_plus_90": 0.3759532215545635
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 2.3992196420668983,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0006082527761464007,
+            "ray_minus_45": 0.0005878122190349839,
+            "ray_0": 0.00031071101223763736,
+            "ray_plus_45": 0.00040110771846634126,
+            "ray_plus_90": 0.0005969501368478328
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.0077635787948004895,
+            "ray_minus_45": 0.02108111744358392,
+            "ray_0": 0.010463684355796019,
+            "ray_plus_45": 0.007851184482585956,
+            "ray_plus_90": 0.00598786074481157
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.02108111744358392,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "straight": {
+          "count": 296,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.07935052855267517,
+            "ray_minus_45": 0.09824876009794958,
+            "ray_0": 0.03647254856627409,
+            "ray_plus_45": 0.0694124259493578,
+            "ray_plus_90": 0.04575718306807323
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 1.0128093203794664,
+            "ray_minus_45": 3.5235634497555566,
+            "ray_0": 1.2282707107820487,
+            "ray_plus_45": 1.3586618666825172,
+            "ray_plus_90": 0.4589791062504001
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 3.5235634497555566,
+          "long_raw_mean": {
+            "ray_minus_90": 0.00034398598597510646,
+            "ray_minus_45": 0.00027327867190104225,
+            "ray_0": 0.00021919741143346368,
+            "ray_plus_45": 0.0002717533572797185,
+            "ray_plus_90": 0.00032906992312230096
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.0043905468436071645,
+            "ray_minus_45": 0.009800782614948735,
+            "ray_0": 0.007381819229159221,
+            "ray_plus_45": 0.0053192338205882775,
+            "ray_plus_90": 0.003300819873108537
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.009800782614948735,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        }
+      }
+    },
+    "track_4_hairpin_1003": {
+      "track_config": {
+        "track_id": "track_4_hairpin_1003",
+        "episode_id": "hairpin_f0.5_s1003",
+        "seed": 1003,
+        "benchmark": "hairpin",
+        "width": 70,
+        "hairpin": true,
+        "hairpin_factor": 0.5,
+        "title": "Track 4: Pinched Hairpin (Seed 1003, f=0.50, W=70)",
+        "rationale": "High-curvature acute hairpin pinch deformation (R_min=36.2 px) completed in 399 steps, testing deep apex navigation."
+      },
+      "timesteps_count": 399,
+      "n_corners": 5,
+      "corners_metadata": [
+        {
+          "corner_id": "corner_1",
+          "apex_step": 110,
+          "apex_idx": 110,
+          "apex_radius": 43.15,
+          "apex_x": 476.89,
+          "apex_y": 488.0,
+          "entry_range": [
+            94,
+            105
+          ],
+          "apex_range": [
+            106,
+            114
+          ],
+          "exit_range": [
+            115,
+            126
+          ]
+        },
+        {
+          "corner_id": "corner_2",
+          "apex_step": 149,
+          "apex_idx": 149,
+          "apex_radius": 75.64,
+          "apex_x": 353.27,
+          "apex_y": 406.84,
+          "entry_range": [
+            133,
+            144
+          ],
+          "apex_range": [
+            145,
+            153
+          ],
+          "exit_range": [
+            154,
+            165
+          ]
+        },
+        {
+          "corner_id": "corner_3",
+          "apex_step": 190,
+          "apex_idx": 190,
+          "apex_radius": 38.2,
+          "apex_x": 192.63,
+          "apex_y": 404.19,
+          "entry_range": [
+            174,
+            185
+          ],
+          "apex_range": [
+            186,
+            194
+          ],
+          "exit_range": [
+            195,
+            206
+          ]
+        },
+        {
+          "corner_id": "corner_4",
+          "apex_step": 250,
+          "apex_idx": 250,
+          "apex_radius": 94.34,
+          "apex_x": 179.88,
+          "apex_y": 198.12,
+          "entry_range": [
+            234,
+            245
+          ],
+          "apex_range": [
+            246,
+            254
+          ],
+          "exit_range": [
+            255,
+            266
+          ]
+        },
+        {
+          "corner_id": "corner_5",
+          "apex_step": 342,
+          "apex_idx": 342,
+          "apex_radius": 103.43,
+          "apex_x": 515.39,
+          "apex_y": 110.49,
+          "entry_range": [
+            326,
+            337
+          ],
+          "apex_range": [
+            338,
+            346
+          ],
+          "exit_range": [
+            347,
+            358
+          ]
+        }
+      ],
+      "phase_statistics": {
+        "entry": {
+          "count": 60,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.022015094914930464,
+            "ray_minus_45": 0.021012227161433354,
+            "ray_0": 0.008659279303947187,
+            "ray_plus_45": 0.00882039359682949,
+            "ray_plus_90": 0.028672354896662
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.2809948934880593,
+            "ray_minus_45": 0.7535760812673366,
+            "ray_0": 0.2916149148774998,
+            "ray_plus_45": 0.17264822926497572,
+            "ray_plus_90": 0.28760537564093447
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.7535760812673366,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0016796469000837533,
+            "ray_minus_45": 0.0010938000268045775,
+            "ray_0": 0.004556263674506529,
+            "ray_plus_45": 0.003972139844942528,
+            "ray_plus_90": 0.002578536533959171
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.021438572198319045,
+            "ray_minus_45": 0.0392277092550371,
+            "ray_0": 0.1534393795330071,
+            "ray_plus_45": 0.07774969485133734,
+            "ray_plus_90": 0.025864668986067024
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.1534393795330071,
+          "n_braking_steps": 7,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.004363155923783779,
+            "ray_minus_45": 0.0023011687527676778,
+            "ray_0": 0.024103712556617602,
+            "ray_plus_45": 0.01957235618361405,
+            "ray_plus_90": 0.012505827604659967
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.05569017707227497,
+            "ray_minus_45": 0.08252841156354693,
+            "ray_0": 0.811730611602482,
+            "ray_plus_45": 0.38310451801822093,
+            "ray_plus_90": 0.12544289643812012
+          },
+          "top_braking_ray_raw": "ray_0"
+        },
+        "apex": {
+          "count": 45,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.009382153136862649,
+            "ray_minus_45": 0.008987848897070055,
+            "ray_0": 0.004092343077475865,
+            "ray_plus_45": 0.00949205852221995,
+            "ray_plus_90": 0.01351991030969657
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.11975134023126278,
+            "ray_minus_45": 0.3223374608907941,
+            "ray_0": 0.13781612029117296,
+            "ray_plus_45": 0.18579523441333304,
+            "ray_plus_90": 0.1356149118991516
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.3223374608907941,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0012606834095398275,
+            "ray_minus_45": 0.001121648561093025,
+            "ray_0": 0.0011362586009555445,
+            "ray_plus_45": 0.0012641194554614938,
+            "ray_plus_90": 0.0014367804453488337
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.01609103216473351,
+            "ray_minus_45": 0.04022646056192597,
+            "ray_0": 0.03826530402425497,
+            "ray_plus_45": 0.024743565371423106,
+            "ray_plus_90": 0.014411993056984925
+          },
+          "top_long_ray_scaled": "ray_minus_45",
+          "top_long_scaled_value": 0.04022646056192597,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "exit": {
+          "count": 60,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.018136840557296332,
+            "ray_minus_45": 0.0484219884701209,
+            "ray_0": 0.018546368807922892,
+            "ray_plus_45": 0.023696470650793344,
+            "ray_plus_90": 0.030340336985621736
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.23149387274052066,
+            "ray_minus_45": 1.7365913683562477,
+            "ray_0": 0.6245782785576421,
+            "ray_plus_45": 0.46382892699476724,
+            "ray_plus_90": 0.3043364958083074
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 1.7365913683562477,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0006055478888811194,
+            "ray_minus_45": 0.000771448921841511,
+            "ray_0": 0.0010511995143436556,
+            "ray_plus_45": 0.001527001730937627,
+            "ray_plus_90": 0.0013472430960973724
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.00772905432366185,
+            "ray_minus_45": 0.027667007926045144,
+            "ray_0": 0.035400804863155375,
+            "ray_plus_45": 0.029889158804171517,
+            "ray_plus_90": 0.013513865817064425
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.035400804863155375,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        },
+        "straight": {
+          "count": 234,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.030683327014082905,
+            "ray_minus_45": 0.06382594748245335,
+            "ray_0": 0.02293281644287528,
+            "ray_plus_45": 0.04511080004567314,
+            "ray_plus_90": 0.071685777138275
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.39163393296724974,
+            "ray_minus_45": 2.2890342378975608,
+            "ray_0": 0.7722988345972389,
+            "ray_plus_45": 0.8829877786192416,
+            "ray_plus_90": 0.7190624884587392
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 2.2890342378975608,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0009593520683424724,
+            "ray_minus_45": 0.0007482248009990952,
+            "ray_0": 0.0009765832075075188,
+            "ray_plus_45": 0.0014272389273181532,
+            "ray_plus_90": 0.0009644928488233146
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.012244918012078162,
+            "ray_minus_45": 0.02683410516705399,
+            "ray_0": 0.032887982813799045,
+            "ray_plus_45": 0.027936426060181176,
+            "ray_plus_90": 0.009674591748343567
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.032887982813799045,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        }
+      }
+    },
+    "track_5_acute_1007": {
+      "track_config": {
+        "track_id": "track_5_acute_1007",
+        "episode_id": "hairpin_f0.35_s1007",
+        "seed": 1007,
+        "benchmark": "hairpin",
+        "width": 70,
+        "hairpin": true,
+        "hairpin_factor": 0.35,
+        "title": "Track 5: Severe Acute Pinched Hairpin (Seed 1007, f=0.35, W=70)",
+        "rationale": "Tightest completed hairpin benchmark in repository (R_min=43.0 px, pinch factor 0.35), completed in 432 steps."
+      },
+      "timesteps_count": 432,
+      "n_corners": 6,
+      "corners_metadata": [
+        {
+          "corner_id": "corner_1",
+          "apex_step": 13,
+          "apex_idx": 13,
+          "apex_radius": 78.61,
+          "apex_x": 666.29,
+          "apex_y": 290.06,
+          "entry_range": [
+            0,
+            8
+          ],
+          "apex_range": [
+            9,
+            17
+          ],
+          "exit_range": [
+            18,
+            29
+          ]
+        },
+        {
+          "corner_id": "corner_2",
+          "apex_step": 198,
+          "apex_idx": 198,
+          "apex_radius": 111.35,
+          "apex_x": 171.54,
+          "apex_y": 420.67,
+          "entry_range": [
+            182,
+            193
+          ],
+          "apex_range": [
+            194,
+            202
+          ],
+          "exit_range": [
+            203,
+            214
+          ]
+        },
+        {
+          "corner_id": "corner_3",
+          "apex_step": 238,
+          "apex_idx": 238,
+          "apex_radius": 117.81,
+          "apex_x": 133.91,
+          "apex_y": 269.63,
+          "entry_range": [
+            222,
+            233
+          ],
+          "apex_range": [
+            234,
+            242
+          ],
+          "exit_range": [
+            243,
+            254
+          ]
+        },
+        {
+          "corner_id": "corner_4",
+          "apex_step": 301,
+          "apex_idx": 301,
+          "apex_radius": 46.77,
+          "apex_x": 319.88,
+          "apex_y": 131.2,
+          "entry_range": [
+            285,
+            296
+          ],
+          "apex_range": [
+            297,
+            305
+          ],
+          "exit_range": [
+            306,
+            317
+          ]
+        },
+        {
+          "corner_id": "corner_5",
+          "apex_step": 338,
+          "apex_idx": 338,
+          "apex_radius": 48.73,
+          "apex_x": 429.52,
+          "apex_y": 222.56,
+          "entry_range": [
+            322,
+            333
+          ],
+          "apex_range": [
+            334,
+            342
+          ],
+          "exit_range": [
+            343,
+            354
+          ]
+        },
+        {
+          "corner_id": "corner_6",
+          "apex_step": 392,
+          "apex_idx": 392,
+          "apex_radius": 49.86,
+          "apex_x": 584.55,
+          "apex_y": 181.25,
+          "entry_range": [
+            376,
+            387
+          ],
+          "apex_range": [
+            388,
+            396
+          ],
+          "exit_range": [
+            397,
+            408
+          ]
+        }
+      ],
+      "phase_statistics": {
+        "entry": {
+          "count": 69,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.019638491191722427,
+            "ray_minus_45": 0.01712382473203394,
+            "ray_0": 0.008654216885127202,
+            "ray_plus_45": 0.0166915762354198,
+            "ray_plus_90": 0.03775809644434628
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.2506605473202732,
+            "ray_minus_45": 0.6141236071138392,
+            "ray_0": 0.29144442992356245,
+            "ray_plus_45": 0.3267168351446853,
+            "ray_plus_90": 0.37874222576071304
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.6141236071138392,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0013624952460278123,
+            "ray_minus_45": 0.0014080370747251436,
+            "ray_0": 0.004449097944693083,
+            "ray_plus_45": 0.003516243265461315,
+            "ray_plus_90": 0.002355634486235246
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.01739053172448162,
+            "ray_minus_45": 0.0504974105266677,
+            "ray_0": 0.14983040422681876,
+            "ray_plus_45": 0.06882608658926578,
+            "ray_plus_90": 0.02362879309105164
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.14983040422681876,
+          "n_braking_steps": 2,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.00041251489892601967,
+            "ray_minus_45": 0.0009080350864678621,
+            "ray_0": 0.018311111256480217,
+            "ray_plus_45": 0.015451003797352314,
+            "ray_plus_90": 0.0102832717821002
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.005265231902649763,
+            "ray_minus_45": 0.0325654923134298,
+            "ray_0": 0.6166556087337259,
+            "ray_plus_45": 0.3024341733387231,
+            "ray_plus_90": 0.10314898285710956
+          },
+          "top_braking_ray_raw": "ray_0"
+        },
+        "apex": {
+          "count": 54,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.006427496518073086,
+            "ray_minus_45": 0.009969220679261492,
+            "ray_0": 0.006854825157056944,
+            "ray_plus_45": 0.008351405293465345,
+            "ray_plus_90": 0.02132447429571753
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.08203887861804948,
+            "ray_minus_45": 0.35753307800498285,
+            "ray_0": 0.23084706988999748,
+            "ray_plus_45": 0.16346836679819082,
+            "ray_plus_90": 0.2139005834110714
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.35753307800498285,
+          "long_raw_mean": {
+            "ray_minus_90": 0.001036235065839719,
+            "ray_minus_45": 0.0011808794409228507,
+            "ray_0": 0.0022614821933125816,
+            "ray_plus_45": 0.0015845693188667712,
+            "ray_plus_90": 0.0014479691953628961
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.013226232413685856,
+            "ray_minus_45": 0.04235069870047519,
+            "ray_0": 0.07615898669525722,
+            "ray_plus_45": 0.031015972705378272,
+            "ray_plus_90": 0.014524224670409938
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.07615898669525722,
+          "n_braking_steps": 9,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0022051616623583767,
+            "ray_minus_45": 0.0006994400690827104,
+            "ray_0": 0.008006578104363548,
+            "ray_plus_45": 0.006382245337590575,
+            "ray_plus_90": 0.005767909189065297
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.028146104699194797,
+            "ray_minus_45": 0.025084504478807907,
+            "ray_0": 0.2696341705134437,
+            "ray_plus_45": 0.12492451092723736,
+            "ray_plus_90": 0.05785648562745181
+          },
+          "top_braking_ray_raw": "ray_0"
+        },
+        "exit": {
+          "count": 72,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.016860231807640957,
+            "ray_minus_45": 0.026427960418749938,
+            "ray_0": 0.012882679919079642,
+            "ray_plus_45": 0.02804394349402628,
+            "ray_plus_90": 0.04113533423910414
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.21519957371426232,
+            "ray_minus_45": 0.9478042805859005,
+            "ray_0": 0.4338446048603629,
+            "ray_plus_45": 0.5489252982532488,
+            "ray_plus_90": 0.4126184716460196
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 0.9478042805859005,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0035915047362019927,
+            "ray_minus_45": 0.0016408959315109921,
+            "ray_0": 0.004945568520270172,
+            "ray_plus_45": 0.003134863031947235,
+            "ray_plus_90": 0.0024396199970498048
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.045841023838898445,
+            "ray_minus_45": 0.05884858926830765,
+            "ray_0": 0.16654983543515284,
+            "ray_plus_45": 0.061361043077314485,
+            "ray_plus_90": 0.024471231198185592
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.16654983543515284,
+          "n_braking_steps": 8,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.01334885967662558,
+            "ray_minus_45": 0.0034336703247390687,
+            "ray_0": 0.020861745695583522,
+            "ray_plus_45": 0.009809131908696145,
+            "ray_plus_90": 0.008508059603627771
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.1703813414166378,
+            "ray_minus_45": 0.12314410118457435,
+            "ray_0": 0.7025522542552163,
+            "ray_plus_45": 0.19200155141281947,
+            "ray_plus_90": 0.08534226390179404
+          },
+          "top_braking_ray_raw": "ray_0"
+        },
+        "straight": {
+          "count": 237,
+          "steer_raw_mean": {
+            "ray_minus_90": 0.031098466906017162,
+            "ray_minus_45": 0.07014167650828036,
+            "ray_0": 0.02980084287184413,
+            "ray_plus_45": 0.06010379740389156,
+            "ray_plus_90": 0.06156562745358706
+          },
+          "steer_scaled_mean": {
+            "ray_minus_90": 0.39693266959171,
+            "ray_minus_45": 2.5155396098918557,
+            "ray_0": 1.0035904781809282,
+            "ray_plus_45": 1.1764570458185326,
+            "ray_plus_90": 0.6175497434436442
+          },
+          "top_steer_ray_scaled": "ray_minus_45",
+          "top_steer_scaled_value": 2.5155396098918557,
+          "long_raw_mean": {
+            "ray_minus_90": 0.0014121420417454503,
+            "ray_minus_45": 0.0009852198502501987,
+            "ray_0": 0.0016909494199645156,
+            "ray_plus_45": 0.0022854879721672518,
+            "ray_plus_90": 0.0018616059653125488
+          },
+          "long_scaled_mean": {
+            "ray_minus_90": 0.01802421039489426,
+            "ray_minus_45": 0.03533362304882351,
+            "ray_0": 0.05694539393599832,
+            "ray_plus_45": 0.04473558317657284,
+            "ray_plus_90": 0.018673313889939733
+          },
+          "top_long_ray_scaled": "ray_0",
+          "top_long_scaled_value": 0.05694539393599832,
+          "n_braking_steps": 0,
+          "braking_long_raw_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "braking_long_scaled_mean": {
+            "ray_minus_90": 0.0,
+            "ray_minus_45": 0.0,
+            "ray_0": 0.0,
+            "ray_plus_45": 0.0,
+            "ray_plus_90": 0.0
+          },
+          "top_braking_ray_raw": null
+        }
+      }
+    }
+  }
+}
