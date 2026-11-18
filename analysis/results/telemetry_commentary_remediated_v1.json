@@ -1,0 +1,2438 @@
+[
+  {
+    "lap_id": "lap_1_std_1001",
+    "track_seed": 1001,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1001_s063_corner_approach",
+    "event_type": "corner_approach",
+    "commentary": "Approaching corner entry with track radius 218.9 px. The policy initiates turn-in with steering angle -13.7 degrees, guided by ray_minus_45 while tracking ray_plus_45 for velocity maintenance (3.23 px/step).",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.23 px/step (range [2.99, 3.46] px/step)",
+        "Track corner radius is 218.9 px"
+      ],
+      "action_facts": [
+        "Steering angle is -13.7 degrees (action -0.457)",
+        "Longitudinal action is 0.911 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_plus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_plus_45",
+        "Verified velocity 3.23 px/step within measured range",
+        "Verified steering angle -13.7 deg within measured range",
+        "Verified corner radius 218.9 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1001_s063_corner_approach",
+      "episode_id": "std_w70_s1001",
+      "track_seed": 1001,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_approach",
+      "start_step": 63,
+      "end_step": 74,
+      "duration_steps": 12,
+      "corner_id": "corner_1",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 3.231,
+        "velocity_range": [
+          2.993,
+          3.465
+        ],
+        "mean_heading_error": -0.18,
+        "mean_signed_distance": -0.7,
+        "mean_corner_radius": 218.9,
+        "min_corner_radius": 168.1
+      },
+      "action_summary": {
+        "mean_steering": -0.457,
+        "steering_range": [
+          -0.674,
+          -0.106
+        ],
+        "mean_longitudinal": 0.911,
+        "longitudinal_range": [
+          0.894,
+          0.924
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 116.0,
+        "min_forward_ray_0": 112.0,
+        "mean_left_diagonal": 62.7,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 3.371,
+        "top_longitudinal_ray": "ray_plus_45",
+        "top_longitudinal_sensitivity": 0.051
+      },
+      "factual_bullet_points": [
+        "Event corner_approach occurred from step 63 to 74 (duration 12 steps).",
+        "Vehicle velocity averaged 3.23 px/step (range 2.99 to 3.46 px/step).",
+        "Steering action averaged -0.457 (approx front wheel angle -13.7 deg).",
+        "Longitudinal action averaged 0.911 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 116.0 px (range 112.0 to 120.0 px).",
+        "Heading error averaged -0.2 deg; centerline signed distance averaged -0.70 px.",
+        "Track curvature radius averaged 218.9 px (corner phase: entry, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (3.371); highest longitudinal sensitivity is on ray_plus_45 (0.051)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_1_std_1001",
+    "track_seed": 1001,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1001_s075_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 75 with curvature radius 137.6 px and steering angle -21.8 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 3.67 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.67 px/step (range [3.51, 3.84] px/step)",
+        "Track corner radius is 146.6 px"
+      ],
+      "action_facts": [
+        "Steering angle is -21.8 degrees (action -0.728)",
+        "Longitudinal action is 0.891 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 3.67 px/step within measured range",
+        "Verified steering angle -21.8 deg within measured range",
+        "Verified step 75 within event window",
+        "Verified corner radius 137.6 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1001_s075_corner_apex",
+      "episode_id": "std_w70_s1001",
+      "track_seed": 1001,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_apex",
+      "start_step": 75,
+      "end_step": 83,
+      "duration_steps": 9,
+      "corner_id": "corner_1",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 3.673,
+        "velocity_range": [
+          3.507,
+          3.837
+        ],
+        "mean_heading_error": -0.59,
+        "mean_signed_distance": -0.85,
+        "mean_corner_radius": 146.6,
+        "min_corner_radius": 137.6
+      },
+      "action_summary": {
+        "mean_steering": -0.728,
+        "steering_range": [
+          -0.971,
+          -0.46
+        ],
+        "mean_longitudinal": 0.891,
+        "longitudinal_range": [
+          0.874,
+          0.908
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 124.9,
+        "min_forward_ray_0": 112.0,
+        "mean_left_diagonal": 62.7,
+        "mean_right_diagonal": 47.6,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 1.272,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.081
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 75 to 83 (duration 9 steps).",
+        "Vehicle velocity averaged 3.67 px/step (range 3.51 to 3.84 px/step).",
+        "Steering action averaged -0.728 (approx front wheel angle -21.8 deg).",
+        "Longitudinal action averaged 0.891 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 124.9 px (range 112.0 to 140.0 px).",
+        "Heading error averaged -0.6 deg; centerline signed distance averaged -0.85 px.",
+        "Track curvature radius averaged 146.6 px (corner phase: apex, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (1.272); highest longitudinal sensitivity is on ray_0 (0.081)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_1_std_1001",
+    "track_seed": 1001,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1001_s084_corner_exit",
+    "event_type": "corner_exit",
+    "commentary": "Exiting corner as curvature unwinds. The policy applies positive longitudinal action (0.927), unwinding steering toward center with ray_minus_45 guiding exit trajectory at 3.98 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.98 px/step (range [3.88, 4.00] px/step)",
+        "Track corner radius is 211.3 px"
+      ],
+      "action_facts": [
+        "Steering angle is -11.1 degrees (action -0.369)",
+        "Longitudinal action is 0.927 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Verified velocity 3.98 px/step within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1001_s084_corner_exit",
+      "episode_id": "std_w70_s1001",
+      "track_seed": 1001,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_exit",
+      "start_step": 84,
+      "end_step": 95,
+      "duration_steps": 12,
+      "corner_id": "corner_1",
+      "corner_phase": "exit",
+      "telemetry_summary": {
+        "mean_velocity": 3.98,
+        "velocity_range": [
+          3.878,
+          4.0
+        ],
+        "mean_heading_error": -0.26,
+        "mean_signed_distance": -0.69,
+        "mean_corner_radius": 211.3,
+        "min_corner_radius": 165.2
+      },
+      "action_summary": {
+        "mean_steering": -0.369,
+        "steering_range": [
+          -0.721,
+          -0.143
+        ],
+        "mean_longitudinal": 0.927,
+        "longitudinal_range": [
+          0.897,
+          0.939
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 140.0,
+        "min_forward_ray_0": 136.0,
+        "mean_left_diagonal": 57.0,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 3.824,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.123
+      },
+      "factual_bullet_points": [
+        "Event corner_exit occurred from step 84 to 95 (duration 12 steps).",
+        "Vehicle velocity averaged 3.98 px/step (range 3.88 to 4.00 px/step).",
+        "Steering action averaged -0.369 (approx front wheel angle -11.1 deg).",
+        "Longitudinal action averaged 0.927 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 140.0 px (range 136.0 to 144.0 px).",
+        "Heading error averaged -0.3 deg; centerline signed distance averaged -0.69 px.",
+        "Track curvature radius averaged 211.3 px (corner phase: exit, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (3.824); highest longitudinal sensitivity is on ray_0 (0.123)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_1_std_1001",
+    "track_seed": 1001,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1001_s189_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 189 with curvature radius 87.4 px and steering angle -22.3 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 89.9 px"
+      ],
+      "action_facts": [
+        "Steering angle is -22.3 degrees (action -0.742)",
+        "Longitudinal action is 0.963 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -22.3 deg within measured range",
+        "Verified step 189 within event window",
+        "Verified corner radius 87.4 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1001_s189_corner_apex",
+      "episode_id": "std_w70_s1001",
+      "track_seed": 1001,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_apex",
+      "start_step": 189,
+      "end_step": 197,
+      "duration_steps": 9,
+      "corner_id": "corner_2",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.76,
+        "mean_signed_distance": 1.09,
+        "mean_corner_radius": 89.9,
+        "min_corner_radius": 87.4
+      },
+      "action_summary": {
+        "mean_steering": -0.742,
+        "steering_range": [
+          -0.893,
+          -0.572
+        ],
+        "mean_longitudinal": 0.963,
+        "longitudinal_range": [
+          0.947,
+          0.97
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 100.9,
+        "min_forward_ray_0": 100.0,
+        "mean_left_diagonal": 80.9,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 1.139,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.059
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 189 to 197 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.742 (approx front wheel angle -22.3 deg).",
+        "Longitudinal action averaged 0.963 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 100.9 px (range 100.0 to 104.0 px).",
+        "Heading error averaged -0.8 deg; centerline signed distance averaged 1.09 px.",
+        "Track curvature radius averaged 89.9 px (corner phase: apex, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (1.139); highest longitudinal sensitivity is on ray_minus_45 (0.059)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_1_std_1001",
+    "track_seed": 1001,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1001_s364_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 364 with curvature radius 83.6 px and steering angle -22.4 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 87.0 px"
+      ],
+      "action_facts": [
+        "Steering angle is -22.4 degrees (action -0.745)",
+        "Longitudinal action is 0.966 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -22.4 deg within measured range",
+        "Verified step 364 within event window",
+        "Verified corner radius 83.6 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1001_s364_corner_apex",
+      "episode_id": "std_w70_s1001",
+      "track_seed": 1001,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_apex",
+      "start_step": 364,
+      "end_step": 372,
+      "duration_steps": 9,
+      "corner_id": "corner_3",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.48,
+        "mean_signed_distance": 1.34,
+        "mean_corner_radius": 87.0,
+        "min_corner_radius": 83.6
+      },
+      "action_summary": {
+        "mean_steering": -0.745,
+        "steering_range": [
+          -0.888,
+          -0.435
+        ],
+        "mean_longitudinal": 0.966,
+        "longitudinal_range": [
+          0.949,
+          0.972
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 100.9,
+        "min_forward_ray_0": 100.0,
+        "mean_left_diagonal": 81.8,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 1.346,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.04
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 364 to 372 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.745 (approx front wheel angle -22.3 deg).",
+        "Longitudinal action averaged 0.966 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 100.9 px (range 100.0 to 104.0 px).",
+        "Heading error averaged -0.5 deg; centerline signed distance averaged 1.34 px.",
+        "Track curvature radius averaged 87.0 px (corner phase: apex, corner ID: corner_3).",
+        "Highest steering sensitivity is on ray_minus_45 (1.346); highest longitudinal sensitivity is on ray_minus_45 (0.040)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_2_fast_1002",
+    "track_seed": 1002,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1002_s066_corner_approach",
+    "event_type": "corner_approach",
+    "commentary": "Approaching corner entry with track radius 169.1 px. The policy initiates turn-in with steering angle -19.7 degrees, guided by ray_minus_45 while tracking ray_0 for velocity maintenance (3.39 px/step).",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.39 px/step (range [3.13, 3.65] px/step)",
+        "Track corner radius is 169.1 px"
+      ],
+      "action_facts": [
+        "Steering angle is -19.7 degrees (action -0.657)",
+        "Longitudinal action is 0.959 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_0",
+        "Verified velocity 3.39 px/step within measured range",
+        "Verified steering angle -19.7 deg within measured range",
+        "Verified corner radius 169.1 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1002_s066_corner_approach",
+      "episode_id": "std_w70_s1002",
+      "track_seed": 1002,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_approach",
+      "start_step": 66,
+      "end_step": 77,
+      "duration_steps": 12,
+      "corner_id": "corner_1",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 3.39,
+        "velocity_range": [
+          3.134,
+          3.648
+        ],
+        "mean_heading_error": -1.77,
+        "mean_signed_distance": -0.72,
+        "mean_corner_radius": 169.1,
+        "min_corner_radius": 114.8
+      },
+      "action_summary": {
+        "mean_steering": -0.657,
+        "steering_range": [
+          -0.873,
+          -0.0
+        ],
+        "mean_longitudinal": 0.959,
+        "longitudinal_range": [
+          0.946,
+          0.966
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 101.3,
+        "min_forward_ray_0": 100.0,
+        "mean_left_diagonal": 77.0,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 1.262,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.05
+      },
+      "factual_bullet_points": [
+        "Event corner_approach occurred from step 66 to 77 (duration 12 steps).",
+        "Vehicle velocity averaged 3.39 px/step (range 3.13 to 3.65 px/step).",
+        "Steering action averaged -0.657 (approx front wheel angle -19.7 deg).",
+        "Longitudinal action averaged 0.959 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 101.3 px (range 100.0 to 104.0 px).",
+        "Heading error averaged -1.8 deg; centerline signed distance averaged -0.72 px.",
+        "Track curvature radius averaged 169.1 px (corner phase: entry, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (1.262); highest longitudinal sensitivity is on ray_0 (0.050)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_2_fast_1002",
+    "track_seed": 1002,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1002_s078_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 78 with curvature radius 88.9 px and steering angle -25.6 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 3.87 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.87 px/step (range [3.69, 4.00] px/step)",
+        "Track corner radius is 97.0 px"
+      ],
+      "action_facts": [
+        "Steering angle is -25.6 degrees (action -0.855)",
+        "Longitudinal action is 0.939 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 3.87 px/step within measured range",
+        "Verified steering angle -25.6 deg within measured range",
+        "Verified step 78 within event window",
+        "Verified corner radius 88.9 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1002_s078_corner_apex",
+      "episode_id": "std_w70_s1002",
+      "track_seed": 1002,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_apex",
+      "start_step": 78,
+      "end_step": 86,
+      "duration_steps": 9,
+      "corner_id": "corner_1",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 3.872,
+        "velocity_range": [
+          3.695,
+          4.0
+        ],
+        "mean_heading_error": 0.06,
+        "mean_signed_distance": -0.4,
+        "mean_corner_radius": 97.0,
+        "min_corner_radius": 88.9
+      },
+      "action_summary": {
+        "mean_steering": -0.855,
+        "steering_range": [
+          -0.966,
+          -0.615
+        ],
+        "mean_longitudinal": 0.939,
+        "longitudinal_range": [
+          0.895,
+          0.967
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 109.8,
+        "min_forward_ray_0": 100.0,
+        "mean_left_diagonal": 74.7,
+        "mean_right_diagonal": 44.9,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.527,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.083
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 78 to 86 (duration 9 steps).",
+        "Vehicle velocity averaged 3.87 px/step (range 3.70 to 4.00 px/step).",
+        "Steering action averaged -0.855 (approx front wheel angle -25.6 deg).",
+        "Longitudinal action averaged 0.939 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 109.8 px (range 100.0 to 136.0 px).",
+        "Heading error averaged 0.1 deg; centerline signed distance averaged -0.40 px.",
+        "Track curvature radius averaged 97.0 px (corner phase: apex, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.527); highest longitudinal sensitivity is on ray_minus_45 (0.083)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_2_fast_1002",
+    "track_seed": 1002,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1002_s100_straight_line_cruising",
+    "event_type": "straight_line_cruising",
+    "commentary": "Straightaway cruising at 4.00 px/step with steering centered (-1.0 degrees). Forward beam ray_minus_45 detects open corridor ahead (200.0 px).",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 28301.8 px"
+      ],
+      "action_facts": [
+        "Steering angle is -1.0 degrees (action -0.034)",
+        "Longitudinal action is 0.982 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_plus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified centered steering (1.0 deg)",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -1.0 deg within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1002_s100_straight_line_cruising",
+      "episode_id": "std_w70_s1002",
+      "track_seed": 1002,
+      "benchmark": "standard_heldout",
+      "event_type": "straight_line_cruising",
+      "start_step": 100,
+      "end_step": 112,
+      "duration_steps": 13,
+      "corner_id": "none",
+      "corner_phase": "straight",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -1.15,
+        "mean_signed_distance": -0.82,
+        "mean_corner_radius": 28301.8,
+        "min_corner_radius": 392.8
+      },
+      "action_summary": {
+        "mean_steering": -0.034,
+        "steering_range": [
+          -0.077,
+          0.067
+        ],
+        "mean_longitudinal": 0.982,
+        "longitudinal_range": [
+          0.982,
+          0.982
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 200.0,
+        "min_forward_ray_0": 200.0,
+        "mean_left_diagonal": 52.0,
+        "mean_right_diagonal": 52.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_plus_45",
+        "top_steering_sensitivity": 1.224,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.01
+      },
+      "factual_bullet_points": [
+        "Event straight_line_cruising occurred from step 100 to 112 (duration 13 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.034 (approx front wheel angle -1.0 deg).",
+        "Longitudinal action averaged 0.982 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 200.0 px (range 200.0 to 200.0 px).",
+        "Heading error averaged -1.2 deg; centerline signed distance averaged -0.82 px.",
+        "Track curvature radius averaged 28301.8 px (corner phase: straight, corner ID: none).",
+        "Highest steering sensitivity is on ray_plus_45 (1.224); highest longitudinal sensitivity is on ray_minus_45 (0.010)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_2_fast_1002",
+    "track_seed": 1002,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1002_s187_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 187 with curvature radius 92.0 px and steering angle -26.1 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 101.0 px"
+      ],
+      "action_facts": [
+        "Steering angle is -26.1 degrees (action -0.870)",
+        "Longitudinal action is 0.937 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -26.1 deg within measured range",
+        "Verified step 187 within event window",
+        "Verified corner radius 92.0 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1002_s187_corner_apex",
+      "episode_id": "std_w70_s1002",
+      "track_seed": 1002,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_apex",
+      "start_step": 187,
+      "end_step": 195,
+      "duration_steps": 9,
+      "corner_id": "corner_2",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.11,
+        "mean_signed_distance": -0.91,
+        "mean_corner_radius": 101.0,
+        "min_corner_radius": 92.0
+      },
+      "action_summary": {
+        "mean_steering": -0.87,
+        "steering_range": [
+          -0.977,
+          -0.699
+        ],
+        "mean_longitudinal": 0.937,
+        "longitudinal_range": [
+          0.894,
+          0.965
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 107.6,
+        "min_forward_ray_0": 100.0,
+        "mean_left_diagonal": 74.7,
+        "mean_right_diagonal": 44.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.432,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.06
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 187 to 195 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.870 (approx front wheel angle -26.1 deg).",
+        "Longitudinal action averaged 0.937 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 107.6 px (range 100.0 to 124.0 px).",
+        "Heading error averaged -0.1 deg; centerline signed distance averaged -0.91 px.",
+        "Track curvature radius averaged 101.0 px (corner phase: apex, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (0.432); highest longitudinal sensitivity is on ray_minus_45 (0.060)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_2_fast_1002",
+    "track_seed": 1002,
+    "benchmark": "standard_heldout",
+    "event_id": "ev_std_w70_s1002_s235_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 235 with curvature radius 119.2 px and steering angle -24.6 degrees. Lateral positioning is guided by ray_0 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 123.7 px"
+      ],
+      "action_facts": [
+        "Steering angle is -24.6 degrees (action -0.819)",
+        "Longitudinal action is 0.901 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_0",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_0",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -24.6 deg within measured range",
+        "Verified step 235 within event window",
+        "Verified corner radius 119.2 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_std_w70_s1002_s235_corner_apex",
+      "episode_id": "std_w70_s1002",
+      "track_seed": 1002,
+      "benchmark": "standard_heldout",
+      "event_type": "corner_apex",
+      "start_step": 235,
+      "end_step": 243,
+      "duration_steps": 9,
+      "corner_id": "corner_3",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.92,
+        "mean_signed_distance": -1.21,
+        "mean_corner_radius": 123.7,
+        "min_corner_radius": 119.2
+      },
+      "action_summary": {
+        "mean_steering": -0.819,
+        "steering_range": [
+          -0.943,
+          -0.376
+        ],
+        "mean_longitudinal": 0.901,
+        "longitudinal_range": [
+          0.867,
+          0.927
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 120.4,
+        "min_forward_ray_0": 108.0,
+        "mean_left_diagonal": 66.2,
+        "mean_right_diagonal": 45.3,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_0",
+        "top_steering_sensitivity": 0.6,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.101
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 235 to 243 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.819 (approx front wheel angle -24.6 deg).",
+        "Longitudinal action averaged 0.901 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 120.4 px (range 108.0 to 144.0 px).",
+        "Heading error averaged -0.9 deg; centerline signed distance averaged -1.21 px.",
+        "Track curvature radius averaged 123.7 px (corner phase: apex, corner ID: corner_3).",
+        "Highest steering sensitivity is on ray_0 (0.600); highest longitudinal sensitivity is on ray_minus_45 (0.101)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_3_narrow_1005",
+    "track_seed": 1005,
+    "benchmark": "narrow_corridor",
+    "event_id": "ev_narrow_w20_s1005_s040_corner_approach",
+    "event_type": "corner_approach",
+    "commentary": "Approaching corner entry with track radius 123.0 px. The policy initiates turn-in with steering angle -26.2 degrees, guided by ray_minus_45 while tracking ray_minus_45 for velocity maintenance (2.18 px/step).",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 2.18 px/step (range [1.93, 2.43] px/step)",
+        "Track corner radius is 123.0 px"
+      ],
+      "action_facts": [
+        "Steering angle is -26.2 degrees (action -0.872)",
+        "Longitudinal action is 0.951 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Verified velocity 2.18 px/step within measured range",
+        "Verified steering angle -26.2 deg within measured range",
+        "Verified corner radius 123.0 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_narrow_w20_s1005_s040_corner_approach",
+      "episode_id": "narrow_w20_s1005",
+      "track_seed": 1005,
+      "benchmark": "narrow_corridor",
+      "event_type": "corner_approach",
+      "start_step": 40,
+      "end_step": 51,
+      "duration_steps": 12,
+      "corner_id": "corner_1",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 2.18,
+        "velocity_range": [
+          1.925,
+          2.433
+        ],
+        "mean_heading_error": 0.13,
+        "mean_signed_distance": -1.08,
+        "mean_corner_radius": 123.0,
+        "min_corner_radius": 101.4
+      },
+      "action_summary": {
+        "mean_steering": -0.872,
+        "steering_range": [
+          -0.944,
+          -0.691
+        ],
+        "mean_longitudinal": 0.951,
+        "longitudinal_range": [
+          0.943,
+          0.96
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 44.7,
+        "min_forward_ray_0": 44.0,
+        "mean_left_diagonal": 20.0,
+        "mean_right_diagonal": 16.0,
+        "min_lateral_distance": 12.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.87,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.098
+      },
+      "factual_bullet_points": [
+        "Event corner_approach occurred from step 40 to 51 (duration 12 steps).",
+        "Vehicle velocity averaged 2.18 px/step (range 1.93 to 2.43 px/step).",
+        "Steering action averaged -0.872 (approx front wheel angle -26.2 deg).",
+        "Longitudinal action averaged 0.951 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 44.7 px (range 44.0 to 48.0 px).",
+        "Heading error averaged 0.1 deg; centerline signed distance averaged -1.08 px.",
+        "Track curvature radius averaged 123.0 px (corner phase: entry, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.870); highest longitudinal sensitivity is on ray_minus_45 (0.098)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_3_narrow_1005",
+    "track_seed": 1005,
+    "benchmark": "narrow_corridor",
+    "event_id": "ev_narrow_w20_s1005_s052_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 52 with curvature radius 94.9 px and steering angle -28.0 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 2.66 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 2.66 px/step (range [2.48, 2.85] px/step)",
+        "Track corner radius is 96.5 px"
+      ],
+      "action_facts": [
+        "Steering angle is -28.0 degrees (action -0.933)",
+        "Longitudinal action is 0.956 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 2.66 px/step within measured range",
+        "Verified steering angle -28.0 deg within measured range",
+        "Verified step 52 within event window",
+        "Verified corner radius 94.9 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_narrow_w20_s1005_s052_corner_apex",
+      "episode_id": "narrow_w20_s1005",
+      "track_seed": 1005,
+      "benchmark": "narrow_corridor",
+      "event_type": "corner_apex",
+      "start_step": 52,
+      "end_step": 60,
+      "duration_steps": 9,
+      "corner_id": "corner_1",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 2.664,
+        "velocity_range": [
+          2.479,
+          2.85
+        ],
+        "mean_heading_error": -1.0,
+        "mean_signed_distance": -1.21,
+        "mean_corner_radius": 96.5,
+        "min_corner_radius": 94.9
+      },
+      "action_summary": {
+        "mean_steering": -0.933,
+        "steering_range": [
+          -0.945,
+          -0.915
+        ],
+        "mean_longitudinal": 0.956,
+        "longitudinal_range": [
+          0.946,
+          0.961
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 48.0,
+        "min_forward_ray_0": 44.0,
+        "mean_left_diagonal": 20.0,
+        "mean_right_diagonal": 16.0,
+        "min_lateral_distance": 12.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.808,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.092
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 52 to 60 (duration 9 steps).",
+        "Vehicle velocity averaged 2.66 px/step (range 2.48 to 2.85 px/step).",
+        "Steering action averaged -0.933 (approx front wheel angle -28.0 deg).",
+        "Longitudinal action averaged 0.956 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 48.0 px (range 44.0 to 52.0 px).",
+        "Heading error averaged -1.0 deg; centerline signed distance averaged -1.21 px.",
+        "Track curvature radius averaged 96.5 px (corner phase: apex, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.808); highest longitudinal sensitivity is on ray_minus_45 (0.092)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_3_narrow_1005",
+    "track_seed": 1005,
+    "benchmark": "narrow_corridor",
+    "event_id": "ev_narrow_w20_s1005_s202_lateral_wall_proximity",
+    "event_type": "lateral_wall_proximity",
+    "commentary": "Navigating narrow corridor with lateral clearance constrained to 8.0 px at 4.00 px/step. Steering sensitivity concentrates on lateral beam ray_minus_45 to maintain clearance.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 120.0 px"
+      ],
+      "action_facts": [
+        "Steering angle is -22.7 degrees (action -0.757)",
+        "Longitudinal action is 0.966 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Verified velocity 4.0 px/step within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_narrow_w20_s1005_s202_lateral_wall_proximity",
+      "episode_id": "narrow_w20_s1005",
+      "track_seed": 1005,
+      "benchmark": "narrow_corridor",
+      "event_type": "lateral_wall_proximity",
+      "start_step": 202,
+      "end_step": 215,
+      "duration_steps": 14,
+      "corner_id": "corner_2",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.79,
+        "mean_signed_distance": 2.32,
+        "mean_corner_radius": 120.0,
+        "min_corner_radius": 88.7
+      },
+      "action_summary": {
+        "mean_steering": -0.757,
+        "steering_range": [
+          -0.945,
+          -0.469
+        ],
+        "mean_longitudinal": 0.966,
+        "longitudinal_range": [
+          0.954,
+          0.975
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 55.7,
+        "min_forward_ray_0": 52.0,
+        "mean_left_diagonal": 12.3,
+        "mean_right_diagonal": 19.7,
+        "min_lateral_distance": 8.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 1.767,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.052
+      },
+      "factual_bullet_points": [
+        "Event lateral_wall_proximity occurred from step 202 to 215 (duration 14 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.757 (approx front wheel angle -22.7 deg).",
+        "Longitudinal action averaged 0.966 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 55.7 px (range 52.0 to 60.0 px).",
+        "Heading error averaged -0.8 deg; centerline signed distance averaged 2.32 px.",
+        "Track curvature radius averaged 120.0 px (corner phase: entry, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (1.767); highest longitudinal sensitivity is on ray_0 (0.052)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_3_narrow_1005",
+    "track_seed": 1005,
+    "benchmark": "narrow_corridor",
+    "event_id": "ev_narrow_w20_s1005_s209_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 209 with curvature radius 88.7 px and steering angle -26.3 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 98.0 px"
+      ],
+      "action_facts": [
+        "Steering angle is -26.3 degrees (action -0.876)",
+        "Longitudinal action is 0.969 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -26.3 deg within measured range",
+        "Verified step 209 within event window",
+        "Verified corner radius 88.7 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_narrow_w20_s1005_s209_corner_apex",
+      "episode_id": "narrow_w20_s1005",
+      "track_seed": 1005,
+      "benchmark": "narrow_corridor",
+      "event_type": "corner_apex",
+      "start_step": 209,
+      "end_step": 217,
+      "duration_steps": 9,
+      "corner_id": "corner_2",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": 0.1,
+        "mean_signed_distance": 2.25,
+        "mean_corner_radius": 98.0,
+        "min_corner_radius": 88.7
+      },
+      "action_summary": {
+        "mean_steering": -0.876,
+        "steering_range": [
+          -0.971,
+          -0.746
+        ],
+        "mean_longitudinal": 0.969,
+        "longitudinal_range": [
+          0.954,
+          0.98
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 55.1,
+        "min_forward_ray_0": 52.0,
+        "mean_left_diagonal": 13.3,
+        "mean_right_diagonal": 18.7,
+        "min_lateral_distance": 8.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.556,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.039
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 209 to 217 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.876 (approx front wheel angle -26.3 deg).",
+        "Longitudinal action averaged 0.969 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 55.1 px (range 52.0 to 60.0 px).",
+        "Heading error averaged 0.1 deg; centerline signed distance averaged 2.25 px.",
+        "Track curvature radius averaged 98.0 px (corner phase: apex, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (0.556); highest longitudinal sensitivity is on ray_0 (0.039)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_3_narrow_1005",
+    "track_seed": 1005,
+    "benchmark": "narrow_corridor",
+    "event_id": "ev_narrow_w20_s1005_s351_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 351 with curvature radius 106.4 px and steering angle -24.7 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 113.3 px"
+      ],
+      "action_facts": [
+        "Steering angle is -24.7 degrees (action -0.823)",
+        "Longitudinal action is 0.977 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -24.7 deg within measured range",
+        "Verified step 351 within event window",
+        "Verified corner radius 106.4 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_narrow_w20_s1005_s351_corner_apex",
+      "episode_id": "narrow_w20_s1005",
+      "track_seed": 1005,
+      "benchmark": "narrow_corridor",
+      "event_type": "corner_apex",
+      "start_step": 351,
+      "end_step": 359,
+      "duration_steps": 9,
+      "corner_id": "corner_3",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.83,
+        "mean_signed_distance": 1.62,
+        "mean_corner_radius": 113.3,
+        "min_corner_radius": 106.4
+      },
+      "action_summary": {
+        "mean_steering": -0.823,
+        "steering_range": [
+          -0.955,
+          -0.276
+        ],
+        "mean_longitudinal": 0.977,
+        "longitudinal_range": [
+          0.975,
+          0.981
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 62.7,
+        "min_forward_ray_0": 56.0,
+        "mean_left_diagonal": 15.6,
+        "mean_right_diagonal": 16.9,
+        "min_lateral_distance": 12.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 1.019,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.013
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 351 to 359 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.823 (approx front wheel angle -24.7 deg).",
+        "Longitudinal action averaged 0.977 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 62.7 px (range 56.0 to 76.0 px).",
+        "Heading error averaged -0.8 deg; centerline signed distance averaged 1.62 px.",
+        "Track curvature radius averaged 113.3 px (corner phase: apex, corner ID: corner_3).",
+        "Highest steering sensitivity is on ray_minus_45 (1.019); highest longitudinal sensitivity is on ray_minus_45 (0.013)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_4_hairpin_1003",
+    "track_seed": 1003,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.5_s1003_s094_corner_approach",
+    "event_type": "corner_approach",
+    "commentary": "Approaching corner entry with track radius 139.8 px. The policy initiates turn-in with steering angle -28.6 degrees, guided by ray_minus_45 while tracking ray_0 for velocity maintenance (4.00 px/step).",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 139.8 px"
+      ],
+      "action_facts": [
+        "Steering angle is -28.6 degrees (action -0.953)",
+        "Longitudinal action is 0.967 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_0",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -28.6 deg within measured range",
+        "Verified corner radius 139.8 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.5_s1003_s094_corner_approach",
+      "episode_id": "hairpin_f0.5_s1003",
+      "track_seed": 1003,
+      "benchmark": "hairpin",
+      "event_type": "corner_approach",
+      "start_step": 94,
+      "end_step": 105,
+      "duration_steps": 12,
+      "corner_id": "corner_1",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -9.81,
+        "mean_signed_distance": 1.89,
+        "mean_corner_radius": 139.8,
+        "min_corner_radius": 69.7
+      },
+      "action_summary": {
+        "mean_steering": -0.953,
+        "steering_range": [
+          -0.973,
+          -0.937
+        ],
+        "mean_longitudinal": 0.967,
+        "longitudinal_range": [
+          0.942,
+          0.98
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 91.0,
+        "min_forward_ray_0": 84.0,
+        "mean_left_diagonal": 198.7,
+        "mean_right_diagonal": 53.7,
+        "min_lateral_distance": 32.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.068,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.029
+      },
+      "factual_bullet_points": [
+        "Event corner_approach occurred from step 94 to 105 (duration 12 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.953 (approx front wheel angle -28.6 deg).",
+        "Longitudinal action averaged 0.967 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 91.0 px (range 84.0 to 100.0 px).",
+        "Heading error averaged -9.8 deg; centerline signed distance averaged 1.89 px.",
+        "Track curvature radius averaged 139.8 px (corner phase: entry, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.068); highest longitudinal sensitivity is on ray_0 (0.029)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_4_hairpin_1003",
+    "track_seed": 1003,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.5_s1003_s106_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 106 with curvature radius 39.9 px and steering angle -29.0 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 50.7 px"
+      ],
+      "action_facts": [
+        "Steering angle is -29.0 degrees (action -0.966)",
+        "Longitudinal action is 0.968 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -29.0 deg within measured range",
+        "Verified step 106 within event window",
+        "Verified corner radius 39.9 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.5_s1003_s106_corner_apex",
+      "episode_id": "hairpin_f0.5_s1003",
+      "track_seed": 1003,
+      "benchmark": "hairpin",
+      "event_type": "corner_apex",
+      "start_step": 106,
+      "end_step": 114,
+      "duration_steps": 9,
+      "corner_id": "corner_1",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": 5.29,
+        "mean_signed_distance": 5.82,
+        "mean_corner_radius": 50.7,
+        "min_corner_radius": 39.9
+      },
+      "action_summary": {
+        "mean_steering": -0.966,
+        "steering_range": [
+          -0.987,
+          -0.946
+        ],
+        "mean_longitudinal": 0.968,
+        "longitudinal_range": [
+          0.957,
+          0.976
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 80.0,
+        "min_forward_ray_0": 80.0,
+        "mean_left_diagonal": 159.1,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 28.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.041,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.012
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 106 to 114 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.966 (approx front wheel angle -29.0 deg).",
+        "Longitudinal action averaged 0.968 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 80.0 px (range 80.0 to 80.0 px).",
+        "Heading error averaged 5.3 deg; centerline signed distance averaged 5.82 px.",
+        "Track curvature radius averaged 50.7 px (corner phase: apex, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.041); highest longitudinal sensitivity is on ray_0 (0.012)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_4_hairpin_1003",
+    "track_seed": 1003,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.5_s1003_s134_sustained_braking",
+    "event_type": "sustained_braking",
+    "commentary": "Deceleration phase approaching curvature (radius 285.8 px). The policy applies negative longitudinal action (-0.285), decelerating within [3.66, 4.00] px/step as ray_0 exhibits dominant sensitivity.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.82 px/step (range [3.66, 4.00] px/step)",
+        "Track corner radius is 285.8 px"
+      ],
+      "action_facts": [
+        "Steering angle is 29.9 degrees (action 0.997)",
+        "Longitudinal action is -0.285 (braking)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_0",
+        "Correctly identified braking / deceleration control regime",
+        "Verified velocity 3.66 px/step within measured range",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified corner radius 285.8 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.5_s1003_s134_sustained_braking",
+      "episode_id": "hairpin_f0.5_s1003",
+      "track_seed": 1003,
+      "benchmark": "hairpin",
+      "event_type": "sustained_braking",
+      "start_step": 134,
+      "end_step": 140,
+      "duration_steps": 7,
+      "corner_id": "corner_2",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 3.819,
+        "velocity_range": [
+          3.661,
+          4.0
+        ],
+        "mean_heading_error": -5.83,
+        "mean_signed_distance": -9.68,
+        "mean_corner_radius": 285.8,
+        "min_corner_radius": 185.8
+      },
+      "action_summary": {
+        "mean_steering": 0.997,
+        "steering_range": [
+          0.996,
+          1.0
+        ],
+        "mean_longitudinal": -0.285,
+        "longitudinal_range": [
+          -0.508,
+          -0.013
+        ],
+        "action_mode": "braking"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 96.6,
+        "min_forward_ray_0": 96.0,
+        "mean_left_diagonal": 56.0,
+        "mean_right_diagonal": 200.0,
+        "min_lateral_distance": 28.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.006,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.812
+      },
+      "factual_bullet_points": [
+        "Event sustained_braking occurred from step 134 to 140 (duration 7 steps).",
+        "Vehicle velocity averaged 3.82 px/step (range 3.66 to 4.00 px/step).",
+        "Steering action averaged 0.997 (approx front wheel angle 29.9 deg).",
+        "Longitudinal action averaged -0.285 (control regime: braking).",
+        "Center forward beam (ray_0) averaged 96.6 px (range 96.0 to 100.0 px).",
+        "Heading error averaged -5.8 deg; centerline signed distance averaged -9.68 px.",
+        "Track curvature radius averaged 285.8 px (corner phase: entry, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (0.006); highest longitudinal sensitivity is on ray_0 (0.812)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_4_hairpin_1003",
+    "track_seed": 1003,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.5_s1003_s145_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 145 with curvature radius 72.0 px and steering angle 24.0 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 3.87 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.87 px/step (range [3.69, 4.00] px/step)",
+        "Track corner radius is 82.3 px"
+      ],
+      "action_facts": [
+        "Steering angle is 24.0 degrees (action 0.801)",
+        "Longitudinal action is 0.973 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 3.87 px/step within measured range",
+        "Verified steering angle 24.0 deg within measured range",
+        "Verified step 145 within event window",
+        "Verified corner radius 72.0 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.5_s1003_s145_corner_apex",
+      "episode_id": "hairpin_f0.5_s1003",
+      "track_seed": 1003,
+      "benchmark": "hairpin",
+      "event_type": "corner_apex",
+      "start_step": 145,
+      "end_step": 153,
+      "duration_steps": 9,
+      "corner_id": "corner_2",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 3.868,
+        "velocity_range": [
+          3.687,
+          4.0
+        ],
+        "mean_heading_error": -5.52,
+        "mean_signed_distance": -7.11,
+        "mean_corner_radius": 82.3,
+        "min_corner_radius": 72.0
+      },
+      "action_summary": {
+        "mean_steering": 0.801,
+        "steering_range": [
+          0.466,
+          0.949
+        ],
+        "mean_longitudinal": 0.973,
+        "longitudinal_range": [
+          0.962,
+          0.979
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 98.7,
+        "min_forward_ray_0": 96.0,
+        "mean_left_diagonal": 50.7,
+        "mean_right_diagonal": 94.7,
+        "min_lateral_distance": 28.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.575,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.024
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 145 to 153 (duration 9 steps).",
+        "Vehicle velocity averaged 3.87 px/step (range 3.69 to 4.00 px/step).",
+        "Steering action averaged 0.801 (approx front wheel angle 24.0 deg).",
+        "Longitudinal action averaged 0.973 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 98.7 px (range 96.0 to 108.0 px).",
+        "Heading error averaged -5.5 deg; centerline signed distance averaged -7.11 px.",
+        "Track curvature radius averaged 82.3 px (corner phase: apex, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (0.575); highest longitudinal sensitivity is on ray_minus_45 (0.024)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_4_hairpin_1003",
+    "track_seed": 1003,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.5_s1003_s210_lateral_wall_proximity",
+    "event_type": "lateral_wall_proximity",
+    "commentary": "Navigating narrow corridor with lateral clearance constrained to 4.0 px at 4.00 px/step. Steering sensitivity concentrates on lateral beam ray_0 to maintain clearance.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 1069.9 px"
+      ],
+      "action_facts": [
+        "Steering angle is -29.8 degrees (action -0.994)",
+        "Longitudinal action is 0.988 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_0",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_0",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_0",
+        "Verified velocity 4.0 px/step within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.5_s1003_s210_lateral_wall_proximity",
+      "episode_id": "hairpin_f0.5_s1003",
+      "track_seed": 1003,
+      "benchmark": "hairpin",
+      "event_type": "lateral_wall_proximity",
+      "start_step": 210,
+      "end_step": 222,
+      "duration_steps": 13,
+      "corner_id": "none",
+      "corner_phase": "straight",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -1.08,
+        "mean_signed_distance": -29.94,
+        "mean_corner_radius": 1069.9,
+        "min_corner_radius": 226.7
+      },
+      "action_summary": {
+        "mean_steering": -0.994,
+        "steering_range": [
+          -0.999,
+          -0.982
+        ],
+        "mean_longitudinal": 0.988,
+        "longitudinal_range": [
+          0.966,
+          0.997
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 90.8,
+        "min_forward_ray_0": 32.0,
+        "mean_left_diagonal": 105.2,
+        "mean_right_diagonal": 9.5,
+        "min_lateral_distance": 4.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_0",
+        "top_steering_sensitivity": 0.01,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.009
+      },
+      "factual_bullet_points": [
+        "Event lateral_wall_proximity occurred from step 210 to 222 (duration 13 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.994 (approx front wheel angle -29.8 deg).",
+        "Longitudinal action averaged 0.988 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 90.8 px (range 32.0 to 160.0 px).",
+        "Heading error averaged -1.1 deg; centerline signed distance averaged -29.94 px.",
+        "Track curvature radius averaged 1069.9 px (corner phase: straight, corner ID: none).",
+        "Highest steering sensitivity is on ray_0 (0.010); highest longitudinal sensitivity is on ray_0 (0.009)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_5_acute_1007",
+    "track_seed": 1007,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.35_s1007_s000_corner_approach",
+    "event_type": "corner_approach",
+    "commentary": "Approaching corner entry with track radius 78.8 px. The policy initiates turn-in with steering angle -29.4 degrees, guided by ray_minus_90 while tracking ray_minus_45 for velocity maintenance (0.19 px/step).",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 0.19 px/step (range [0.00, 0.39] px/step)",
+        "Track corner radius is 78.8 px"
+      ],
+      "action_facts": [
+        "Steering angle is -29.4 degrees (action -0.981)",
+        "Longitudinal action is 0.981 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_90",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_90",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Verified velocity 0.19 px/step within measured range",
+        "Verified steering angle -29.4 deg within measured range",
+        "Verified corner radius 78.8 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.35_s1007_s000_corner_approach",
+      "episode_id": "hairpin_f0.35_s1007",
+      "track_seed": 1007,
+      "benchmark": "hairpin",
+      "event_type": "corner_approach",
+      "start_step": 0,
+      "end_step": 8,
+      "duration_steps": 9,
+      "corner_id": "corner_1",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 0.194,
+        "velocity_range": [
+          0.0,
+          0.388
+        ],
+        "mean_heading_error": -0.42,
+        "mean_signed_distance": 0.0,
+        "mean_corner_radius": 78.8,
+        "min_corner_radius": 78.8
+      },
+      "action_summary": {
+        "mean_steering": -0.981,
+        "steering_range": [
+          -0.986,
+          -0.976
+        ],
+        "mean_longitudinal": 0.981,
+        "longitudinal_range": [
+          0.979,
+          0.982
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 103.1,
+        "min_forward_ray_0": 100.0,
+        "mean_left_diagonal": 78.2,
+        "mean_right_diagonal": 44.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_90",
+        "top_steering_sensitivity": 0.045,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.007
+      },
+      "factual_bullet_points": [
+        "Event corner_approach occurred from step 0 to 8 (duration 9 steps).",
+        "Vehicle velocity averaged 0.19 px/step (range 0.00 to 0.39 px/step).",
+        "Steering action averaged -0.981 (approx front wheel angle -29.4 deg).",
+        "Longitudinal action averaged 0.981 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 103.1 px (range 100.0 to 104.0 px).",
+        "Heading error averaged -0.4 deg; centerline signed distance averaged 0.00 px.",
+        "Track curvature radius averaged 78.8 px (corner phase: entry, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_90 (0.045); highest longitudinal sensitivity is on ray_minus_45 (0.007)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_5_acute_1007",
+    "track_seed": 1007,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.35_s1007_s009_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 9 with curvature radius 78.6 px and steering angle -28.5 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 0.63 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 0.63 px/step (range [0.44, 0.82] px/step)",
+        "Track corner radius is 79.1 px"
+      ],
+      "action_facts": [
+        "Steering angle is -28.5 degrees (action -0.950)",
+        "Longitudinal action is 0.980 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 0.63 px/step within measured range",
+        "Verified steering angle -28.5 deg within measured range",
+        "Verified step 9 within event window",
+        "Verified corner radius 78.6 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.35_s1007_s009_corner_apex",
+      "episode_id": "hairpin_f0.35_s1007",
+      "track_seed": 1007,
+      "benchmark": "hairpin",
+      "event_type": "corner_apex",
+      "start_step": 9,
+      "end_step": 17,
+      "duration_steps": 9,
+      "corner_id": "corner_1",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 0.63,
+        "velocity_range": [
+          0.436,
+          0.824
+        ],
+        "mean_heading_error": -0.23,
+        "mean_signed_distance": 0.04,
+        "mean_corner_radius": 79.1,
+        "min_corner_radius": 78.6
+      },
+      "action_summary": {
+        "mean_steering": -0.95,
+        "steering_range": [
+          -0.983,
+          -0.897
+        ],
+        "mean_longitudinal": 0.98,
+        "longitudinal_range": [
+          0.978,
+          0.982
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 105.8,
+        "min_forward_ray_0": 104.0,
+        "mean_left_diagonal": 73.8,
+        "mean_right_diagonal": 46.7,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.277,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.008
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 9 to 17 (duration 9 steps).",
+        "Vehicle velocity averaged 0.63 px/step (range 0.44 to 0.82 px/step).",
+        "Steering action averaged -0.950 (approx front wheel angle -28.5 deg).",
+        "Longitudinal action averaged 0.980 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 105.8 px (range 104.0 to 108.0 px).",
+        "Heading error averaged -0.2 deg; centerline signed distance averaged 0.04 px.",
+        "Track curvature radius averaged 79.1 px (corner phase: apex, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.277); highest longitudinal sensitivity is on ray_minus_45 (0.008)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_5_acute_1007",
+    "track_seed": 1007,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.35_s1007_s018_corner_exit",
+    "event_type": "corner_exit",
+    "commentary": "Exiting corner as curvature unwinds. The policy applies positive longitudinal action (0.980), unwinding steering toward center with ray_minus_45 guiding exit trajectory at 1.14 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 1.14 px/step (range [0.87, 1.41] px/step)",
+        "Track corner radius is 90.8 px"
+      ],
+      "action_facts": [
+        "Steering angle is -26.3 degrees (action -0.878)",
+        "Longitudinal action is 0.980 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Verified velocity 1.14 px/step within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.35_s1007_s018_corner_exit",
+      "episode_id": "hairpin_f0.35_s1007",
+      "track_seed": 1007,
+      "benchmark": "hairpin",
+      "event_type": "corner_exit",
+      "start_step": 18,
+      "end_step": 29,
+      "duration_steps": 12,
+      "corner_id": "corner_1",
+      "corner_phase": "exit",
+      "telemetry_summary": {
+        "mean_velocity": 1.138,
+        "velocity_range": [
+          0.872,
+          1.405
+        ],
+        "mean_heading_error": 0.62,
+        "mean_signed_distance": -0.07,
+        "mean_corner_radius": 90.8,
+        "min_corner_radius": 80.6
+      },
+      "action_summary": {
+        "mean_steering": -0.878,
+        "steering_range": [
+          -0.942,
+          -0.742
+        ],
+        "mean_longitudinal": 0.98,
+        "longitudinal_range": [
+          0.979,
+          0.981
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 116.3,
+        "min_forward_ray_0": 108.0,
+        "mean_left_diagonal": 67.3,
+        "mean_right_diagonal": 48.0,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.676,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.007
+      },
+      "factual_bullet_points": [
+        "Event corner_exit occurred from step 18 to 29 (duration 12 steps).",
+        "Vehicle velocity averaged 1.14 px/step (range 0.87 to 1.40 px/step).",
+        "Steering action averaged -0.878 (approx front wheel angle -26.3 deg).",
+        "Longitudinal action averaged 0.980 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 116.3 px (range 108.0 to 124.0 px).",
+        "Heading error averaged 0.6 deg; centerline signed distance averaged -0.07 px.",
+        "Track curvature radius averaged 90.8 px (corner phase: exit, corner ID: corner_1).",
+        "Highest steering sensitivity is on ray_minus_45 (0.676); highest longitudinal sensitivity is on ray_0 (0.007)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_5_acute_1007",
+    "track_seed": 1007,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.35_s1007_s194_corner_apex",
+    "event_type": "corner_apex",
+    "commentary": "Navigating corner apex at step 194 with curvature radius 109.5 px and steering angle -23.5 degrees. Lateral positioning is guided by ray_minus_45 while holding speed at 4.00 px/step.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 4.00 px/step (range [4.00, 4.00] px/step)",
+        "Track corner radius is 115.7 px"
+      ],
+      "action_facts": [
+        "Steering angle is -23.5 degrees (action -0.783)",
+        "Longitudinal action is 0.914 (throttle)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_minus_45"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant steering sensor in commentary text: ray_minus_45",
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_minus_45",
+        "Correctly identified throttle / cruising control regime",
+        "Verified velocity 4.0 px/step within measured range",
+        "Verified steering angle -23.5 deg within measured range",
+        "Verified step 194 within event window",
+        "Verified corner radius 109.5 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.35_s1007_s194_corner_apex",
+      "episode_id": "hairpin_f0.35_s1007",
+      "track_seed": 1007,
+      "benchmark": "hairpin",
+      "event_type": "corner_apex",
+      "start_step": 194,
+      "end_step": 202,
+      "duration_steps": 9,
+      "corner_id": "corner_2",
+      "corner_phase": "apex",
+      "telemetry_summary": {
+        "mean_velocity": 4.0,
+        "velocity_range": [
+          4.0,
+          4.0
+        ],
+        "mean_heading_error": -0.4,
+        "mean_signed_distance": -1.07,
+        "mean_corner_radius": 115.7,
+        "min_corner_radius": 109.5
+      },
+      "action_summary": {
+        "mean_steering": -0.783,
+        "steering_range": [
+          -0.897,
+          -0.575
+        ],
+        "mean_longitudinal": 0.914,
+        "longitudinal_range": [
+          0.881,
+          0.95
+        ],
+        "action_mode": "throttle"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 110.7,
+        "min_forward_ray_0": 104.0,
+        "mean_left_diagonal": 68.9,
+        "mean_right_diagonal": 44.9,
+        "min_lateral_distance": 36.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.983,
+        "top_longitudinal_ray": "ray_minus_45",
+        "top_longitudinal_sensitivity": 0.105
+      },
+      "factual_bullet_points": [
+        "Event corner_apex occurred from step 194 to 202 (duration 9 steps).",
+        "Vehicle velocity averaged 4.00 px/step (range 4.00 to 4.00 px/step).",
+        "Steering action averaged -0.783 (approx front wheel angle -23.5 deg).",
+        "Longitudinal action averaged 0.914 (control regime: throttle).",
+        "Center forward beam (ray_0) averaged 110.7 px (range 104.0 to 120.0 px).",
+        "Heading error averaged -0.4 deg; centerline signed distance averaged -1.07 px.",
+        "Track curvature radius averaged 115.7 px (corner phase: apex, corner ID: corner_2).",
+        "Highest steering sensitivity is on ray_minus_45 (0.983); highest longitudinal sensitivity is on ray_minus_45 (0.105)."
+      ]
+    }
+  },
+  {
+    "lap_id": "lap_5_acute_1007",
+    "track_seed": 1007,
+    "benchmark": "hairpin",
+    "event_id": "ev_hairpin_f0.35_s1007_s332_sustained_braking",
+    "event_type": "sustained_braking",
+    "commentary": "Deceleration phase approaching curvature (radius 74.3 px). The policy applies negative longitudinal action (-0.626), decelerating within [2.42, 3.91] px/step as ray_0 exhibits dominant sensitivity.",
+    "evidence": {
+      "telemetry_facts": [
+        "Velocity is 3.21 px/step (range [2.42, 3.91] px/step)",
+        "Track corner radius is 74.3 px"
+      ],
+      "action_facts": [
+        "Steering angle is 29.9 degrees (action 0.998)",
+        "Longitudinal action is -0.626 (braking)"
+      ],
+      "saliency_facts": [
+        "Dominant steering sensor is ray_minus_45",
+        "Dominant longitudinal sensor is ray_0"
+      ]
+    },
+    "confidence": 0.95,
+    "interpretation_notes": "Deterministic telemetry slice mock grounded in actual measurements.",
+    "model_id": "gemini-3.8-flash",
+    "grounding_validation": {
+      "is_valid": true,
+      "verdict": "CORRECT_GROUNDED",
+      "grounding_score": 1.0,
+      "verified_facts": [
+        "Correctly referenced dominant longitudinal sensor in commentary text: ray_0",
+        "Correctly identified braking / deceleration control regime",
+        "Verified velocity 2.42 px/step within measured range",
+        "Verified velocity 3.91 px/step within measured range",
+        "Verified corner radius 74.3 px within measured range"
+      ],
+      "flagged_issues": []
+    },
+    "ground_truth_telemetry": {
+      "event_id": "ev_hairpin_f0.35_s1007_s332_sustained_braking",
+      "episode_id": "hairpin_f0.35_s1007",
+      "track_seed": 1007,
+      "benchmark": "hairpin",
+      "event_type": "sustained_braking",
+      "start_step": 332,
+      "end_step": 350,
+      "duration_steps": 19,
+      "corner_id": "corner_5",
+      "corner_phase": "entry",
+      "telemetry_summary": {
+        "mean_velocity": 3.206,
+        "velocity_range": [
+          2.425,
+          3.906
+        ],
+        "mean_heading_error": -13.63,
+        "mean_signed_distance": -3.6,
+        "mean_corner_radius": 74.3,
+        "min_corner_radius": 46.5
+      },
+      "action_summary": {
+        "mean_steering": 0.998,
+        "steering_range": [
+          0.99,
+          1.0
+        ],
+        "mean_longitudinal": -0.626,
+        "longitudinal_range": [
+          -0.93,
+          -0.127
+        ],
+        "action_mode": "braking"
+      },
+      "sensor_summary": {
+        "mean_forward_ray_0": 74.1,
+        "min_forward_ray_0": 72.0,
+        "mean_left_diagonal": 44.4,
+        "mean_right_diagonal": 166.3,
+        "min_lateral_distance": 28.0
+      },
+      "saliency_triggers": {
+        "top_steering_ray": "ray_minus_45",
+        "top_steering_sensitivity": 0.003,
+        "top_longitudinal_ray": "ray_0",
+        "top_longitudinal_sensitivity": 0.488
+      },
+      "factual_bullet_points": [
+        "Event sustained_braking occurred from step 332 to 350 (duration 19 steps).",
+        "Vehicle velocity averaged 3.21 px/step (range 2.42 to 3.91 px/step).",
+        "Steering action averaged 0.998 (approx front wheel angle 29.9 deg).",
+        "Longitudinal action averaged -0.626 (control regime: braking).",
+        "Center forward beam (ray_0) averaged 74.1 px (range 72.0 to 80.0 px).",
+        "Heading error averaged -13.6 deg; centerline signed distance averaged -3.60 px.",
+        "Track curvature radius averaged 74.3 px (corner phase: entry, corner ID: corner_5).",
+        "Highest steering sensitivity is on ray_minus_45 (0.003); highest longitudinal sensitivity is on ray_0 (0.488)."
+      ]
+    }
+  }
+]
