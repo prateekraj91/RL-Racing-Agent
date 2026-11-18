@@ -101,39 +101,39 @@ def load_api_credentials() -> Tuple[str, str]:
 class GroundingValidator:
     """Deterministic validation layer verifying LLM commentary against empirical telemetry.
 
-    Supports dual-mode validation:
-    1. Remediated Mode (Default): Strict typed numerical checks, simulation physical bounds
-       ([-2.0, 4.0] px/step speed, [-30, 30] deg steering), elimination of evidence leakage,
-       rejection of non-existent sensors, and strict semantic filtering against domain violations
-       (tire grip, visual gaze, steering chatter, competitor entities, intentional apex clipping).
-    2. Legacy Audit Mode: Retains the baseline logic from commit 9a3db88 to allow the independent
-       historical audit test suite (tests/test_grounded_commentary_audit.py) to run unmodified.
+    Production-only strict validation path verifying:
+    - Simulation physical bounds (speed [-2.0, 4.0] px/step, steering [-30, 30] deg).
+    - Elimination of evidence leakage (sensors must be present in commentary text).
+    - Non-existent sensor rejection (cameras, 360 lidar, IMU, GPS).
+    - Contradictory real sensor attribution (steering/longitudinal sensors must match dominant saliency).
+    - Strict semantic & physics filtering against domain violations and synonyms
+      (tire traction, downforce, weight transfer, visual gaze, competitor agents, intentional apex clipping).
+    - Steering coherence (|mean_steer| <= 0.08 / 2.4 deg for straight-line cruising).
+    - Unit correctness (px/step for speed, deg for steering angles, px for radius).
+    - Fabricated corner label rejection (Turn IDs must match event corner_id).
+    - Cross-lap / evidence provenance integrity (lap_id, track_seed, event_id).
     """
 
     REQUIRED_KEYS = ["event_id", "event_type", "commentary", "evidence", "confidence", "model_id"]
 
-    LEGACY_FORBIDDEN_HALLUCINATIONS = [
-        "spun out", "spin out", "crash", "collision", "overtake", "overtaking",
-        "tire puncture", "gear shift", "gearbox", "turbo", "pit stop"
-    ]
-
-    REMEDIATED_FORBIDDEN_CONCEPTS = [
-        # Baseline hallucinations
-        "spun out", "spin out", "crash", "collision", "overtake", "overtaking",
-        "tire puncture", "gear shift", "gearbox", "turbo", "pit stop",
-        # Simulation physics violations (Car has grip_limit=False, no aero/downforce)
-        "tire grip", "grip limit", "grip optimization", "maximize tire grip",
-        "maximizing tire grip", "downforce", "aerodynamic", "diffuser", "ground effect",
-        "suspension", "anti-roll", "chatter", "steering chatter", "wheel chatter", "chassis flex",
-        # Non-existent sensor hardware and anthropomorphic vision
-        "visual gaze", "shifts gaze", "shifts its visual gaze", "shifting visual gaze",
-        "foveal", "attention mechanism", "camera", "rear camera", "lidar 360", "360 lidar",
-        "gps", "imu", "accelerometer",
-        # Non-existent competitor agents
-        "competitor", "opponent", "other car", "other vehicle", "traffic", "grid", "paddock",
-        # Unmeasured anthropomorphic driving intentions
-        "deliberately clips", "intentional apex clipping", "deliberate apex",
-        "intentionally clips", "clips the apex barrier",
+    REMEDIATED_FORBIDDEN_PATTERNS = [
+        # Hallucinations & accidents
+        r"\b(?:spun\s+out|spin\s+out|crash|collision|overtake|overtaking|pit\s+stop)\b",
+        r"\b(?:tire\s+puncture|tyre\s+puncture|gear\s*shift|gearbox|turbo|supercharger|clutch|differential|engine\s+braking)\b",
+        # Physics violations (Car has grip_limit=False, no aero/downforce, no suspension/weight transfer)
+        r"\b(?:tire|tyre|rubber)\s+(?:grip|traction|friction|adhesion|contact\s+patch|slip|temperature)\b",
+        r"\b(?:grip\s+limit|grip\s+optimization|maximize\s+tire\s+grip|maximizing\s+tire\s+grip|mechanical\s+grip|friction\s+circle)\b",
+        r"\b(?:aero|aerodynamic|downforce|diffuser|ground\s+effect|wing|spoiler|drag\s+reduction|aero\s+balance)\b",
+        r"\b(?:suspension|anti-roll|chassis\s+flex|body\s+roll|weight\s+transfer|load\s+transfer|pitch\s+angle)\b",
+        r"\b(?:chatter|steering\s+chatter|wheel\s+chatter)\b",
+        # Non-existent sensors & anthropomorphic vision
+        r"\b(?:visual\s+gaze|shifts?\s+(?:its\s+)?(?:visual\s+)?gaze|shifting\s+(?:visual\s+)?gaze|foveal|ocular|peripheral\s+vision|eyeball|driver\'?s?\s+eyes?|visual\s+field|gazing|looking\s+ahead)\b",
+        r"\b(?:attention\s+mechanism|rear_camera|camera|lidar_360|360\s+lidar|gps|imu|accelerometer)\b",
+        # Competitors & racing traffic
+        r"\b(?:competitor|opponent|rival|other\s+car|other\s+vehicle|traffic|grid|paddock|slipstream|drafting)\b",
+        # Unmeasured driving intentions
+        r"\b(?:deliberately|intentionally|consciously)\s+(?:clips?|aims?|targets?|hugs?|cuts?)\b",
+        r"\b(?:intentional|deliberate)\s+(?:apex|curb|kerb|line)\b",
     ]
 
     VALID_SENSOR_NAMES = {
@@ -145,143 +145,21 @@ class GroundingValidator:
     ]
 
     @classmethod
-    def _is_historical_audit_caller(cls) -> bool:
-        """Inspect stack to detect if invoked from the historical audit test suite."""
-        import inspect
-        for frame_info in inspect.stack():
-            if "test_grounded_commentary_audit" in frame_info.filename:
-                return True
-        return False
-
-    @classmethod
     def validate_commentary_item(
         cls,
         commentary_item: Dict[str, Any],
         ground_truth_event: Dict[str, Any],
-        legacy_audit_mode: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Validate a single Gemini commentary against its source telemetry event.
+        """Strict production validation verifying typed physical limits, sensor citations, and semantics.
 
         Args:
             commentary_item: The generated commentary dictionary.
             ground_truth_event: The telemetry event record slice.
-            legacy_audit_mode: Optional boolean flag. If None, auto-detects whether caller
-                is the historical audit test suite.
 
         Returns:
             Dictionary with is_valid boolean, grounding_score [0..1], verified_facts,
             flagged_issues, and verdict ('CORRECT_GROUNDED', 'UNCERTAIN_INTERPRETATION', 'UNSUPPORTED_REJECTED').
         """
-        if legacy_audit_mode is None:
-            legacy_audit_mode = cls._is_historical_audit_caller()
-
-        if legacy_audit_mode:
-            return cls._validate_legacy_audit_item(commentary_item, ground_truth_event)
-        return cls._validate_remediated_item(commentary_item, ground_truth_event)
-
-    @classmethod
-    def _validate_legacy_audit_item(
-        cls,
-        commentary_item: Dict[str, Any],
-        ground_truth_event: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Baseline validation logic preserved for historical audit test execution."""
-        verified_facts = []
-        flagged_issues = []
-
-        # 1. Schema Validation
-        for k in cls.REQUIRED_KEYS:
-            if k not in commentary_item:
-                flagged_issues.append(f"Missing required key: {k}")
-
-        if commentary_item.get("event_id") != ground_truth_event.get("event_id"):
-            flagged_issues.append(
-                f"event_id mismatch: got {commentary_item.get('event_id')}, expected {ground_truth_event.get('event_id')}"
-            )
-
-        conf = commentary_item.get("confidence", 0.0)
-        if not isinstance(conf, (int, float)) or not (0.0 <= conf <= 1.0):
-            flagged_issues.append(f"Invalid confidence value: {conf}")
-
-        text = commentary_item.get("commentary", "")
-        ev_data = commentary_item.get("evidence", {})
-
-        # 2. Hallucination Checks
-        is_actual_crash = (
-            ground_truth_event.get("benchmark", "") == "hairpin"
-            and ground_truth_event.get("track_seed") == 1001
-            and ground_truth_event.get("end_step", 0) >= 220
-        )
-        for term in cls.LEGACY_FORBIDDEN_HALLUCINATIONS:
-            if term in ["crash", "collision"] and is_actual_crash:
-                continue
-            if re.search(r"\b" + re.escape(term) + r"\b", text.lower()):
-                flagged_issues.append(f"Commentary contains unsupported hallucinated concept: '{term}'")
-
-        # 3. Numerical Grounding Validation (Baseline with dead-code ranges)
-        telem = ground_truth_event.get("telemetry_summary", {})
-        sensors = ground_truth_event.get("sensor_summary", {})
-        actions = ground_truth_event.get("action_summary", {})
-        saliencies = ground_truth_event.get("saliency_triggers", {})
-
-        # Verify action mode grounding
-        act_mode = actions.get("action_mode", "")
-        if act_mode == "braking":
-            if any(w in text.lower() for w in ["brak", "decel", "slow"]):
-                verified_facts.append("Correctly identified braking / deceleration control regime")
-            else:
-                flagged_issues.append("Failed to identify active negative longitudinal braking")
-        elif act_mode == "throttle":
-            if any(w in text.lower() for w in ["throttle", "accel", "speed", "cruis"]):
-                verified_facts.append("Correctly identified throttle / cruising control regime")
-
-        # Verify sensor citations
-        top_s_ray = saliencies.get("top_steering_ray") or saliencies.get("dominant_steering_saliency_ray")
-        top_l_ray = saliencies.get("top_longitudinal_ray") or saliencies.get("dominant_longitudinal_saliency_ray")
-        if top_s_ray and (top_s_ray in str(ev_data) or top_s_ray in text):
-            verified_facts.append(f"Correctly referenced dominant steering sensor: {top_s_ray}")
-        if top_l_ray and (top_l_ray in str(ev_data) or top_l_ray in text):
-            verified_facts.append(f"Correctly referenced dominant longitudinal sensor: {top_l_ray}")
-        if top_l_ray in str(ev_data) or top_l_ray in text:
-            verified_facts.append(f"Correctly referenced dominant longitudinal sensor: {top_l_ray}")
-
-        # Baseline un-evaluated dead-code ranges
-        numbers = [float(x) for x in re.findall(r"\b\d+\.?\d*\b", text)]
-        valid_ranges = [
-            telem.get("velocity_range", [0, 4]),
-            [sensors.get("min_forward_ray_0", 0) - 5.0, sensors.get("mean_forward_ray_0", 100) + 5.0],
-            [actions.get("steering_range", [-1, 1])[0] * 30.0 - 5.0, actions.get("steering_range", [-1, 1])[1] * 30.0 + 5.0],
-            [telem.get("min_corner_radius", 0) - 10.0, telem.get("mean_corner_radius", 100) + 10.0],
-        ]
-
-        grounding_score = max(0.0, 1.0 - (len(flagged_issues) * 0.25))
-
-        # Classification
-        if flagged_issues:
-            verdict = "UNSUPPORTED_REJECTED"
-            is_valid = False
-        elif conf < 0.80 or "uncertain" in str(commentary_item.get("interpretation_notes", "")).lower():
-            verdict = "UNCERTAIN_INTERPRETATION"
-            is_valid = True
-        else:
-            verdict = "CORRECT_GROUNDED"
-            is_valid = True
-
-        return {
-            "is_valid": is_valid,
-            "verdict": verdict,
-            "grounding_score": round(grounding_score, 2),
-            "verified_facts": verified_facts,
-            "flagged_issues": flagged_issues,
-        }
-
-    @classmethod
-    def _validate_remediated_item(
-        cls,
-        commentary_item: Dict[str, Any],
-        ground_truth_event: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        """Strict remediated validation verifying typed physical limits, sensor citations, and semantics."""
         verified_facts = []
         flagged_issues = []
 
@@ -308,7 +186,24 @@ class GroundingValidator:
         actions = ground_truth_event.get("action_summary", {})
         saliencies = ground_truth_event.get("saliency_triggers", {})
 
-        # 2. Strict Semantic & Domain Hallucination Filter
+        # Cross-lap / evidence reference provenance validation
+        if isinstance(ev_data, dict):
+            ev_lap = ev_data.get("lap_id")
+            gt_lap = ground_truth_event.get("lap_id") or commentary_item.get("lap_id")
+            if ev_lap and gt_lap and ev_lap != gt_lap:
+                flagged_issues.append(f"Mismatched evidence reference: evidence references lap '{ev_lap}', expected '{gt_lap}'")
+
+            ev_eid = ev_data.get("event_id")
+            gt_eid = ground_truth_event.get("event_id")
+            if ev_eid and gt_eid and ev_eid != gt_eid:
+                flagged_issues.append(f"Mismatched evidence reference: evidence references event '{ev_eid}', expected '{gt_eid}'")
+
+            ev_seed = ev_data.get("track_seed")
+            gt_seed = ground_truth_event.get("track_seed") or commentary_item.get("track_seed")
+            if ev_seed is not None and gt_seed is not None and int(ev_seed) != int(gt_seed):
+                flagged_issues.append(f"Mismatched evidence reference: evidence references track seed {ev_seed}, expected {gt_seed}")
+
+        # 2. Strict Semantic & Domain Synonyms Filter
         is_actual_crash = (
             ground_truth_event.get("benchmark", "") == "hairpin"
             and ground_truth_event.get("track_seed") == 1001
@@ -316,27 +211,77 @@ class GroundingValidator:
         )
         combined_text_for_terms = (text + " " + str(ev_data) + " " + interp).lower()
 
-        for term in cls.REMEDIATED_FORBIDDEN_CONCEPTS:
-            if term in ["crash", "collision"] and is_actual_crash:
+        for pat in cls.REMEDIATED_FORBIDDEN_PATTERNS:
+            if ("crash" in pat or "collision" in pat) and is_actual_crash:
                 continue
-            pattern = r"\b" + re.escape(term) + r"\b"
-            if re.search(pattern, combined_text_for_terms):
-                flagged_issues.append(f"Commentary contains unsupported hallucinated concept: '{term}'")
+            m = re.search(pat, combined_text_for_terms, re.IGNORECASE)
+            if m:
+                flagged_issues.append(f"Commentary contains unsupported hallucinated concept or domain violation: '{m.group(0)}'")
 
-        # 3. Evidence Integrity & Non-existent Sensors Check
+        # 3. Unit Validation & Cross-Unit Contradictions
+        if re.search(r"\b(?:km/h|mph|m/s|kmph|knots)\b", text, re.IGNORECASE):
+            flagged_issues.append("Invalid unit: simulation velocity must be in 'px/step', real-world velocity units are not supported")
+
+        if re.search(r"(-?\d+\.?\d*)\s*(?:deg|degrees|°)\s*(?:speed|velocity)", text, re.IGNORECASE) or \
+           re.search(r"(?:speed|velocity)\s*(?:of|is|at)?\s*(-?\d+\.?\d*)\s*(?:deg|degrees|°)", text, re.IGNORECASE):
+            flagged_issues.append("Cross-unit error: velocity cannot be measured in degrees")
+
+        if re.search(r"(?:steer|steering|wheel)\s*(?:angle|lock|action)?\s*(?:of|is|at)?\s*(-?\d+\.?\d*)\s*(?:px/step|pixels/step)", text, re.IGNORECASE):
+            flagged_issues.append("Cross-unit error: steering cannot be measured in px/step")
+
+        if re.search(r"(?:radius|curvature)\s*(?:of|is|at)?\s*(-?\d+\.?\d*)\s*(?:deg|degrees|°)", text, re.IGNORECASE):
+            flagged_issues.append("Cross-unit error: corner radius cannot be measured in degrees")
+
+        # 4. Fabricated Corner Labels
+        corner_matches = re.finditer(r"\b(?:turn|corner)\s*(\d+)\b", text, re.IGNORECASE)
+        gt_corner_id = ground_truth_event.get("corner_id")
+        for cm in corner_matches:
+            cited_turn = int(cm.group(1))
+            if gt_corner_id and gt_corner_id != "none":
+                m_gt = re.search(r"(\d+)", str(gt_corner_id))
+                expected_turn = int(m_gt.group(1)) if m_gt else None
+                if expected_turn is not None and cited_turn != expected_turn:
+                    flagged_issues.append(f"Fabricated corner label: commentary cites Turn {cited_turn}, but ground truth event is {gt_corner_id}")
+            else:
+                flagged_issues.append(f"Fabricated corner label: commentary cites Turn {cited_turn} during section with no corner")
+
+        # 5. Non-Existent Sensors & Evidence Integrity
         ev_str = str(ev_data).lower()
         for fake_sensor in cls.INVALID_SENSOR_INDICATORS:
             if fake_sensor in ev_str or fake_sensor in text.lower():
                 flagged_issues.append(f"Evidence references invalid or nonexistent sensor: '{fake_sensor}'")
 
-        # Sensor citation verification: Dominant rays must appear directly in commentary text
+        # Dominant sensor citations in commentary text
         top_s_ray = saliencies.get("top_steering_ray") or saliencies.get("dominant_steering_saliency_ray")
         top_l_ray = saliencies.get("top_longitudinal_ray") or saliencies.get("dominant_longitudinal_saliency_ray")
 
+        text_sensors = [r for r in cls.VALID_SENSOR_NAMES if r in text]
         if top_s_ray and top_s_ray in text:
             verified_facts.append(f"Correctly referenced dominant steering sensor in commentary text: {top_s_ray}")
         if top_l_ray and top_l_ray in text:
             verified_facts.append(f"Correctly referenced dominant longitudinal sensor in commentary text: {top_l_ray}")
+
+        # Sensor cited only in metadata, not in commentary text
+        claims_sensor_guidance = bool(re.search(r"\b(?:sensor|saliency|guided by|directed by|lookahead beam|lookahead ray)\b", text, re.IGNORECASE))
+        has_sensor_in_metadata = any(r in ev_str for r in cls.VALID_SENSOR_NAMES) or bool(saliencies)
+        if claims_sensor_guidance and not text_sensors:
+            flagged_issues.append("Sensor guidance claimed in commentary, but no sensor ray is cited in commentary text")
+        elif has_sensor_in_metadata and not text_sensors and "saliency_facts" in ev_data:
+            flagged_issues.append("Sensor data present in metadata/saliency_facts, but no sensor ray is cited in commentary text")
+
+        # Contradictory real sensor attribution
+        for other_ray in cls.VALID_SENSOR_NAMES:
+            if other_ray in text:
+                if top_s_ray and other_ray != top_s_ray:
+                    if re.search(rf"\b(?:steering|steer|lateral)\b[^\.\n]*\b{other_ray}\b", text, re.IGNORECASE) or \
+                       re.search(rf"\b{other_ray}\b[^\.\n]*\b(?:dictates|controls|guides|steers|governs)\b[^\.\n]*\b(?:steering|steer|lateral)\b", text, re.IGNORECASE) or \
+                       re.search(rf"\bdominant\s+steering\s+sensor\s+{other_ray}\b", text, re.IGNORECASE):
+                        flagged_issues.append(f"Contradictory sensor attribution: commentary attributes steering to {other_ray}, but dominant steering sensor is {top_s_ray}")
+                if top_l_ray and other_ray != top_l_ray:
+                    if re.search(rf"\b(?:throttle|braking|longitudinal|speed|cruising)\b[^\.\n]*\b{other_ray}\b", text, re.IGNORECASE) or \
+                       re.search(rf"\b{other_ray}\b[^\.\n]*\b(?:dictates|controls|guides|governs)\b[^\.\n]*\b(?:throttle|braking|longitudinal|speed)\b", text, re.IGNORECASE) or \
+                       re.search(rf"\bdominant\s+longitudinal\s+sensor\s+{other_ray}\b", text, re.IGNORECASE):
+                        flagged_issues.append(f"Contradictory sensor attribution: commentary attributes longitudinal control to {other_ray}, but dominant longitudinal sensor is {top_l_ray}")
 
         # Reject evidence leakage where evidence dictionary cites fake/contradictory sensors
         if isinstance(ev_data, dict):
@@ -347,7 +292,7 @@ class GroundingValidator:
                 if f"top longitudinal sensor is {r_name}" in saliency_facts and top_l_ray and r_name != top_l_ray:
                     flagged_issues.append(f"Evidence falsely claims {r_name} is top longitudinal sensor (expected {top_l_ray})")
 
-        # 4. Action Regime & Steering Coherence
+        # 6. Action Regime & Steering Coherence
         act_mode = actions.get("action_mode", "")
         if act_mode == "braking":
             if any(w in text.lower() for w in ["brak", "decel", "slow"]):
@@ -362,32 +307,31 @@ class GroundingValidator:
             if any(w in text.lower() for w in ["threshold braking", "heavy braking", "negative longitudinal action"]):
                 flagged_issues.append("Contradictory claim: commentary claims braking during active throttle regime")
 
-        # Steering Coherence
-        if any(w in text.lower() for w in ["steering centered", "neutral steering", "zero steering", "straight line"]):
+        # Steering Coherence: strictly aligned with straight-line cruising detector (|delta| <= 0.08 / 2.4 deg)
+        if any(w in text.lower() for w in ["steering centered", "neutral steering", "zero steering", "straight line", "straight-line cruising", "straight cruising"]):
             actual_mean_steer = abs(actions.get("mean_steering", 0.0))
             actual_wheel_deg = actual_mean_steer * 30.0
             is_corner_phase = ground_truth_event.get("corner_phase") in ["entry", "apex", "exit"]
-            if actual_mean_steer > 0.15 or is_corner_phase:
+            if actual_mean_steer > 0.08 or is_corner_phase:
                 flagged_issues.append(
-                    f"Contradictory steering claim: commentary claims steering centered/neutral during corner phase "
+                    f"Contradictory steering claim: commentary claims steering centered/neutral during corner phase or high steer "
                     f"(actual steering: {actions.get('mean_steering', 0.0):.3f}, angle {actions.get('mean_steering', 0.0)*30.0:.1f} deg, phase: {ground_truth_event.get('corner_phase')})"
                 )
             else:
                 verified_facts.append(f"Verified centered steering ({actual_wheel_deg:.1f} deg)")
 
-        # 5. Typed Numerical Grounding & Physical Limits
-        # 5a. Explicit Velocity Citations
+        # 7. Typed Numerical Grounding & Physical Limits
         velocity_values: List[float] = []
         # Pattern 1: [v1, v2] px/step, from v1 to v2 px/step, or within [v1, v2]
         for m in re.finditer(
-            r"(?:\[|\bfrom\s+|\bwithin\s+\[?)\s*(-?\d+\.?\d*)\s*(?:,\s*|\s+to\s+)\s*(-?\d+\.?\d*)\s*\]?\s*(?:px/step|px\s*/\s*step|pixels/step|km/h|mph)?",
+            r"(?:\[|\bfrom\s+|\bwithin\s+\[?)\s*(-?\d+\.?\d*)\s*(?:,\s*|\s+to\s+)\s*(-?\d+\.?\d*)\s*\]?\s*(?:px/step|px\s*/\s*step|pixels/step)?",
             text,
             re.IGNORECASE,
         ):
             velocity_values.extend([float(m.group(1)), float(m.group(2))])
         # Pattern 2: single number followed by px/step
         for m in re.finditer(
-            r"(-?\d+\.?\d*)\s*[\]\)]?\s*(?:px/step|px\s*/\s*step|pixels/step|pixels\s*/\s*step|km/h|mph)",
+            r"(-?\d+\.?\d*)\s*[\]\)]?\s*(?:px/step|px\s*/\s*step|pixels/step|pixels\s*/\s*step)",
             text,
             re.IGNORECASE,
         ):
@@ -422,7 +366,7 @@ class GroundingValidator:
                 else:
                     verified_facts.append(f"Verified velocity {v_val} px/step within measured range")
 
-        # 5b. Explicit Steering Angle Citations
+        # Steering Angle Citations
         steer_matches = re.findall(r"(-?\d+\.?\d*)\s*(?:deg|degrees|°)", text, re.IGNORECASE)
         for s_str in steer_matches:
             s_val = float(s_str)
@@ -441,7 +385,7 @@ class GroundingValidator:
                 else:
                     verified_facts.append(f"Verified steering angle {s_val} deg within measured range")
 
-        # 5c. Explicit Step Range Citations
+        # Step Range Citations
         step_matches = re.findall(r"\bstep\s*(\d+)\b", text, re.IGNORECASE)
         ev_start = ground_truth_event.get("start_step", 0)
         ev_end = ground_truth_event.get("end_step", 0)
@@ -454,7 +398,7 @@ class GroundingValidator:
             else:
                 verified_facts.append(f"Verified step {st_val} within event window")
 
-        # 5d. Explicit Corner Radius Citations
+        # Corner Radius Citations
         radius_matches = re.findall(
             r"(?:radius|curvature)\s*(?:of|is|radius)?\s*(\d+\.?\d*)\s*(?:px)?",
             text,
@@ -471,7 +415,7 @@ class GroundingValidator:
             else:
                 verified_facts.append(f"Verified corner radius {r_val} px within measured range")
 
-        # 5e. General Numerical Verification: Catch unexplained / arbitrary numbers
+        # General Numerical Verification: Catch unexplained / arbitrary numbers
         all_numbers = [float(x) for x in re.findall(r"-?\b\d+\.?\d*\b", text)]
         for num in all_numbers:
             is_accounted = (
@@ -485,7 +429,6 @@ class GroundingValidator:
                 flagged_issues.append(f"Unexplained / ungrounded numerical value cited in commentary: {num}")
 
         grounding_score = max(0.0, 1.0 - (len(flagged_issues) * 0.25))
-
         if flagged_issues:
             verdict = "UNSUPPORTED_REJECTED"
             is_valid = False

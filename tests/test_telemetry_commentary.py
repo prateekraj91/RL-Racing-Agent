@@ -436,7 +436,7 @@ def test_remediated_validator_rejects_impossible_velocities(sample_corner_approa
         "confidence": 0.95,
         "model_id": "gemini-3.8-flash",
     }
-    val_888 = GroundingValidator.validate_commentary_item(item_888, sample_corner_approach_gt, legacy_audit_mode=False)
+    val_888 = GroundingValidator.validate_commentary_item(item_888, sample_corner_approach_gt)
     assert val_888["is_valid"] is False
     assert val_888["verdict"] == "UNSUPPORTED_REJECTED"
     assert any("Physically impossible velocity" in issue for issue in val_888["flagged_issues"])
@@ -450,7 +450,7 @@ def test_remediated_validator_rejects_impossible_velocities(sample_corner_approa
         "confidence": 0.95,
         "model_id": "gemini-3.8-flash",
     }
-    val_882 = GroundingValidator.validate_commentary_item(item_882, sample_corner_approach_gt, legacy_audit_mode=False)
+    val_882 = GroundingValidator.validate_commentary_item(item_882, sample_corner_approach_gt)
     assert val_882["is_valid"] is False
     assert val_882["verdict"] == "UNSUPPORTED_REJECTED"
     assert any("Physically impossible velocity" in issue for issue in val_882["flagged_issues"])
@@ -468,7 +468,7 @@ def test_remediated_validator_rejects_evidence_leakage(sample_corner_approach_gt
         "confidence": 0.95,
         "model_id": "gemini-3.8-flash",
     }
-    val = GroundingValidator.validate_commentary_item(item_omitted, sample_corner_approach_gt, legacy_audit_mode=False)
+    val = GroundingValidator.validate_commentary_item(item_omitted, sample_corner_approach_gt)
     assert not any("referenced dominant steering sensor in commentary text" in f for f in val["verified_facts"])
 
 
@@ -482,7 +482,7 @@ def test_remediated_validator_rejects_fake_sensors(sample_corner_approach_gt):
         "confidence": 0.95,
         "model_id": "gemini-3.8-flash",
     }
-    val = GroundingValidator.validate_commentary_item(item_fake_sensor, sample_corner_approach_gt, legacy_audit_mode=False)
+    val = GroundingValidator.validate_commentary_item(item_fake_sensor, sample_corner_approach_gt)
     assert val["is_valid"] is False
     assert val["verdict"] == "UNSUPPORTED_REJECTED"
     assert any("invalid or nonexistent sensor" in issue for issue in val["flagged_issues"])
@@ -501,7 +501,7 @@ def test_remediated_validator_rejects_unsupported_physics_and_gaze(sample_corner
         "confidence": 0.95,
         "model_id": "gemini-3.8-flash",
     }
-    val = GroundingValidator.validate_commentary_item(item_hallucinated, sample_corner_approach_gt, legacy_audit_mode=False)
+    val = GroundingValidator.validate_commentary_item(item_hallucinated, sample_corner_approach_gt)
     assert val["is_valid"] is False
     assert val["verdict"] == "UNSUPPORTED_REJECTED"
     assert any("tire grip" in issue for issue in val["flagged_issues"])
@@ -518,7 +518,7 @@ def test_remediated_validator_rejects_contradictory_steering(sample_corner_appro
         "confidence": 0.95,
         "model_id": "gemini-3.8-flash",
     }
-    val = GroundingValidator.validate_commentary_item(contradictory_item, sample_corner_approach_gt, legacy_audit_mode=False)
+    val = GroundingValidator.validate_commentary_item(contradictory_item, sample_corner_approach_gt)
     assert val["is_valid"] is False
     assert val["verdict"] == "UNSUPPORTED_REJECTED"
     assert any("Contradictory steering claim" in issue for issue in val["flagged_issues"])
@@ -537,7 +537,7 @@ def test_mock_generator_corner_approach_remediation(sample_corner_approach_gt):
     assert "ray_minus_45" in item["commentary"]
     assert "steering centered" not in item["commentary"]
 
-    val = GroundingValidator.validate_commentary_item(item, sample_corner_approach_gt, legacy_audit_mode=False)
+    val = GroundingValidator.validate_commentary_item(item, sample_corner_approach_gt)
     assert val["is_valid"] is True
     assert val["verdict"] == "CORRECT_GROUNDED"
     assert len(val["flagged_issues"]) == 0
