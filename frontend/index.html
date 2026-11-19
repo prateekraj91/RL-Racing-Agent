@@ -5,20 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RL Racing Agent // Autonomous Simulation Dashboard</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/vendor/three.min.js"></script>
+  <script src="/static/vendor/OrbitControls.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
 </head>
-<body>
+<body class="cinematic-mode">
   <div class="dashboard-container">
-    <!-- Top Bar Header -->
+    <!-- Top Bar Navigation & Controls -->
     <header class="top-bar">
       <div class="brand">
         <span class="brand-badge">RL RACING LAB</span>
         <h1>AUTONOMOUS RACING SIMULATOR</h1>
         <span class="policy-tag">Frozen Policy: generalist-v1.0 (SAC)</span>
       </div>
+
+      <!-- Center: Camera Mode Selector -->
+      <div class="camera-switcher-pill" id="cameraSwitcher">
+        <span class="cam-label">VIEW:</span>
+        <button class="cam-btn active" id="btnCamChase" title="Cinematic Damped Chase Camera">
+          <span class="cam-icon">🎥</span> Chase
+        </button>
+        <button class="cam-btn" id="btnCamCockpit" title="Hood / Cockpit View">
+          <span class="cam-icon">🏎</span> Cockpit
+        </button>
+        <button class="cam-btn" id="btnCamOrbit" title="Free 3D Orbit / Inspect">
+          <span class="cam-icon">🔍</span> Orbit
+        </button>
+        <button class="cam-btn" id="btnCamOverhead" title="Satellite Broadcast Camera">
+          <span class="cam-icon">🛰</span> Overhead
+        </button>
+      </div>
+
       <div class="system-pills">
         <div class="pill pill-model">
           <span class="pill-dot green"></span>
-          <span>ACTOR: 18,308 PARAMS (FROZEN)</span>
+          <span>18,308 PARAMS (FROZEN)</span>
         </div>
         <div class="pill pill-status" id="statusPill">
           <span class="pill-dot cyan" id="statusDot"></span>
@@ -32,9 +57,81 @@
 
     <!-- Main Workspace -->
     <main class="main-workspace">
-      <!-- Left Column: Canvas and Interactive Controls -->
-      <section class="viewport-section">
-        <!-- Control Toolbar -->
+      <!-- Left Column: AI Race Engineer & Grounded Telemetry Stream -->
+      <aside class="sidebar-section left-sidebar">
+        <!-- AI Race Engineer Card -->
+        <div class="dashboard-card race-engineer-card">
+          <div class="card-header engineer-header">
+            <div class="engineer-title-wrap">
+              <div class="engineer-avatar">
+                <span class="avatar-icon">🏎️</span>
+                <span class="avatar-radar-pulse"></span>
+              </div>
+              <div>
+                <h2>AI RACE ENGINEER</h2>
+                <div class="engineer-subtitle">TELEMETRY & DYNAMICS ANALYSIS</div>
+              </div>
+            </div>
+            <div class="commentary-meta">
+              <span class="badge" id="commentaryModeBadge">OFFLINE DETERMINISTIC</span>
+              <span class="badge badge-success">STRICT VALIDATION</span>
+            </div>
+          </div>
+
+          <!-- Real-Time Event Stream -->
+          <div class="commentary-feed" id="commentaryFeed">
+            <div class="commentary-item welcome-item">
+              <span class="c-step">[STEP 0]</span>
+              <span class="c-source">[AI ENGINEER]</span>
+              <span class="c-text">Autonomous racing policy loaded. System prepped on start line. Ready to engage.</span>
+            </div>
+          </div>
+
+          <!-- Grounded Post-Lap Performance Review Card -->
+          <div class="lap-review-card" id="lapReviewCard" style="display: none;">
+            <div class="review-header">
+              <span class="review-badge">POST-LAP PERFORMANCE REVIEW</span>
+              <span class="review-verdict" id="reviewVerdict">EXCELLENT</span>
+            </div>
+            <div class="review-metrics-grid">
+              <div class="rev-stat">
+                <span class="rev-label">Lap Time:</span>
+                <span class="rev-val" id="revTime">--</span>
+              </div>
+              <div class="rev-stat">
+                <span class="rev-label">Avg Speed:</span>
+                <span class="rev-val" id="revAvgSpeed">--</span>
+              </div>
+              <div class="rev-stat">
+                <span class="rev-label">Top Speed:</span>
+                <span class="rev-val" id="revMaxSpeed">--</span>
+              </div>
+              <div class="rev-stat">
+                <span class="rev-label">Smoothness:</span>
+                <span class="rev-val" id="revSmoothness">--</span>
+              </div>
+              <div class="rev-stat">
+                <span class="rev-label">Min Boundary:</span>
+                <span class="rev-val" id="revMinMargin">--</span>
+              </div>
+              <div class="rev-stat">
+                <span class="rev-label">Off-Track:</span>
+                <span class="rev-val" id="revOffTrack">0</span>
+              </div>
+            </div>
+            <div class="review-observations">
+              <div class="obs-title">Grounded Observations:</div>
+              <ul class="obs-list" id="reviewObsList">
+                <li>Vehicle negotiated all corners with zero boundary violations.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: 3D Racing Environment Viewport -->
+      <section class="viewport-section center-viewport">
+        <!-- Simulation Control Toolbar -->
         <div class="control-toolbar">
           <div class="control-group">
             <button class="btn btn-primary" id="btnStartPause">
@@ -52,7 +149,7 @@
           <div class="control-divider"></div>
 
           <div class="control-group track-selector-group">
-            <label for="trackPreset">Track Preset:</label>
+            <label for="trackPreset">Track:</label>
             <select id="trackPreset" class="select-input">
               <option value="standard_medium">Standard Medium (70px)</option>
               <option value="narrow_corridor">Narrow Corridor (40px)</option>
@@ -69,7 +166,7 @@
           <div class="control-divider"></div>
 
           <div class="control-group sim-speed-group">
-            <label for="speedRange">Sim Speed:</label>
+            <label for="speedRange">Speed:</label>
             <input type="range" id="speedRange" min="1" max="5" value="2" step="1">
             <span class="speed-val" id="speedVal">2x</span>
           </div>
@@ -86,61 +183,82 @@
           </div>
         </div>
 
-        <!-- Simulation Canvas Container -->
+        <!-- 3D Three.js Viewport Container -->
         <div class="canvas-container" id="canvasContainer">
-          <canvas id="raceCanvas" width="840" height="620"></canvas>
+          <canvas id="threeCanvas"></canvas>
+
+          <!-- Floating In-World 3D HUD Indicators -->
+          <div class="in-world-hud">
+            <!-- Active Camera Prompt Tag -->
+            <div class="cam-hint-tag" id="camHintTag">
+              <span class="dot"></span>
+              <span id="camHintText">CHASE CAMERA // DAMPED TRAJECTORY TRACKING</span>
+            </div>
+
+            <!-- Top Lidar Sensor HUD Bar -->
+            <div class="lidar-hud-bar" id="lidarHudBar">
+              <div class="lidar-hud-tag" id="hudRay0"><span class="beam-lbl">L -90°</span><span class="beam-val">36px</span></div>
+              <div class="lidar-hud-tag" id="hudRay1"><span class="beam-lbl">DL -45°</span><span class="beam-val">56px</span></div>
+              <div class="lidar-hud-tag" id="hudRay2"><span class="beam-lbl">FWD 0°</span><span class="beam-val">148px</span></div>
+              <div class="lidar-hud-tag" id="hudRay3"><span class="beam-lbl">DR +45°</span><span class="beam-val">48px</span></div>
+              <div class="lidar-hud-tag" id="hudRay4"><span class="beam-lbl">R +90°</span><span class="beam-val">36px</span></div>
+            </div>
+
+            <!-- 2D Minimap Radar Overlay (Contains #raceCanvas for test & minimap) -->
+            <div class="minimap-radar-card">
+              <div class="minimap-header">
+                <span class="radar-dot"></span>
+                <span>CIRCUIT RADAR</span>
+              </div>
+              <canvas id="raceCanvas" width="220" height="160"></canvas>
+            </div>
+
+            <!-- Cockpit Speed & Action Overlay -->
+            <div class="cockpit-hud-overlay">
+              <div class="cockpit-speed-dial">
+                <div class="speed-number" id="cockpitSpeed">0.00</div>
+                <div class="speed-unit">PX / STEP</div>
+              </div>
+              <div class="cockpit-action-bars">
+                <div class="action-row">
+                  <span class="act-name">STEER:</span>
+                  <div class="act-bar-track">
+                    <div class="act-bar-fill steer" id="cockpitSteerBar" style="width: 0%; left: 50%;"></div>
+                  </div>
+                  <span class="act-deg" id="cockpitSteerDeg">0.0°</span>
+                </div>
+                <div class="action-row">
+                  <span class="act-name">LONG:</span>
+                  <div class="act-bar-track">
+                    <div class="act-bar-fill throttle" id="cockpitThrottleBar" style="width: 0%; left: 50%;"></div>
+                  </div>
+                  <span class="act-mode" id="cockpitActionMode">COAST</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lap Completed Overlay Modal -->
           <div class="canvas-overlay" id="canvasOverlay" style="display: none;">
             <div class="overlay-modal" id="overlayModal">
               <h2 id="overlayTitle">LAP COMPLETED!</h2>
               <p id="overlayMessage">Clean lap finished at step 431.</p>
+              <div class="modal-stats" id="modalStats"></div>
               <button class="btn btn-primary" id="btnOverlayRestart">Drive Again</button>
-            </div>
-          </div>
-          <!-- Track Legend / Overlay Indicators -->
-          <div class="canvas-hud">
-            <div class="hud-item">
-              <span class="hud-dot" style="background: #00f0ff;"></span>
-              <span>Trajectory Trail</span>
-            </div>
-            <div class="hud-item">
-              <span class="hud-dot" style="background: #00e676;"></span>
-              <span>Lidar Beams</span>
-            </div>
-            <div class="hud-item">
-              <span class="hud-dot" style="background: #ffb700;"></span>
-              <span>Vehicle Pose</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Commentary Stream Panel -->
-        <div class="commentary-panel">
-          <div class="panel-header">
-            <h3>GROUNDED TELEMETRY COMMENTARY</h3>
-            <div class="commentary-meta">
-              <span class="badge" id="commentaryModeBadge">OFFLINE DETERMINISTIC</span>
-              <span class="badge badge-success">STRICT VALIDATION</span>
-            </div>
-          </div>
-          <div class="commentary-feed" id="commentaryFeed">
-            <div class="commentary-item welcome-item">
-              <span class="c-step">[STEP 0]</span>
-              <span class="c-source">[INIT]</span>
-              <span class="c-text">Simulator initialized. Select track and click Start to begin autonomous run.</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Right Column: Live Telemetry & Policy Saliency -->
-      <aside class="sidebar-section">
+      <!-- Right Column: Vehicle Dynamics & Policy Saliency -->
+      <aside class="sidebar-section right-sidebar">
         <!-- Live Telemetry Card -->
         <div class="dashboard-card telemetry-card">
           <div class="card-header">
-            <h2>LIVE VEHICLE TELEMETRY</h2>
+            <h2>VEHICLE DYNAMICS</h2>
             <span class="metric-clock" id="stepClock">STEP: 0 / 700</span>
           </div>
-          
+
           <div class="gauges-grid">
             <!-- Speed Gauge -->
             <div class="gauge-box">
@@ -224,7 +342,7 @@
             <span class="card-tag">|∂a / ∂obs|</span>
           </div>
           <p class="saliency-disclaimer">
-            Online mathematical gradient sensitivity of frozen policy weights w.r.t input features. Not human visual attention or gaze.
+            Mathematical sensitivity of frozen policy weights w.r.t input features. Not human visual attention.
           </p>
 
           <div class="saliency-tabs">

@@ -494,7 +494,10 @@ class SimulationSession:
         steer_act = telemetry_snapshot["steering_action"]
         throttle = telemetry_snapshot["throttle_action"]
         dist = telemetry_snapshot["signed_distance"]
+        heading_err = telemetry_snapshot["heading_error"]
+        slip = telemetry_snapshot["slip_angle"]
         fwd_ray = rays[2] if len(rays) > 2 else 200.0
+        min_ray = min(rays) if rays else 200.0
 
         event_detected: Optional[Tuple[str, str]] = None
 
@@ -506,27 +509,39 @@ class SimulationSession:
         elif self.is_completed:
             event_detected = (
                 "lap_completed",
-                f"Lap completed cleanly at step {step} with final speed {vel:.2f} px/step.",
+                f"Lap completed cleanly at step {step}. Mean velocity maintained at {vel:.2f} px/step across finish line.",
             )
-        elif fwd_ray < 90.0 and vel > 2.5:
+        elif min_ray < 28.0 and abs(steer_deg) > 12.0:
+            side = "Left" if rays[0] < rays[4] else "Right"
+            event_detected = (
+                "corner_apex",
+                f"Apex clipping detected. {side} boundary clearance is {min_ray:.1f} px. Vehicle holding {steer_deg:.1f}° steering at {vel:.2f} px/step.",
+            )
+        elif fwd_ray < 85.0 and vel > 2.2:
+            left_diag = rays[1] if len(rays) > 1 else 200.0
             event_detected = (
                 "corner_approach",
-                f"Approaching corner entry (forward beam {fwd_ray:.1f} px). Steering command is {steer_deg:.1f}° at speed {vel:.2f} px/step.",
+                f"Corner approach detected. Vehicle speed is {vel:.2f} px/step. Left diagonal boundary is {left_diag:.1f} px away. Steering demand is {steer_act:+.2f}.",
+            )
+        elif abs(slip) > 4.5:
+            event_detected = (
+                "slip_correction",
+                f"Elevated slip angle ({slip:+.1f}°) detected in turn. Counter-steering demand ({steer_deg:.1f}°) applied to stabilize trajectory.",
             )
         elif abs(steer_act) > 0.65:
             event_detected = (
                 "high_steering_demand",
-                f"High steering demand of {steer_deg:.1f}° (action {steer_act:.3f}) applied to manage lateral offset ({dist:.1f} px).",
+                f"High steering demand of {steer_deg:.1f}° (action {steer_act:+.3f}) applied to manage lateral offset ({dist:.1f} px, heading error {heading_err:.1f}°).",
             )
         elif throttle < -0.15:
             event_detected = (
                 "braking_onset",
-                f"Deceleration initiated (longitudinal command {throttle:.3f}) entering turn, reducing forward velocity to {vel:.2f} px/step.",
+                f"Deceleration initiated (longitudinal command {throttle:+.3f}) entering turn, reducing forward velocity to {vel:.2f} px/step.",
             )
-        elif fwd_ray > 150.0 and throttle > 0.75 and abs(steer_deg) < 5.0 and step > 20:
+        elif fwd_ray > 140.0 and throttle > 0.70 and abs(steer_deg) < 6.0 and step > 15:
             event_detected = (
                 "straight_cruising",
-                f"Full throttle straight-line cruising at {vel:.2f} px/step with centered steering ({steer_deg:.1f}°).",
+                f"Full throttle straight-line cruising at {vel:.2f} px/step with centered steering ({steer_deg:.1f}°) and clear forward vision.",
             )
 
         if event_detected:
@@ -645,6 +660,79 @@ class SimulationSession:
         if len(self.commentary_log) > 50:
             self.commentary_log.pop(0)
 
+    def get_lap_review(self) -> Optional[Dict[str, Any]]:
+        """Compute grounded post-lap performance review from session history."""
+        if not self.history or len(self.history) < 10:
+            return None
+
+        velocities = [h["velocity"] for h in self.history]
+        steering_acts = [h["steering_action"] for h in self.history]
+        rewards = [h["reward"] for h in self.history]
+
+        if len(steering_acts) > 1:
+            steer_diffs = [
+                abs(steering_acts[i] - steering_acts[i - 1])
+                for i in range(1, len(steering_acts))
+            ]
+            steer_smoothness = float(np.mean(steer_diffs))
+        else:
+            steer_smoothness = 0.0
+
+        all_rays = [r for h in self.history for r in (h.get("rays") or [])]
+        min_boundary = min(all_rays) if all_rays else 200.0
+
+        track_half_width = (self.track_geometry.get("width", 70.0) / 2.0) if self.track_geometry else 35.0
+        off_track_count = sum(
+            1 for h in self.history if abs(h.get("signed_distance", 0.0)) > track_half_width
+        )
+
+        avg_speed = float(np.mean(velocities))
+        max_speed = float(np.max(velocities))
+        total_reward = float(np.sum(rewards))
+        total_steps = len(self.history)
+
+        strengths: List[str] = []
+        weaknesses: List[str] = []
+
+        if max_speed >= 3.8:
+            strengths.append(f"Achieved near-maximum velocity ({max_speed:.2f} px/step) on open sections.")
+        if off_track_count == 0:
+            strengths.append("Maintained 100% track boundary compliance with zero off-track excursions.")
+        else:
+            weaknesses.append(f"Exceeded nominal track boundary on {off_track_count} step(s).")
+
+        if steer_smoothness < 0.08:
+            strengths.append(f"High steering smoothness (mean Δaction of {steer_smoothness:.3f}) avoiding abrupt oscillation.")
+        else:
+            weaknesses.append(f"Steering oscillations detected during turn transitions (mean Δaction {steer_smoothness:.3f}).")
+
+        if min_boundary < 20.0:
+            weaknesses.append(f"Aggressive apex clipping with minimum boundary proximity dropping to {min_boundary:.1f} px.")
+        elif min_boundary > 25.0:
+            strengths.append(f"Safe margins preserved with minimum boundary proximity of {min_boundary:.1f} px.")
+
+        return {
+            "lap_completed": self.is_completed,
+            "is_crashed": self.is_crashed,
+            "total_steps": total_steps,
+            "lap_time_steps": total_steps,
+            "average_speed": round(avg_speed, 2),
+            "maximum_speed": round(max_speed, 2),
+            "steering_smoothness_score": round(max(0.0, 1.0 - steer_smoothness * 5.0) * 100, 1),
+            "steering_jitter_metric": round(steer_smoothness, 4),
+            "min_boundary_proximity_px": round(min_boundary, 1),
+            "off_track_events": off_track_count,
+            "cumulative_reward": round(total_reward, 2),
+            "final_lap_progress_pct": round(self.env.lap_progress * 100.0, 1),
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "verdict": (
+                "EXCELLENT // CLEAN FAST LAP"
+                if self.is_completed and off_track_count == 0 and avg_speed > 3.0
+                else ("LAP COMPLETED WITH CORNERING STRESS" if self.is_completed else "INCOMPLETE RUN")
+            ),
+        }
+
     def get_state(self) -> Dict[str, Any]:
         """Serialize current full simulation state for API response."""
         if self.env is None:
@@ -698,6 +786,7 @@ class SimulationSession:
             "trajectory_length": len(self.trajectory),
             "saliency": self.current_saliency,
             "commentary": self.commentary_log[-10:],
+            "lap_review": self.get_lap_review() if (self.is_completed or self.is_crashed or self.env.step_count > 20) else None,
             "track": self.track_geometry,
         }
 
