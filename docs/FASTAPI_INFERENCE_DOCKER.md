@@ -187,27 +187,35 @@ curl -s -X POST http://localhost:8000/predict/batch \
 
 ## 3. Observation Contract & Telemetry Validation
 
-The observation vector accepted by `POST /predict` and `POST /predict/batch` consists of exactly 9 floating-point values:
+The observation vector accepted by `POST /predict` and `POST /predict/batch` consists of exactly 9 floating-point values corresponding to the state vector emitted by `RacingEnv`:
 
-| Index | Feature Key | Physical Meaning | Valid Range | Runtime Scale |
-| :---: | :--- | :--- | :---: | :---: |
-| `0` | `velocity` | Vehicle forward speed | $[0.0, 4.0]$ | Raw pixels / step |
-| `1` | `err` | Heading error relative to track tangent | $[-180.0, 180.0]$ | Degrees |
-| `2` | `dist` | Lateral offset from track centerline | $[-20.0, 20.0]$ | Raw pixels |
-| `3` | `slip` | Vehicle sideslip / drift angle | $[-1.0, 1.0]$ | Normalized |
-| `4` | `ray_-90` | Left $90^\circ$ perpendicular ray-cast | $[0.0, 200.0]$ | Raw pixels |
-| `5` | `ray_-45` | Left $45^\circ$ diagonal ray-cast | $[0.0, 200.0]$ | Raw pixels |
-| `6` | `ray_0` | Forward $0^\circ$ centerline ray-cast | $[0.0, 200.0]$ | Raw pixels |
-| `7` | `ray_45` | Right $45^\circ$ diagonal ray-cast | $[0.0, 200.0]$ | Raw pixels |
-| `8` | `ray_90` | Right $90^\circ$ perpendicular ray-cast | $[0.0, 200.0]$ | Raw pixels |
+| Index | Feature Key | Physical Meaning | Kinematic / Typical Range | Environment Bounds | Units & Representation |
+| :---: | :--- | :--- | :---: | :---: | :--- |
+| `0` | `velocity` | Longitudinal vehicle speed | $[-2.0, 4.0]$ | $[-1000.0, 1000.0]$ | Pixels / step (negative = reverse/braking) |
+| `1` | `err` | Heading error relative to track tangent | $[-180.0, 180.0]$ | $[-1000.0, 1000.0]$ | Degrees |
+| `2` | `dist` | Signed lateral Euclidean distance to centerline | Track-dependent (nominal $\pm \frac{W}{2}$) | $[-1000.0, 1000.0]$ | Raw pixels ($+$ = right of center, $-$ = left) |
+| `3` | `slip` | Tire sideslip angle ($\theta_v - \theta_{\text{car}}$) | $[-180.0, 180.0]$ | $[-1000.0, 1000.0]$ | Degrees (wrapped $\pm 180^\circ$) |
+| `4` | `ray_-90` | Left $90^\circ$ perpendicular ray-cast | $[0.0, 200.0]$ | $[-1000.0, 1000.0]$ | Raw pixels (unnormalized) |
+| `5` | `ray_-45` | Left $45^\circ$ diagonal ray-cast | $[0.0, 200.0]$ | $[-1000.0, 1000.0]$ | Raw pixels (unnormalized) |
+| `6` | `ray_0` | Forward $0^\circ$ centerline ray-cast | $[0.0, 200.0]$ | $[-1000.0, 1000.0]$ | Raw pixels (unnormalized) |
+| `7` | `ray_45` | Right $45^\circ$ diagonal ray-cast | $[0.0, 200.0]$ | $[-1000.0, 1000.0]$ | Raw pixels (unnormalized) |
+| `8` | `ray_90` | Right $90^\circ$ perpendicular ray-cast | $[0.0, 200.0]$ | $[-1000.0, 1000.0]$ | Raw pixels (unnormalized) |
 
-> [!IMPORTANT]
-> **Raw Pixel Ray Distances**: Although `configs/generalist_v1.json` textually describes rays as `"normalized [0, 1]"`, runtime `RacingEnv` and policy weights operate strictly on **raw pixel distances $[0.0, 200.0]$**. Input values must **not** be divided by 200.
+### 3.1 Clarifications on Historical Configuration Discrepancies
+During runtime code inspection of `env/environment.py` and `env/car.py`, several historical metadata discrepancies in `configs/generalist_v1.json` were identified and documented:
+1. **Velocity Range**: `Car.update()` clamps forward/reverse velocity with:
+   $$\text{velocity} \in \left[-\frac{\text{max\_speed}}{2}, \text{max\_speed}\right] = [-2.0, 4.0]\ \text{px/step}$$
+   When decelerating or reversing, velocity is negative down to $-2.0\ \text{px/step}$.
+2. **Slip Angle Units**: In `RacingEnv.step()`, sideslip is computed as:
+   $$\theta_v = \text{math.degrees}(\text{math.atan2}(-v_y, v_x)), \quad \text{slip} = (\theta_v - \theta_{\text{car}} + 180^\circ) \pmod{360^\circ} - 180^\circ$$
+   `slip` is an angle in **degrees** spanning $[-180.0^\circ, 180.0^\circ]$, **not** a dimensionless or normalized scalar in $[-1, 1]$.
+3. **Signed Distance Scale & Track Widths**: Signed distance is the signed Euclidean distance in raw pixels from vehicle coordinates $(x, y)$ to the nearest centerline projection. Track widths vary across standard tracks ($W = 70\text{ px}$), domain randomization ($W \in [20, 70]\text{ px}$), and wide curriculum tiers; off-track excursions also produce larger offsets. The Gym `observation_space` specifies box bounds $[-1000.0, 1000.0]$.
+4. **Ray Sensors**: All five rangefinder beams return raw Euclidean pixel distances in $[0.0, 200.0]$ (with ray-cast step size 4 pixels). They are strictly **unnormalized**.
 
-### Validation Rules
+### 3.2 Validation Rules
 - **Vector Length**: Must equal 9 exactly (`len(v) == 9`).
 - **Finite Numbers**: Non-finite floats (`NaN`, `Infinity`, `-Infinity`, or `null`) are rejected with `422 Unprocessable Entity`.
-- **Environment Bounds**: Values must fall within the Gym `RacingEnv` observation box `[-1000.0, 1000.0]`.
+- **Environment Bounds**: Values must fall within the Gym `RacingEnv` observation box `[-1000.0, 1000.0]`. Valid observations from `RacingEnv` are guaranteed never to be falsely rejected.
 
 ---
 

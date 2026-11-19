@@ -11,8 +11,14 @@ class ObservationRequest(BaseModel):
     observation: List[float] = Field(
         ...,
         description=(
-            "9-element raw observation vector: [velocity, err, dist, slip, "
-            "ray_-90, ray_-45, ray_0, ray_45, ray_90]. Ray distances are raw pixels [0, 200]."
+            "9-element raw observation vector: "
+            "[velocity, heading_error, signed_dist, slip_angle, "
+            "ray_-90, ray_-45, ray_0, ray_45, ray_90]. "
+            "velocity is in px/step (kinematic limits [-2.0, 4.0]). "
+            "heading_error is in degrees [-180.0, 180.0]. "
+            "signed_dist is signed lateral distance from centerline in pixels (positive = right, negative = left). "
+            "slip_angle is tire sideslip angle in degrees [-180.0, 180.0] (velocity_angle - car.angle). "
+            "ray distances are raw rangefinder distances in pixels [0.0, 200.0] (unnormalized)."
         ),
         json_schema_extra={
             "example": [3.23, -12.4, -0.7, 0.0, 36.0, 52.0, 116.0, 48.0, 36.0]
@@ -45,7 +51,11 @@ class BatchObservationRequest(BaseModel):
     observations: List[List[float]] = Field(
         ...,
         min_length=1,
-        description="List of 9-element observation vectors",
+        description=(
+            "List of 9-element observation vectors: "
+            "[velocity (px/step), heading_error (deg), signed_dist (px), slip_angle (deg), "
+            "5x raw pixel ray distances [0, 200]]"
+        ),
         json_schema_extra={
             "example": [
                 [3.23, -12.4, -0.7, 0.0, 36.0, 52.0, 116.0, 48.0, 36.0],
