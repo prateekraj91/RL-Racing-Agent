@@ -166,3 +166,30 @@ class HealthResponse(BaseModel):
     obs_dim: int = Field(9, description="Observation feature dimension")
     action_dim: int = Field(2, description="Action vector dimension")
     parameter_count: int = Field(18308, description="Instantiated SAC actor parameter count")
+
+
+class SimulationStartRequest(BaseModel):
+    """Configuration to start a new simulation session."""
+
+    preset_id: str = Field("standard_medium", description="Track preset identifier")
+    track_seed: Optional[int] = Field(1001, description="Procedural track generator seed")
+    steer_penalty_coeff: float = Field(0.01, description="Steering penalty coefficient")
+
+
+class SimulationStepRequest(BaseModel):
+    """Request to step the active simulation."""
+
+    steps: int = Field(1, ge=1, le=50, description="Number of simulation steps to advance")
+    calculate_saliency: bool = Field(
+        False, description="Whether to calculate online input-gradient saliency"
+    )
+    commentary_mode: Literal["offline", "gemini"] = Field(
+        "offline", description="Commentary mode: offline deterministic or live Gemini"
+    )
+
+
+class SimulationResetRequest(BaseModel):
+    """Request to reset the current simulation."""
+
+    preset_id: Optional[str] = Field(None, description="Optional new track preset")
+    track_seed: Optional[int] = Field(None, description="Optional new track seed")

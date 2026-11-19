@@ -5,3 +5,4 @@ uvicorn[standard]>=0.32.0
 pydantic>=2.10.0
 numpy>=1.24.0
 httpx>=0.28.0
+gymnasium>=1.0.0

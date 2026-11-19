@@ -5,16 +5,20 @@ to deliver low-latency CPU inference without event-loop blocking.
 """
 
 from contextlib import asynccontextmanager
+import json
 import logging
 import math
 import os
-from typing import Tuple
+from pathlib import Path
+from typing import Optional, Tuple
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.responses import FileResponse
+from starlette.staticfiles import StaticFiles
 
 from sac.actor import SACActor
 from inference.model_loader import (
@@ -22,12 +26,19 @@ from inference.model_loader import (
     predict_action,
     predict_batch,
 )
+from inference.simulation import (
+    TRACK_PRESETS,
+    simulation_manager,
+)
 from inference.schemas import (
     ActionResponse,
     BatchActionResponse,
     BatchObservationRequest,
     HealthResponse,
     ObservationRequest,
+    SimulationResetRequest,
+    SimulationStartRequest,
+    SimulationStepRequest,
 )
 
 logging.basicConfig(
@@ -54,6 +65,14 @@ async def lifespan(app: FastAPI):
         app.state.actor = actor
         app.state.metadata = metadata
         app.state.ready = True
+
+        # Initialize simulation session
+        try:
+            simulation_manager.start(preset_id="standard_medium", track_seed=1001)
+            logger.info("Simulation session pre-initialized successfully.")
+        except Exception as sim_err:
+            logger.warning("Could not pre-initialize simulation: %s", sim_err)
+
         logger.info(
             "Model generalist-v1.0 successfully loaded and ready for inference (%d params).",
             metadata["parameter_count"],
@@ -212,3 +231,122 @@ def predict_batch_endpoint(
         batch_size=len(action_responses),
         total_latency_ms=round(latency_ms, 4),
     )
+
+
+# ==============================================================================
+# Stateful Simulation Endpoints
+# ==============================================================================
+
+@app.get(
+    "/simulation/tracks",
+    summary="List supported track presets",
+    description="Returns available track presets with recommended evaluation seeds.",
+)
+def get_simulation_tracks() -> list:
+    """Return catalog of available track presets."""
+    return list(TRACK_PRESETS.values())
+
+
+@app.post(
+    "/simulation/start",
+    summary="Start new simulation session",
+    description="Resets RacingEnv with selected track preset and seed, initializes vehicle.",
+)
+def start_simulation_endpoint(
+    payload: SimulationStartRequest,
+    actor_bundle: Tuple[SACActor, dict] = Depends(get_actor_and_metadata),
+) -> dict:
+    """Initialize a fresh simulation run."""
+    return simulation_manager.start(
+        preset_id=payload.preset_id,
+        track_seed=payload.track_seed,
+        steer_penalty_coeff=payload.steer_penalty_coeff,
+    )
+
+
+@app.post(
+    "/simulation/step",
+    summary="Advance simulation by bounded steps",
+    description="Runs frozen SACActor deterministically, steps RacingEnv, records telemetry and saliency.",
+)
+def step_simulation_endpoint(
+    payload: SimulationStepRequest,
+    actor_bundle: Tuple[SACActor, dict] = Depends(get_actor_and_metadata),
+) -> dict:
+    """Step active simulation using the loaded frozen actor."""
+    actor, _ = actor_bundle
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    return simulation_manager.step(
+        actor=actor,
+        steps=payload.steps,
+        calculate_saliency=payload.calculate_saliency,
+        commentary_mode=payload.commentary_mode,
+        gemini_api_key=gemini_key,
+    )
+
+
+@app.post(
+    "/simulation/reset",
+    summary="Reset active simulation",
+    description="Resets vehicle to track start line, clears trajectory and event history.",
+)
+def reset_simulation_endpoint(
+    payload: Optional[SimulationResetRequest] = None,
+    actor_bundle: Tuple[SACActor, dict] = Depends(get_actor_and_metadata),
+) -> dict:
+    """Reset the current simulation session."""
+    preset = payload.preset_id if payload and payload.preset_id else simulation_manager.preset_id
+    seed = payload.track_seed if payload and payload.track_seed else simulation_manager.track_seed
+    return simulation_manager.start(preset_id=preset, track_seed=seed)
+
+
+@app.get(
+    "/simulation/state",
+    summary="Get latest simulation state",
+    description="Returns current vehicle pose, live rays, telemetry, and recent trajectory.",
+)
+def get_simulation_state_endpoint(
+    actor_bundle: Tuple[SACActor, dict] = Depends(get_actor_and_metadata),
+) -> dict:
+    """Return latest state of the active simulation session."""
+    return simulation_manager.get_state()
+
+
+@app.get(
+    "/simulation/historical-saliency",
+    summary="Get historical benchmark saliency reference",
+    description="Returns verified per-corner saliency summary from offline analysis.",
+)
+def get_historical_saliency_endpoint() -> dict:
+    """Return historical saliency benchmark summary from disk if available."""
+    summary_path = Path("analysis/results/policy_saliency_summary.json")
+    if summary_path.is_file():
+        try:
+            with open(summary_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            logger.warning("Could not parse historical saliency summary: %s", exc)
+    return {
+        "status": "unavailable",
+        "message": "Historical saliency summary not available on disk.",
+    }
+
+
+# ==============================================================================
+# Static Frontend Delivery
+# ==============================================================================
+
+frontend_path = Path("frontend")
+if frontend_path.is_dir():
+    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/demo", include_in_schema=False)
+    def serve_frontend():
+        """Serve the interactive autonomous racing dashboard."""
+        index_file = frontend_path / "index.html"
+        if index_file.is_file():
+            return FileResponse(str(index_file))
+        raise HTTPException(
+            status_code=404, detail="Frontend index.html not found."
+        )

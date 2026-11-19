@@ -38,7 +38,9 @@ RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuse
 # Copy application code and frozen model artifacts
 COPY sac/__init__.py ./sac/__init__.py
 COPY sac/actor.py ./sac/actor.py
+COPY env/ ./env/
 COPY inference/ ./inference/
+COPY frontend/ ./frontend/
 COPY models/generalist_v1.pth ./models/generalist_v1.pth
 COPY configs/generalist_v1.json ./configs/generalist_v1.json
 

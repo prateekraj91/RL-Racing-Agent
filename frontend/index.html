@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RL Racing Agent // Autonomous Simulation Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <!-- Top Bar Header -->
+    <header class="top-bar">
+      <div class="brand">
+        <span class="brand-badge">RL RACING LAB</span>
+        <h1>AUTONOMOUS RACING SIMULATOR</h1>
+        <span class="policy-tag">Frozen Policy: generalist-v1.0 (SAC)</span>
+      </div>
+      <div class="system-pills">
+        <div class="pill pill-model">
+          <span class="pill-dot green"></span>
+          <span>ACTOR: 18,308 PARAMS (FROZEN)</span>
+        </div>
+        <div class="pill pill-status" id="statusPill">
+          <span class="pill-dot cyan" id="statusDot"></span>
+          <span id="statusText">READY</span>
+        </div>
+        <div class="pill pill-fps">
+          <span id="fpsCounter">60 FPS</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-workspace">
+      <!-- Left Column: Canvas and Interactive Controls -->
+      <section class="viewport-section">
+        <!-- Control Toolbar -->
+        <div class="control-toolbar">
+          <div class="control-group">
+            <button class="btn btn-primary" id="btnStartPause">
+              <span class="btn-icon" id="startIcon">▶</span>
+              <span id="startText">Start Simulation</span>
+            </button>
+            <button class="btn btn-secondary" id="btnStep" title="Advance by 1 step">
+              <span class="btn-icon">⏭</span> Step
+            </button>
+            <button class="btn btn-danger" id="btnReset" title="Reset car and track">
+              <span class="btn-icon">↺</span> Reset
+            </button>
+          </div>
+
+          <div class="control-divider"></div>
+
+          <div class="control-group track-selector-group">
+            <label for="trackPreset">Track Preset:</label>
+            <select id="trackPreset" class="select-input">
+              <option value="standard_medium">Standard Medium (70px)</option>
+              <option value="narrow_corridor">Narrow Corridor (40px)</option>
+              <option value="hairpin_challenge">Hairpin Switchback</option>
+              <option value="wide_oval">Wide Oval (100px)</option>
+              <option value="default_circuit">Default Circuit</option>
+            </select>
+
+            <label for="trackSeed">Seed:</label>
+            <input type="number" id="trackSeed" class="number-input" value="1001" min="1" max="99999">
+            <button class="btn btn-sm btn-outline" id="btnLoadTrack">Load Track</button>
+          </div>
+
+          <div class="control-divider"></div>
+
+          <div class="control-group sim-speed-group">
+            <label for="speedRange">Sim Speed:</label>
+            <input type="range" id="speedRange" min="1" max="5" value="2" step="1">
+            <span class="speed-val" id="speedVal">2x</span>
+          </div>
+
+          <div class="control-group toggles-group">
+            <label class="toggle-label" title="Compute online gradient saliency every few steps">
+              <input type="checkbox" id="checkSaliency" checked>
+              <span class="toggle-text">Online Saliency</span>
+            </label>
+            <label class="toggle-label" title="Enable live Gemini commentary (requires GEMINI_API_KEY)">
+              <input type="checkbox" id="checkGemini">
+              <span class="toggle-text">Gemini Live</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Simulation Canvas Container -->
+        <div class="canvas-container" id="canvasContainer">
+          <canvas id="raceCanvas" width="840" height="620"></canvas>
+          <div class="canvas-overlay" id="canvasOverlay" style="display: none;">
+            <div class="overlay-modal" id="overlayModal">
+              <h2 id="overlayTitle">LAP COMPLETED!</h2>
+              <p id="overlayMessage">Clean lap finished at step 431.</p>
+              <button class="btn btn-primary" id="btnOverlayRestart">Drive Again</button>
+            </div>
+          </div>
+          <!-- Track Legend / Overlay Indicators -->
+          <div class="canvas-hud">
+            <div class="hud-item">
+              <span class="hud-dot" style="background: #00f0ff;"></span>
+              <span>Trajectory Trail</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-dot" style="background: #00e676;"></span>
+              <span>Lidar Beams</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-dot" style="background: #ffb700;"></span>
+              <span>Vehicle Pose</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Commentary Stream Panel -->
+        <div class="commentary-panel">
+          <div class="panel-header">
+            <h3>GROUNDED TELEMETRY COMMENTARY</h3>
+            <div class="commentary-meta">
+              <span class="badge" id="commentaryModeBadge">OFFLINE DETERMINISTIC</span>
+              <span class="badge badge-success">STRICT VALIDATION</span>
+            </div>
+          </div>
+          <div class="commentary-feed" id="commentaryFeed">
+            <div class="commentary-item welcome-item">
+              <span class="c-step">[STEP 0]</span>
+              <span class="c-source">[INIT]</span>
+              <span class="c-text">Simulator initialized. Select track and click Start to begin autonomous run.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Live Telemetry & Policy Saliency -->
+      <aside class="sidebar-section">
+        <!-- Live Telemetry Card -->
+        <div class="dashboard-card telemetry-card">
+          <div class="card-header">
+            <h2>LIVE VEHICLE TELEMETRY</h2>
+            <span class="metric-clock" id="stepClock">STEP: 0 / 700</span>
+          </div>
+          
+          <div class="gauges-grid">
+            <!-- Speed Gauge -->
+            <div class="gauge-box">
+              <div class="gauge-label">FORWARD VELOCITY</div>
+              <div class="gauge-value" id="valVelocity">0.00 <span class="unit">px/step</span></div>
+              <div class="bar-track">
+                <div class="bar-fill cyan" id="barVelocity" style="width: 0%;"></div>
+              </div>
+              <div class="gauge-scale"><span>-2.0</span><span>0</span><span>4.0 cap</span></div>
+            </div>
+
+            <!-- Steering Angle -->
+            <div class="gauge-box">
+              <div class="gauge-label">STEERING WHEEL ANGLE</div>
+              <div class="gauge-value" id="valSteering">0.0° <span class="unit" id="valSteeringAction">(act: 0.00)</span></div>
+              <div class="balance-track">
+                <div class="balance-center"></div>
+                <div class="balance-fill" id="barSteering" style="width: 0%; left: 50%;"></div>
+              </div>
+              <div class="gauge-scale"><span>-30° (L)</span><span>0°</span><span>+30° (R)</span></div>
+            </div>
+
+            <!-- Throttle / Brake -->
+            <div class="gauge-box">
+              <div class="gauge-label">LONGITUDINAL ACTION</div>
+              <div class="gauge-value" id="valThrottle">0.00 <span class="unit" id="valActionMode">COASTING</span></div>
+              <div class="balance-track">
+                <div class="balance-center"></div>
+                <div class="balance-fill" id="barThrottle" style="width: 0%; left: 50%;"></div>
+              </div>
+              <div class="gauge-scale"><span>Brake (-1)</span><span>0</span><span>Throttle (+1)</span></div>
+            </div>
+
+            <!-- Progress -->
+            <div class="gauge-box">
+              <div class="gauge-label">LAP PROGRESS</div>
+              <div class="gauge-value" id="valProgress">0.0%</div>
+              <div class="bar-track">
+                <div class="bar-fill green" id="barProgress" style="width: 0%;"></div>
+              </div>
+              <div class="gauge-scale"><span>Start (0%)</span><span>Finish (100%)</span></div>
+            </div>
+          </div>
+
+          <!-- Secondary Telemetry Grid -->
+          <div class="telemetry-readouts">
+            <div class="readout-item">
+              <span class="readout-key">Heading Error:</span>
+              <span class="readout-val" id="valHeadingErr">0.0°</span>
+            </div>
+            <div class="readout-item">
+              <span class="readout-key">Signed Dist:</span>
+              <span class="readout-val" id="valSignedDist">0.0 px</span>
+            </div>
+            <div class="readout-item">
+              <span class="readout-key">Slip Angle:</span>
+              <span class="readout-val" id="valSlip">0.0°</span>
+            </div>
+            <div class="readout-item">
+              <span class="readout-key">Position (X, Y):</span>
+              <span class="readout-val" id="valPos">0.0, 0.0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Lidar Sensor Beams Card -->
+        <div class="dashboard-card sensors-card">
+          <div class="card-header">
+            <h2>RANGEFINDER BEAMS (RAW PIXELS)</h2>
+            <span class="card-tag">5 RAYS [0, 200] px</span>
+          </div>
+          <div class="sensors-list" id="sensorsList">
+            <!-- Ray rows populated by JS -->
+          </div>
+        </div>
+
+        <!-- Policy Saliency Card -->
+        <div class="dashboard-card saliency-card">
+          <div class="card-header">
+            <h2>INPUT GRADIENT SALIENCY</h2>
+            <span class="card-tag">|∂a / ∂obs|</span>
+          </div>
+          <p class="saliency-disclaimer">
+            Online mathematical gradient sensitivity of frozen policy weights w.r.t input features. Not human visual attention or gaze.
+          </p>
+
+          <div class="saliency-tabs">
+            <button class="tab-btn active" id="tabSteer">Steering Saliency</button>
+            <button class="tab-btn" id="tabLong">Throttle Saliency</button>
+            <button class="tab-btn" id="tabHist">Benchmark Reference</button>
+          </div>
+
+          <div class="saliency-bars-container" id="saliencyBarsContainer">
+            <!-- Dynamically populated bars -->
+          </div>
+
+          <div class="saliency-highlights">
+            <div class="highlight-item">
+              <span class="hl-label">Top Steering Ray:</span>
+              <span class="hl-value" id="topSteerRay">None</span>
+            </div>
+            <div class="highlight-item">
+              <span class="hl-label">Top Throttle Ray:</span>
+              <span class="hl-value" id="topThrottleRay">None</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

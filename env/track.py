@@ -1,5 +1,9 @@
 import numpy as np
-import pygame
+
+try:
+    import pygame
+except ImportError:
+    pygame = None
 
 
 class Track:
@@ -198,6 +202,8 @@ class Track:
 
     # ---------- render ----------
     def draw(self, screen):
+        if pygame is None:
+            raise RuntimeError("Pygame is required for desktop rendering but is not installed.")
         pts = [(int(px), int(py)) for px, py in self.centerline]
         pygame.draw.lines(screen, (80, 80, 80), True, pts, int(self.width))
         pygame.draw.lines(screen, (140, 140, 140), True, pts, 2)
