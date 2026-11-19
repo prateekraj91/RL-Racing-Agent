@@ -237,6 +237,69 @@ def test_simulation_historical_saliency_endpoint(client: TestClient):
     assert "analysis_results" in data or "status" in data
 
 
+def test_frontend_simulation_schema_contract(client: TestClient):
+    """Schema contract test asserting the exact keys, types, and units required by the frontend.
+
+    Prevents silent key-mismatch regressions between frontend/app.js and inference/simulation.py:
+    - Ray endpoints: ray["end"] must exist as [float, float] in px.
+    - Saliency keys: "feature_saliency_steer" and "feature_saliency_long" must exist.
+    - Heading error and slip angle: must be in degrees.
+    - Signed distance and sensor rays: must be in px.
+    - Vehicle state: x, y in px, angle in degrees, velocity in px/step.
+    """
+    client.post("/simulation/start", json={"preset_id": "standard_medium", "track_seed": 1001})
+    res = client.post(
+        "/simulation/step",
+        json={"steps": 5, "calculate_saliency": True, "commentary_mode": "offline"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+
+    # 1. Rays contract: length 5, start [x, y], end [x, y], distance in px
+    assert "rays" in data, "Missing 'rays' key required by 3D renderer"
+    assert len(data["rays"]) == 5, f"Expected 5 sensor rays, got {len(data['rays'])}"
+    for idx, ray in enumerate(data["rays"]):
+        assert "end" in ray, f"Ray {idx} missing 'end' key (frontend reads ray.end)"
+        assert isinstance(ray["end"], list) and len(ray["end"]) == 2, f"Ray {idx} 'end' must be [x, y] list"
+        assert all(isinstance(v, (int, float)) and math.isfinite(v) for v in ray["end"])
+        assert "start" in ray, f"Ray {idx} missing 'start' key"
+        assert isinstance(ray["start"], list) and len(ray["start"]) == 2
+        assert "distance" in ray and isinstance(ray["distance"], (int, float))
+        assert 0.0 <= ray["distance"] <= 200.0, f"Ray {idx} distance {ray['distance']} out of px bounds [0, 200]"
+
+    # 2. Saliency contract: feature_saliency_steer and feature_saliency_long
+    assert "saliency" in data and data["saliency"] is not None, "Missing 'saliency' object"
+    sal = data["saliency"]
+    assert "feature_saliency_steer" in sal, "Missing 'feature_saliency_steer' in saliency payload"
+    assert "feature_saliency_long" in sal, "Missing 'feature_saliency_long' in saliency payload"
+    assert "top_steering_ray" in sal and isinstance(sal["top_steering_ray"], str)
+    assert "top_longitudinal_ray" in sal and isinstance(sal["top_longitudinal_ray"], str)
+    assert len(sal["feature_saliency_steer"]) == 9
+    assert len(sal["feature_saliency_long"]) == 9
+
+    # 3. Telemetry contract: heading_error and slip_angle in degrees, signed_distance in px
+    assert "telemetry" in data, "Missing 'telemetry' object"
+    telem = data["telemetry"]
+    assert "heading_error" in telem and isinstance(telem["heading_error"], (int, float))
+    assert -180.0 <= telem["heading_error"] <= 180.0, "heading_error must be in degrees [-180, 180]"
+    assert "slip_angle" in telem and isinstance(telem["slip_angle"], (int, float))
+    assert "signed_distance" in telem and isinstance(telem["signed_distance"], (int, float))
+    assert -1000.0 <= telem["signed_distance"] <= 1000.0, "signed_distance must be in px"
+    assert "rays" in telem and len(telem["rays"]) == 5
+    for r in telem["rays"]:
+        assert 0.0 <= r <= 200.0, "Telemetry ray measurement must be in px [0, 200]"
+
+    # 4. Vehicle state contract: x, y in px, angle in degrees, velocity in px/step
+    veh = data["vehicle"]
+    assert "x" in veh and isinstance(veh["x"], (int, float)) and math.isfinite(veh["x"])
+    assert "y" in veh and isinstance(veh["y"], (int, float)) and math.isfinite(veh["y"])
+    assert "angle" in veh and isinstance(veh["angle"], (int, float)) and math.isfinite(veh["angle"])
+    assert "velocity" in veh and isinstance(veh["velocity"], (int, float))
+    assert -2.0 <= veh["velocity"] <= 4.0, "Vehicle velocity must be in px/step [-2, 4]"
+    assert "steering_angle_deg" in veh and isinstance(veh["steering_angle_deg"], (int, float))
+    assert -30.0 <= veh["steering_angle_deg"] <= 30.0, "Steering angle must be in degrees [-30, 30]"
+
+
 def test_frozen_weights_integrity_remains_intact():
     """Verify models/generalist_v1.pth and configs/generalist_v1.json have not been modified."""
     actual_model_hash = compute_sha256(Path("models/generalist_v1.pth"))

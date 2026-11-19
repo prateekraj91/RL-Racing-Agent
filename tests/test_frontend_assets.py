@@ -46,3 +46,13 @@ def test_static_js_delivery(client: TestClient):
     assert ("javascript" in res.headers["content-type"] or "text/plain" in res.headers["content-type"])
     assert "init" in res.text
     assert "raceCanvas" in res.text
+
+
+def test_static_world_js_delivery(client: TestClient):
+    """Verify GET /static/world.js returns 200 with valid JavaScript coordinate module."""
+    res = client.get("/static/world.js")
+    assert res.status_code == 200
+    assert ("javascript" in res.headers["content-type"] or "text/plain" in res.headers["content-type"])
+    assert "envToWorld" in res.text
+    assert "envHeadingToWorld" in res.text
+    assert "PX_TO_WORLD" in res.text

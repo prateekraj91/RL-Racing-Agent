@@ -543,6 +543,11 @@ class SimulationSession:
                 "straight_cruising",
                 f"Full throttle straight-line cruising at {vel:.2f} px/step with centered steering ({steer_deg:.1f}°) and clear forward vision.",
             )
+        elif step % 25 == 0 and step > 0:
+            event_detected = (
+                "cadence_telemetry",
+                f"Pace steady at step {step}. Velocity maintained at {vel:.2f} px/step with {dist:+.1f} px lateral offset.",
+            )
 
         if event_detected:
             event_type, default_text = event_detected

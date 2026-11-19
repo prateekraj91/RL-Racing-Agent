@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/vendor/three.min.js"></script>
   <script src="/static/vendor/OrbitControls.js"></script>
+  <script src="/static/world.js"></script>
   <script>
     if (typeof THREE === 'undefined') {
       document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
@@ -35,7 +36,7 @@
         <button class="cam-btn" id="btnCamOrbit" title="Free 3D Orbit / Inspect">
           <span class="cam-icon">🔍</span> Orbit
         </button>
-        <button class="cam-btn" id="btnCamOverhead" title="Satellite Broadcast Camera">
+        <button class="cam-btn" id="btnCamOverhead" title="Top-down Circuit View">
           <span class="cam-icon">🛰</span> Overhead
         </button>
       </div>
@@ -49,87 +50,19 @@
           <span class="pill-dot cyan" id="statusDot"></span>
           <span id="statusText">READY</span>
         </div>
+        <button class="pill pill-debug" id="btnDebugToggle" title="Toggle 3D Debug Overlay (Key: D)">
+          <span class="pill-dot amber"></span>
+          <span>DEBUG (D)</span>
+        </button>
         <div class="pill pill-fps">
           <span id="fpsCounter">60 FPS</span>
         </div>
       </div>
     </header>
 
-    <!-- Main Workspace -->
+    <!-- Main Workspace (Dominant Viewport >= 65% width + Right Telemetry Sidebar) -->
     <main class="main-workspace">
-      <!-- Left Column: AI Race Engineer & Grounded Telemetry Stream -->
-      <aside class="sidebar-section left-sidebar">
-        <!-- AI Race Engineer Card -->
-        <div class="dashboard-card race-engineer-card">
-          <div class="card-header engineer-header">
-            <div class="engineer-title-wrap">
-              <div class="engineer-avatar">
-                <span class="avatar-icon">🏎️</span>
-                <span class="avatar-radar-pulse"></span>
-              </div>
-              <div>
-                <h2>AI RACE ENGINEER</h2>
-                <div class="engineer-subtitle">TELEMETRY & DYNAMICS ANALYSIS</div>
-              </div>
-            </div>
-            <div class="commentary-meta">
-              <span class="badge" id="commentaryModeBadge">OFFLINE DETERMINISTIC</span>
-              <span class="badge badge-success">STRICT VALIDATION</span>
-            </div>
-          </div>
-
-          <!-- Real-Time Event Stream -->
-          <div class="commentary-feed" id="commentaryFeed">
-            <div class="commentary-item welcome-item">
-              <span class="c-step">[STEP 0]</span>
-              <span class="c-source">[AI ENGINEER]</span>
-              <span class="c-text">Autonomous racing policy loaded. System prepped on start line. Ready to engage.</span>
-            </div>
-          </div>
-
-          <!-- Grounded Post-Lap Performance Review Card -->
-          <div class="lap-review-card" id="lapReviewCard" style="display: none;">
-            <div class="review-header">
-              <span class="review-badge">POST-LAP PERFORMANCE REVIEW</span>
-              <span class="review-verdict" id="reviewVerdict">EXCELLENT</span>
-            </div>
-            <div class="review-metrics-grid">
-              <div class="rev-stat">
-                <span class="rev-label">Lap Time:</span>
-                <span class="rev-val" id="revTime">--</span>
-              </div>
-              <div class="rev-stat">
-                <span class="rev-label">Avg Speed:</span>
-                <span class="rev-val" id="revAvgSpeed">--</span>
-              </div>
-              <div class="rev-stat">
-                <span class="rev-label">Top Speed:</span>
-                <span class="rev-val" id="revMaxSpeed">--</span>
-              </div>
-              <div class="rev-stat">
-                <span class="rev-label">Smoothness:</span>
-                <span class="rev-val" id="revSmoothness">--</span>
-              </div>
-              <div class="rev-stat">
-                <span class="rev-label">Min Boundary:</span>
-                <span class="rev-val" id="revMinMargin">--</span>
-              </div>
-              <div class="rev-stat">
-                <span class="rev-label">Off-Track:</span>
-                <span class="rev-val" id="revOffTrack">0</span>
-              </div>
-            </div>
-            <div class="review-observations">
-              <div class="obs-title">Grounded Observations:</div>
-              <ul class="obs-list" id="reviewObsList">
-                <li>Vehicle negotiated all corners with zero boundary violations.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Center: 3D Racing Environment Viewport -->
+      <!-- Dominant Viewport Column with 3D Canvas & Bottom Engineer Drawer -->
       <section class="viewport-section center-viewport">
         <!-- Simulation Control Toolbar -->
         <div class="control-toolbar">
@@ -195,7 +128,7 @@
               <span id="camHintText">CHASE CAMERA // DAMPED TRAJECTORY TRACKING</span>
             </div>
 
-            <!-- Top Lidar Sensor HUD Bar -->
+            <!-- Slim Top Lidar Sensor HUD Bar (Clean edge positioning) -->
             <div class="lidar-hud-bar" id="lidarHudBar">
               <div class="lidar-hud-tag" id="hudRay0"><span class="beam-lbl">L -90°</span><span class="beam-val">36px</span></div>
               <div class="lidar-hud-tag" id="hudRay1"><span class="beam-lbl">DL -45°</span><span class="beam-val">56px</span></div>
@@ -204,16 +137,29 @@
               <div class="lidar-hud-tag" id="hudRay4"><span class="beam-lbl">R +90°</span><span class="beam-val">36px</span></div>
             </div>
 
-            <!-- 2D Minimap Radar Overlay (Contains #raceCanvas for test & minimap) -->
+            <!-- Debug HUD Overlay (toggled with 'D') -->
+            <div class="debug-hud-card" id="debugOverlay" style="display: none;">
+              <div class="debug-header">DEBUG INSPECTOR (KEY: D)</div>
+              <div class="debug-grid">
+                <div><span>Car Env (X, Y):</span> <strong id="dbgEnvPos">0.0, 0.0</strong></div>
+                <div><span>Car World (X, Z):</span> <strong id="dbgWorldPos">0.0, 0.0</strong></div>
+                <div><span>Heading:</span> <strong id="dbgHeading">0.0°</strong> (<span id="dbgHeadingRad">0.00 rad</span>)</div>
+                <div><span>Steer Angle:</span> <strong id="dbgSteerAngle">0.0°</strong></div>
+                <div><span>Cam Mode / Pos:</span> <strong id="dbgCamPos">chase [0, 0, 0]</strong></div>
+                <div><span>Scale:</span> <strong>PX_TO_WORLD = 0.1</strong></div>
+              </div>
+            </div>
+
+            <!-- 2D Minimap Radar Overlay (Bottom-right corner) -->
             <div class="minimap-radar-card">
               <div class="minimap-header">
                 <span class="radar-dot"></span>
                 <span>CIRCUIT RADAR</span>
               </div>
-              <canvas id="raceCanvas" width="220" height="160"></canvas>
+              <canvas id="raceCanvas" width="200" height="150"></canvas>
             </div>
 
-            <!-- Cockpit Speed & Action Overlay -->
+            <!-- Compact Cockpit Speed & Action Overlay (Bottom-left corner) -->
             <div class="cockpit-hud-overlay">
               <div class="cockpit-speed-dial">
                 <div class="speed-number" id="cockpitSpeed">0.00</div>
@@ -245,6 +191,77 @@
               <p id="overlayMessage">Clean lap finished at step 431.</p>
               <div class="modal-stats" id="modalStats"></div>
               <button class="btn btn-primary" id="btnOverlayRestart">Drive Again</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Strip: AI Race Engineer Commentary Feed & Post-Lap Performance Review -->
+        <div class="engineer-drawer" id="engineerDrawer">
+          <div class="engineer-drawer-header">
+            <div class="engineer-title-wrap">
+              <span class="avatar-icon">🏎️</span>
+              <div class="engineer-titles">
+                <span class="drawer-title">AI RACE ENGINEER FEED</span>
+                <span class="drawer-subtitle">GROUNDED TELEMETRY STREAM & CORNER DYNAMICS</span>
+              </div>
+            </div>
+            <div class="commentary-meta">
+              <span class="badge" id="commentaryModeBadge">OFFLINE DETERMINISTIC</span>
+              <span class="badge badge-success">STRICT VALIDATION</span>
+              <button class="btn-drawer-toggle" id="btnToggleDrawer" title="Toggle Engineer Feed Panel">
+                <span id="drawerToggleIcon">▼</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="engineer-drawer-body" id="engineerDrawerBody">
+            <!-- Real-Time Event Stream -->
+            <div class="commentary-feed" id="commentaryFeed">
+              <div class="commentary-item welcome-item">
+                <span class="c-step">[STEP 0]</span>
+                <span class="c-source">[OFFLINE DETERMINISTIC]</span>
+                <span class="c-text">Autonomous racing policy loaded. System prepped on start line. Ready to engage.</span>
+              </div>
+            </div>
+
+            <!-- Grounded Post-Lap Performance Review Card -->
+            <div class="lap-review-card" id="lapReviewCard" style="display: none;">
+              <div class="review-header">
+                <span class="review-badge">POST-LAP PERFORMANCE REVIEW</span>
+                <span class="review-verdict" id="reviewVerdict">EXCELLENT</span>
+              </div>
+              <div class="review-metrics-grid">
+                <div class="rev-stat">
+                  <span class="rev-label">Lap Time:</span>
+                  <span class="rev-val" id="revTime">--</span>
+                </div>
+                <div class="rev-stat">
+                  <span class="rev-label">Avg Speed:</span>
+                  <span class="rev-val" id="revAvgSpeed">--</span>
+                </div>
+                <div class="rev-stat">
+                  <span class="rev-label">Top Speed:</span>
+                  <span class="rev-val" id="revMaxSpeed">--</span>
+                </div>
+                <div class="rev-stat">
+                  <span class="rev-label">Smoothness:</span>
+                  <span class="rev-val" id="revSmoothness">--</span>
+                </div>
+                <div class="rev-stat">
+                  <span class="rev-label">Min Boundary:</span>
+                  <span class="rev-val" id="revMinMargin">--</span>
+                </div>
+                <div class="rev-stat">
+                  <span class="rev-label">Off-Track:</span>
+                  <span class="rev-val" id="revOffTrack">0</span>
+                </div>
+              </div>
+              <div class="review-observations">
+                <div class="obs-title">Grounded Observations:</div>
+                <ul class="obs-list" id="reviewObsList">
+                  <li>Vehicle negotiated all corners with zero boundary violations.</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
