@@ -151,11 +151,11 @@ function initThreeJS() {
   // 1. Scene & Atmosphere
   scene = new THREE.Scene();
 
-  // Distance fog blending smoothly into the HDRI horizon
-  scene.fog = new THREE.Fog(0xaec7dc, 450.0, 2400.0);
+  // Distance fog gently blending the horizon into the HDRI sky without veiling the track
+  scene.fog = new THREE.Fog(0x9bc2e0, 1200.0, 3800.0);
 
-  // 2. Camera Setup (PX_TO_WORLD = 1.0, 1 world unit = 1 pixel; near=2.0 for chase/orbit)
-  camera = new THREE.PerspectiveCamera(52, width / height, 2.0, 5000);
+  // 2. Camera Setup (natural 48 deg FOV for reduced distortion and sharp framing)
+  camera = new THREE.PerspectiveCamera(48, width / height, 2.0, 5000);
   camera.position.set(0, 300, 450);
 
   // 3. WebGL Renderer with High-Fidelity Color Pipeline
@@ -167,9 +167,9 @@ function initThreeJS() {
   renderer.setSize(width, height, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-  // PBR Tone Mapping & Color Management
+  // PBR Tone Mapping & Color Management (punchy contrast, no washed-out highlights)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.physicallyCorrectLights = true;
 
@@ -251,30 +251,29 @@ function onCanvasResize(width, height) {
   if (composer) {
     composer.setSize(width, height);
   }
-  if (ssaoPass && typeof ssaoPass.setSize === "function") {
-    ssaoPass.setSize(Math.max(1, Math.floor(width * 0.5)), Math.max(1, Math.floor(height * 0.5)));
-  }
 }
 
 function setupLighting() {
-  const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+  // Balanced cool sky ambient fill (clean daylight contrast, not milky or blown out)
+  const ambient = new THREE.AmbientLight(0xdbe7f4, 0.22);
   scene.add(ambient);
 
-  // Directional sun matching HDRI sun angle
-  mainSun = new THREE.DirectionalLight(0xfffaed, 1.85);
-  mainSun.position.set(300, 480, 200);
+  // Directional sun matching HDRI sun angle with crisp contact shadows
+  mainSun = new THREE.DirectionalLight(0xfff6ea, 1.55);
+  mainSun.position.set(240, 420, 180);
   mainSun.castShadow = true;
   mainSun.shadow.mapSize.width = 2048;
   mainSun.shadow.mapSize.height = 2048;
   mainSun.shadow.camera.near = 50;
-  mainSun.shadow.camera.far = 1200;
+  mainSun.shadow.camera.far = 1100;
 
   // Tight shadow frustum tracking around the car
-  mainSun.shadow.camera.left = -90;
-  mainSun.shadow.camera.right = 90;
-  mainSun.shadow.camera.top = 90;
-  mainSun.shadow.camera.bottom = -90;
-  mainSun.shadow.bias = -0.0003;
+  mainSun.shadow.camera.left = -85;
+  mainSun.shadow.camera.right = 85;
+  mainSun.shadow.camera.top = 85;
+  mainSun.shadow.camera.bottom = -85;
+  mainSun.shadow.bias = -0.00015;
+  mainSun.shadow.normalBias = 0.02;
   scene.add(mainSun);
 }
 
@@ -312,90 +311,113 @@ function loadHDRIEnvironment() {
 function loadPBRTextures() {
   const texLoader = new THREE.TextureLoader();
   const res = STATE.graphicsQuality === "high" ? "2k" : "1k";
+  const maxAniso = renderer && renderer.capabilities && renderer.capabilities.getMaxAnisotropy
+    ? renderer.capabilities.getMaxAnisotropy()
+    : 8;
 
   // Asphalt
   pbrTextures.asphaltDiff = texLoader.load(`/static/assets/textures/asphalt/asphalt_diff_${res}.jpg`);
   pbrTextures.asphaltDiff.wrapS = THREE.RepeatWrapping;
   pbrTextures.asphaltDiff.wrapT = THREE.RepeatWrapping;
   pbrTextures.asphaltDiff.encoding = THREE.sRGBEncoding;
+  pbrTextures.asphaltDiff.anisotropy = maxAniso;
+  pbrTextures.asphaltDiff.generateMipmaps = true;
+  pbrTextures.asphaltDiff.minFilter = THREE.LinearMipmapLinearFilter;
+  pbrTextures.asphaltDiff.magFilter = THREE.LinearFilter;
 
   pbrTextures.asphaltNor = texLoader.load(`/static/assets/textures/asphalt/asphalt_nor_${res}.jpg`);
   pbrTextures.asphaltNor.wrapS = THREE.RepeatWrapping;
   pbrTextures.asphaltNor.wrapT = THREE.RepeatWrapping;
+  pbrTextures.asphaltNor.anisotropy = maxAniso;
+  pbrTextures.asphaltNor.generateMipmaps = true;
+  pbrTextures.asphaltNor.minFilter = THREE.LinearMipmapLinearFilter;
+  pbrTextures.asphaltNor.magFilter = THREE.LinearFilter;
 
   pbrTextures.asphaltRough = texLoader.load(`/static/assets/textures/asphalt/asphalt_rough_${res}.jpg`);
   pbrTextures.asphaltRough.wrapS = THREE.RepeatWrapping;
   pbrTextures.asphaltRough.wrapT = THREE.RepeatWrapping;
+  pbrTextures.asphaltRough.anisotropy = maxAniso;
+  pbrTextures.asphaltRough.generateMipmaps = true;
+  pbrTextures.asphaltRough.minFilter = THREE.LinearMipmapLinearFilter;
+  pbrTextures.asphaltRough.magFilter = THREE.LinearFilter;
 
-  // Ground Runoff
+  // Ground Runoff (Rich natural grass scaling)
   pbrTextures.groundDiff = texLoader.load("/static/assets/textures/ground/ground_diff_1k.jpg");
   pbrTextures.groundDiff.wrapS = THREE.RepeatWrapping;
   pbrTextures.groundDiff.wrapT = THREE.RepeatWrapping;
-  pbrTextures.groundDiff.repeat.set(80, 80);
+  pbrTextures.groundDiff.repeat.set(50, 50);
   pbrTextures.groundDiff.encoding = THREE.sRGBEncoding;
+  pbrTextures.groundDiff.anisotropy = maxAniso;
+  pbrTextures.groundDiff.generateMipmaps = true;
+  pbrTextures.groundDiff.minFilter = THREE.LinearMipmapLinearFilter;
+  pbrTextures.groundDiff.magFilter = THREE.LinearFilter;
 
   pbrTextures.groundNor = texLoader.load("/static/assets/textures/ground/ground_nor_1k.jpg");
   pbrTextures.groundNor.wrapS = THREE.RepeatWrapping;
   pbrTextures.groundNor.wrapT = THREE.RepeatWrapping;
-  pbrTextures.groundNor.repeat.set(80, 80);
+  pbrTextures.groundNor.repeat.set(50, 50);
+  pbrTextures.groundNor.anisotropy = maxAniso;
+  pbrTextures.groundNor.generateMipmaps = true;
+  pbrTextures.groundNor.minFilter = THREE.LinearMipmapLinearFilter;
+  pbrTextures.groundNor.magFilter = THREE.LinearFilter;
 
   pbrTextures.groundRough = texLoader.load("/static/assets/textures/ground/ground_rough_1k.jpg");
   pbrTextures.groundRough.wrapS = THREE.RepeatWrapping;
   pbrTextures.groundRough.wrapT = THREE.RepeatWrapping;
-  pbrTextures.groundRough.repeat.set(80, 80);
+  pbrTextures.groundRough.repeat.set(50, 50);
+  pbrTextures.groundRough.anisotropy = maxAniso;
+  pbrTextures.groundRough.generateMipmaps = true;
+  pbrTextures.groundRough.minFilter = THREE.LinearMipmapLinearFilter;
+  pbrTextures.groundRough.magFilter = THREE.LinearFilter;
 }
 
 function initEffectComposer(width, height) {
   if (!THREE.EffectComposer) return;
 
-  const pr = renderer.getPixelRatio();
-  // Render composer at 0.8x pixel ratio (max 1.25) to guarantee >= 55 FPS on Mac Retina displays
-  const composerPr = Math.min(pr * 0.8, 1.25);
-  const renderTarget = new THREE.WebGLRenderTarget(width * composerPr, height * composerPr, {
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
-    format: THREE.RGBAFormat,
-    encoding: THREE.sRGBEncoding,
-  });
+  const pr = Math.min(window.devicePixelRatio || 1, 2);
+
+  // Use WebGLMultisampleRenderTarget with 4x hardware MSAA at native canvas resolution
+  let renderTarget;
+  if (typeof THREE.WebGLMultisampleRenderTarget !== "undefined") {
+    renderTarget = new THREE.WebGLMultisampleRenderTarget(
+      Math.round(width * pr),
+      Math.round(height * pr),
+      {
+        format: THREE.RGBAFormat,
+        encoding: THREE.sRGBEncoding,
+        samples: 4,
+      }
+    );
+  } else {
+    renderTarget = new THREE.WebGLRenderTarget(
+      Math.round(width * pr),
+      Math.round(height * pr),
+      {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        encoding: THREE.sRGBEncoding,
+      }
+    );
+  }
 
   composer = new THREE.EffectComposer(renderer, renderTarget);
-  composer.setPixelRatio(composerPr);
+  composer.setPixelRatio(pr);
   composer.setSize(width, height);
 
-  // 1. Scene Render Pass
+  // 1. Scene Render Pass (Full native resolution with 4x hardware MSAA)
   renderPass = new THREE.RenderPass(scene, camera);
   composer.addPass(renderPass);
 
-  // 2. Screen-Space Ambient Occlusion (SSAOPass rendered at half resolution for >= 55 FPS performance)
-  if (THREE.SSAOPass) {
-    try {
-      const ssaoW = Math.max(1, Math.floor(width * 0.5));
-      const ssaoH = Math.max(1, Math.floor(height * 0.5));
-      ssaoPass = new THREE.SSAOPass(scene, camera, ssaoW, ssaoH);
-      ssaoPass.kernelRadius = 14.0;
-      ssaoPass.minDistance = 0.005;
-      ssaoPass.maxDistance = 0.12;
-      composer.addPass(ssaoPass);
-    } catch (e) {
-      console.warn("SSAOPass initialization skipped:", e);
-    }
-  }
-
-  // 3. UnrealBloomPass (Lower half-resolution bloom pass for high performance)
+  // 2. High-precision specular glint bloom (localized, zero milky haze)
   if (THREE.UnrealBloomPass) {
     bloomPass = new THREE.UnrealBloomPass(
-      new THREE.Vector2(Math.max(1, Math.floor(width * 0.5)), Math.max(1, Math.floor(height * 0.5))),
-      0.28, // subtle strength
-      0.25, // radius
-      0.85  // threshold
+      new THREE.Vector2(Math.round(width * pr * 0.5), Math.round(height * pr * 0.5)),
+      0.08, // Subtle specular glint
+      0.15, // Small radius
+      0.92  // High threshold to avoid milky haze
     );
     composer.addPass(bloomPass);
-  }
-
-  // 4. SMAAPass (Subpixel Morphological Antialiasing)
-  if (THREE.SMAAPass) {
-    smaaPass = new THREE.SMAAPass(width * composerPr, height * composerPr);
-    composer.addPass(smaaPass);
   }
 }
 
@@ -460,7 +482,7 @@ function build3DTrack(trackData) {
     if (i > 0) {
       const prevIn = envToWorld(innerPts[i - 1][0], innerPts[i - 1][1]);
       const segDist = Math.hypot(inW.x - prevIn.x, inW.z - prevIn.z);
-      accumulatedV += segDist / 35.0; // Uniform tiling along arc-length
+      accumulatedV += segDist / 20.0; // Tighter, crisper asphalt aggregate
     }
 
     roadUvs.push(0.0, accumulatedV, 1.0, accumulatedV);
@@ -481,12 +503,12 @@ function build3DTrack(trackData) {
   roadGeo.setIndex(roadIndices);
 
   const roadMat = new THREE.MeshStandardMaterial({
-    color: 0x333338,
+    color: 0x242426, // Natural dark asphalt
     map: pbrTextures.asphaltDiff,
     normalMap: pbrTextures.asphaltNor,
     roughnessMap: pbrTextures.asphaltRough,
-    roughness: 0.85,
-    metalness: 0.08,
+    roughness: 0.70,
+    metalness: 0.04,
     side: THREE.DoubleSide,
   });
   roadMesh = new THREE.Mesh(roadGeo, roadMat);
@@ -517,15 +539,16 @@ function build3DTrack(trackData) {
     buildStartFinishMarker(innerPts[0], outerPts[0]);
   }
 
-  // 6. Ground Runoff Plane (Surrounding terrain with PBR grass)
+  // 6. Ground Runoff Plane (Surrounding terrain with rich natural grass)
   const groundGeo = new THREE.PlaneGeometry(3500, 3500);
   groundGeo.rotateX(-Math.PI / 2);
   const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x486b3a, // Vibrant natural grass green
     map: pbrTextures.groundDiff,
     normalMap: pbrTextures.groundNor,
     roughnessMap: pbrTextures.groundRough,
-    roughness: 0.95,
-    metalness: 0.05,
+    roughness: 0.88,
+    metalness: 0.02,
   });
   groundPlaneMesh = new THREE.Mesh(groundGeo, groundMat);
   groundPlaneMesh.position.y = -0.40;
@@ -1003,10 +1026,10 @@ function buildCenterline(centerPts) {
   }
   const geo = new THREE.BufferGeometry().setFromPoints(points);
   const mat = new THREE.LineDashedMaterial({
-    color: 0xffb700,
-    dashSize: 12.0,
-    gapSize: 8.0,
-    linewidth: 2,
+    color: 0xffffff, // Natural high-contrast white road markings
+    dashSize: 14.0,
+    gapSize: 10.0,
+    linewidth: 3,
   });
   const line = new THREE.Line(geo, mat);
   line.computeLineDistances();
@@ -1273,28 +1296,110 @@ function setupGLTFCar(gltf) {
     frPivot.add(wheelFR);
   }
 
-  // Brake light materials
-  const brakeMaterials = [];
-  if (brakeMesh && brakeMesh.material) {
-    const mats = Array.isArray(brakeMesh.material) ? brakeMesh.material : [brakeMesh.material];
-    mats.forEach((m) => {
-      m.emissive = new THREE.Color(0x220004);
-      m.emissiveIntensity = 0.4;
-      brakeMaterials.push(m);
-    });
-  }
+  // High-fidelity unbranded sports racing car PBR materials
+  const bodyMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xd91626, // Racing Rosso / vibrant clean red
+    metalness: 0.35,
+    roughness: 0.18,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.06,
+    envMap: hdrEnvMap,
+    envMapIntensity: 1.35,
+  });
 
-  // Enhance all materials for PBR tone mapping & environment reflections
+  const glassMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x111622,
+    metalness: 0.1,
+    roughness: 0.05,
+    transmission: 0.65,
+    transparent: true,
+    opacity: 0.60,
+    envMap: hdrEnvMap,
+    envMapIntensity: 1.5,
+  });
+
+  const rimMaterial = new THREE.MeshStandardMaterial({
+    color: 0xdcdfe4, // Satin Silver Rims
+    metalness: 0.90,
+    roughness: 0.20,
+    envMap: hdrEnvMap,
+    envMapIntensity: 1.2,
+  });
+
+  const tireMaterial = new THREE.MeshStandardMaterial({
+    color: 0x18181a, // Matte Black Rubber
+    metalness: 0.05,
+    roughness: 0.82,
+  });
+
+  const headlightMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.6,
+    roughness: 0.08,
+    transmission: 0.85,
+    transparent: true,
+    opacity: 0.80,
+    envMap: hdrEnvMap,
+    envMapIntensity: 1.5,
+  });
+
+  const taillightMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xc80815,
+    emissive: 0x220004,
+    emissiveIntensity: 0.4,
+    metalness: 0.15,
+    roughness: 0.15,
+    clearcoat: 0.8,
+  });
+
+  const trimMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1c, // Dark trim / diffusers / splitters
+    metalness: 0.35,
+    roughness: 0.45,
+  });
+
+  const chromeMaterial = new THREE.MeshStandardMaterial({
+    color: 0xeeeeee,
+    metalness: 0.95,
+    roughness: 0.08,
+    envMap: hdrEnvMap,
+    envMapIntensity: 1.4,
+  });
+
+  const brakeMaterials = [];
   model.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
       child.receiveShadow = true;
-      if (child.material) {
-        if (hdrEnvMap) {
-          child.material.envMap = hdrEnvMap;
-          child.material.envMapIntensity = 1.0;
+
+      const n = (child.name || "").toLowerCase();
+
+      if (n === "body") {
+        child.material = bodyMaterial;
+      } else if (n === "glass") {
+        child.material = glassMaterial;
+      } else if (n.startsWith("tire")) {
+        child.material = tireMaterial;
+      } else if (n.startsWith("rim_") || n.startsWith("wheel")) {
+        child.material = rimMaterial;
+      } else if (n === "lights") {
+        child.material = headlightMaterial;
+      } else if (n === "lights_red" || n === "brakes" || n === "steering_red_lights") {
+        const mat = taillightMaterial.clone();
+        child.material = mat;
+        brakeMaterials.push(mat);
+      } else if (n === "chrome") {
+        child.material = chromeMaterial;
+      } else if (n.includes("carbon") || n === "grills" || n === "plastic_gray" || n === "wipers") {
+        child.material = trimMaterial;
+      } else {
+        if (child.material) {
+          if (hdrEnvMap) {
+            child.material.envMap = hdrEnvMap;
+            child.material.envMapIntensity = 1.0;
+          }
+          child.material.needsUpdate = true;
         }
-        child.material.needsUpdate = true;
       }
     }
   });
@@ -1572,19 +1677,18 @@ function updateCameraDirector(car, velocity, delta = 0.016) {
 
     if (STATE.activeCameraMode === "chase") {
       if (controls) controls.enabled = false;
-      // 3.5 car lengths behind (3.5 * 50 px = 175 px)
-      // 1.2 car lengths above (1.2 * 50 px = 60 px)
-      const followDist = 175.0;
-      const followHeight = 60.0 + Math.min(Math.abs(velocity) * 2.0, 10.0);
+      // 2.6 car lengths behind (130 px), 45 px above (sharp proportions, car fills frame comfortably)
+      const followDist = 130.0;
+      const followHeight = 45.0 + Math.min(Math.abs(velocity) * 1.5, 8.0);
       const targetCamPos = new THREE.Vector3(
         carPos.x + backward.x * followDist,
         followHeight,
         carPos.z + backward.z * followDist
       );
       const lookTarget = new THREE.Vector3(
-        carPos.x + forward.x * 45.0,
-        12.0,
-        carPos.z + forward.z * 45.0
+        carPos.x + forward.x * 52.0,
+        10.0,
+        carPos.z + forward.z * 52.0
       );
 
       // Frame-delta-based camera smoothing: 1 - exp(-decay * delta)
@@ -1721,7 +1825,7 @@ function setGraphicsQuality(quality) {
     }
     if (btnQuality) btnQuality.className = "pill pill-quality active";
     if (qualityDot) qualityDot.className = "pill-dot green";
-    if (qualityText) qualityText.innerText = "QUALITY: HIGH (PBR+AO)";
+    if (qualityText) qualityText.innerText = "QUALITY: HIGH (CRISP PBR)";
   }
 }
 
