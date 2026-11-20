@@ -135,7 +135,7 @@ function initThreeJS() {
 
   // PBR Tone Mapping & Color Management
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.physicallyCorrectLights = true;
 
@@ -217,18 +217,21 @@ function onCanvasResize(width, height) {
   if (!renderer || !camera || width <= 0 || height <= 0) return;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  const pr = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(pr);
   renderer.setSize(width, height, false);
 
   if (composer) {
+    composer.setPixelRatio(pr);
     composer.setSize(width, height);
   }
 }
 
 function setupLighting() {
-  const ambient = new THREE.AmbientLight(0xdbe7f4, 0.40);
+  const ambient = new THREE.AmbientLight(0xfff6ee, 0.25);
   scene.add(ambient);
 
-  mainSun = new THREE.DirectionalLight(0xfff6ea, 1.75);
+  mainSun = new THREE.DirectionalLight(0xfff8ee, 1.20);
   mainSun.position.set(260, 440, 200);
   mainSun.castShadow = true;
   mainSun.shadow.mapSize.width = 2048;
@@ -274,6 +277,86 @@ function loadHDRIEnvironment() {
   );
 }
 
+// ==============================================================================
+// Procedural Texture Generators (Lush Natural Lawn & Illuminated City Skyline)
+// ==============================================================================
+
+function createProceduralGrassTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  // Rich base lawn green (manicured racing circuit grass)
+  ctx.fillStyle = "#388434";
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Micro-contrast natural blade tone patches
+  const colors = ["#2d6d2a", "#3f923b", "#499e44", "#357c32", "#52aa4c", "#32772f"];
+  for (let i = 0; i < 4500; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const r = Math.random() * 3.5 + 1.2;
+    ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(40, 40);
+  tex.anisotropy = renderer ? Math.min(renderer.capabilities.getMaxAnisotropy(), 8) : 4;
+  return tex;
+}
+
+function createProceduralBuildingTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  // Dark slate-blue architectural facade
+  ctx.fillStyle = "#222c3d";
+  ctx.fillRect(0, 0, 256, 512);
+
+  // Vertical architectural mullions
+  ctx.fillStyle = "#18202c";
+  for (let x = 0; x < 256; x += 16) {
+    ctx.fillRect(x, 0, 2, 512);
+  }
+
+  // Window grid with warm white and cool cyan lit office windows
+  const rows = 32;
+  const cols = 16;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const isLit = Math.sin(r * 12.3 + c * 34.5) > 0.15;
+      if (isLit) {
+        const warm = Math.sin(r * 5.1 + c * 9.2) > -0.2;
+        ctx.fillStyle = warm ? "#ffeaa7" : "#a8e6cf";
+        ctx.globalAlpha = 0.65 + Math.random() * 0.35;
+        ctx.fillRect(c * 16 + 3, r * 16 + 3, 9, 10);
+      } else {
+        ctx.fillStyle = "#111722";
+        ctx.globalAlpha = 0.85;
+        ctx.fillRect(c * 16 + 3, r * 16 + 3, 9, 10);
+      }
+    }
+  }
+  ctx.globalAlpha = 1.0;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 6);
+  return tex;
+}
+
+let proceduralGrassTex = null;
+let proceduralBuildingTex = null;
+
 function loadPBRTextures() {
   const loader = new THREE.TextureLoader();
 
@@ -289,7 +372,9 @@ function loadPBRTextures() {
   pbrTextures.asphaltNor = loader.load("/static/assets/textures/asphalt/asphalt_nor_1k.jpg", (tex) => configureTexture(tex, 1, 16));
   pbrTextures.asphaltRough = loader.load("/static/assets/textures/asphalt/asphalt_rough_1k.jpg", (tex) => configureTexture(tex, 1, 16));
 
-  pbrTextures.groundDiff = loader.load("/static/assets/textures/ground/ground_diff_1k.jpg", (tex) => configureTexture(tex, 32, 32));
+  proceduralGrassTex = createProceduralGrassTexture();
+  proceduralBuildingTex = createProceduralBuildingTexture();
+  pbrTextures.groundDiff = proceduralGrassTex;
   pbrTextures.groundNor = loader.load("/static/assets/textures/ground/ground_nor_1k.jpg", (tex) => configureTexture(tex, 32, 32));
   pbrTextures.groundRough = loader.load("/static/assets/textures/ground/ground_rough_1k.jpg", (tex) => configureTexture(tex, 32, 32));
 }
@@ -306,6 +391,7 @@ function initEffectComposer(width, height) {
   });
 
   composer = new THREE.EffectComposer(renderer, renderTarget);
+  composer.setPixelRatio(pr);
   renderPass = new THREE.RenderPass(scene, camera);
   composer.addPass(renderPass);
 
@@ -388,12 +474,12 @@ function build3DTrack(trackData) {
   roadGeo.setIndex(roadIndices);
 
   const roadMat = new THREE.MeshStandardMaterial({
-    color: 0x222225, // Charcoal asphalt matching concept
+    color: 0x24272e, // Deep charcoal racetrack asphalt
     map: pbrTextures.asphaltDiff,
     normalMap: pbrTextures.asphaltNor,
     roughnessMap: pbrTextures.asphaltRough,
-    roughness: 0.72,
-    metalness: 0.03,
+    roughness: 0.76,
+    metalness: 0.05,
     side: THREE.DoubleSide,
   });
   roadMesh = new THREE.Mesh(roadGeo, roadMat);
@@ -431,11 +517,11 @@ function build3DTrack(trackData) {
   const groundGeo = new THREE.PlaneGeometry(4200, 4200);
   groundGeo.rotateX(-Math.PI / 2);
   const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x489643, // Vibrant lawn grass green matching concept
-    map: pbrTextures.groundDiff,
+    color: 0x388334, // Natural lush circuit lawn green matching concept video
+    map: proceduralGrassTex || pbrTextures.groundDiff,
     normalMap: pbrTextures.groundNor,
     roughnessMap: pbrTextures.groundRough,
-    roughness: 0.88,
+    roughness: 0.82,
     metalness: 0.02,
   });
   groundPlaneMesh = new THREE.Mesh(groundGeo, groundMat);
@@ -927,36 +1013,81 @@ function buildEnvironmentProps(trackData) {
 }
 
 function buildDistantCitySkyline() {
-  const buildingCount = 36;
-  const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
   const buildingMat = new THREE.MeshStandardMaterial({
-    color: 0x5a6f87,
-    metalness: 0.35,
-    roughness: 0.55,
+    color: 0x3d4b60,
+    map: proceduralBuildingTex,
+    emissive: 0x354458,
+    emissiveMap: proceduralBuildingTex,
+    emissiveIntensity: 0.35,
+    metalness: 0.40,
+    roughness: 0.45,
   });
 
-  const mesh = new THREE.InstancedMesh(buildingGeo, buildingMat, buildingCount);
+  const spireMat = new THREE.MeshStandardMaterial({
+    color: 0x90a4ae,
+    metalness: 0.85,
+    roughness: 0.20,
+  });
+
+  const buildingCount = 36;
   const dummy = new THREE.Object3D();
+
+  // Instanced main towers
+  const towerGeo = new THREE.BoxGeometry(1, 1, 1);
+  const towerMesh = new THREE.InstancedMesh(towerGeo, buildingMat, buildingCount);
+  towerMesh.castShadow = false;
+  towerMesh.receiveShadow = false;
+
+  // Instanced setback crown towers
+  const crownGeo = new THREE.BoxGeometry(1, 1, 1);
+  const crownMesh = new THREE.InstancedMesh(crownGeo, buildingMat, buildingCount);
+  crownMesh.castShadow = false;
+
+  // Instanced spire needles
+  const spireGeo = new THREE.CylinderGeometry(0.12, 0.4, 1.0, 8);
+  const spireMesh = new THREE.InstancedMesh(spireGeo, spireMat, buildingCount);
 
   for (let i = 0; i < buildingCount; i++) {
     const angle = (i / buildingCount) * Math.PI * 2;
-    const dist = 750.0 + (Math.sin(i * 3.3) * 0.5 + 0.5) * 450.0;
+    const dist = 780.0 + (Math.sin(i * 3.3) * 0.5 + 0.5) * 420.0;
     const x = Math.cos(angle) * dist;
     const z = Math.sin(angle) * dist;
 
-    const bWidth = 36.0 + (i % 6) * 12.0;
-    const bDepth = 36.0 + ((i + 2) % 5) * 12.0;
-    const bHeight = 85.0 + (Math.sin(i * 1.7) * 0.5 + 0.5) * 110.0;
+    const bWidth = 38.0 + (i % 5) * 10.0;
+    const bDepth = 38.0 + ((i + 2) % 4) * 10.0;
+    const bHeight = 80.0 + (Math.sin(i * 1.7) * 0.5 + 0.5) * 95.0;
 
+    // Main base tower
     dummy.position.set(x, bHeight / 2 - 2, z);
     dummy.rotation.set(0, angle, 0);
     dummy.scale.set(bWidth, bHeight, bDepth);
     dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
+    towerMesh.setMatrixAt(i, dummy.matrix);
+
+    // Architectural setback crown
+    const crownWidth = bWidth * 0.65;
+    const crownDepth = bDepth * 0.65;
+    const crownHeight = bHeight * 0.35;
+    dummy.position.set(x, bHeight + crownHeight / 2 - 2, z);
+    dummy.scale.set(crownWidth, crownHeight, crownDepth);
+    dummy.updateMatrix();
+    crownMesh.setMatrixAt(i, dummy.matrix);
+
+    // Rooftop antenna spire
+    const spireHeight = 18.0 + (i % 3) * 10.0;
+    dummy.position.set(x, bHeight + crownHeight + spireHeight / 2 - 2, z);
+    dummy.scale.set(1.0, spireHeight, 1.0);
+    dummy.updateMatrix();
+    spireMesh.setMatrixAt(i, dummy.matrix);
   }
 
-  mesh.instanceMatrix.needsUpdate = true;
-  propsGroup.add(mesh);
+  towerMesh.instanceMatrix.needsUpdate = true;
+  crownMesh.instanceMatrix.needsUpdate = true;
+  spireMesh.instanceMatrix.needsUpdate = true;
+
+  propsGroup.add(towerMesh);
+  propsGroup.add(crownMesh);
+  propsGroup.add(spireMesh);
 }
 
 // ==============================================================================
@@ -984,90 +1115,182 @@ function buildProceduralVehicle() {
   const height = 12.0;
 
   // Materials
-  const liveryMat = new THREE.MeshPhysicalMaterial({
-    color: 0xd91626, // Racing Rosso red matching concept
-    metalness: 0.28,
-    roughness: 0.20,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.08,
+  const liveryMat = new THREE.MeshStandardMaterial({
+    color: 0x8a0c20, // Deep crimson sports car red matching concept reference frames
+    metalness: 0.0,
+    roughness: 0.48,
+    envMapIntensity: 0.0,
   });
 
   const carbonMat = new THREE.MeshStandardMaterial({
-    color: 0x16181c,
-    metalness: 0.7,
-    roughness: 0.4,
+    color: 0x16181c, // Matte carbon fiber
+    metalness: 0.60,
+    roughness: 0.40,
+    envMapIntensity: 0.15,
   });
 
   const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x111622, // Dark sports car tinted glass canopy
+    color: 0x0e131d, // Dark GT cockpit glass
     metalness: 0.85,
-    roughness: 0.10,
+    roughness: 0.12,
     transparent: true,
-    opacity: 0.94,
+    opacity: 0.92,
   });
 
-  // 1. Lower Wedge Body / Side Sills
-  const bodyGeo = new THREE.BoxGeometry(length * 0.88, height * 0.40, width * 0.84);
-  const bodyMesh = new THREE.Mesh(bodyGeo, liveryMat);
-  bodyMesh.position.y = height * 0.42;
-  bodyMesh.castShadow = true;
-  bodyMesh.receiveShadow = true;
-  carBodyGroup.add(bodyMesh);
+  // 1. Lower Cockpit Tub & Chassis
+  const tubGeo = new THREE.BoxGeometry(length * 0.86, height * 0.36, width * 0.78);
+  const tubMesh = new THREE.Mesh(tubGeo, liveryMat);
+  tubMesh.position.y = height * 0.36;
+  tubMesh.castShadow = true;
+  tubMesh.receiveShadow = true;
+  carBodyGroup.add(tubMesh);
 
-  // Sloping Nose / Front Hood Wedge
-  const hoodGeo = new THREE.BoxGeometry(length * 0.26, height * 0.26, width * 0.80);
+  // 1b. Rear Fastback Deck & Fascia (sculpts the vertical rear body matching concept)
+  const rearDeckGeo = new THREE.BoxGeometry(length * 0.28, height * 0.38, width * 0.76);
+  const rearDeckMesh = new THREE.Mesh(rearDeckGeo, liveryMat);
+  rearDeckMesh.position.set(-length * 0.30, height * 0.48, 0);
+  rearDeckMesh.castShadow = true;
+  rearDeckMesh.receiveShadow = true;
+  carBodyGroup.add(rearDeckMesh);
+
+  // 2. Sculpted Sloping Front Hood & Low Nose
+  const hoodGeo = new THREE.BoxGeometry(length * 0.28, height * 0.24, width * 0.74);
   const hoodMesh = new THREE.Mesh(hoodGeo, liveryMat);
-  hoodMesh.position.set(length * 0.36, height * 0.36, 0);
+  hoodMesh.position.set(length * 0.35, height * 0.34, 0);
   hoodMesh.rotation.z = -0.16;
   hoodMesh.castShadow = true;
   carBodyGroup.add(hoodMesh);
 
-  // 2. Cockpit Greenhouse / Fastback Canopy
-  const cabinGeo = new THREE.BoxGeometry(length * 0.46, height * 0.44, width * 0.65);
-  const cabinMesh = new THREE.Mesh(cabinGeo, glassMat);
-  cabinMesh.position.set(-length * 0.02, height * 0.76, 0);
-  cabinMesh.castShadow = true;
-  carBodyGroup.add(cabinMesh);
+  // Twin hood air extraction louvers in carbon
+  const ventGeo = new THREE.BoxGeometry(length * 0.12, 0.4, width * 0.22);
+  const ventL = new THREE.Mesh(ventGeo, carbonMat);
+  ventL.position.set(length * 0.32, height * 0.44, -width * 0.20);
+  ventL.rotation.z = -0.16;
+  const ventR = new THREE.Mesh(ventGeo, carbonMat);
+  ventR.position.set(length * 0.32, height * 0.44, width * 0.20);
+  ventR.rotation.z = -0.16;
+  carBodyGroup.add(ventL);
+  carBodyGroup.add(ventR);
 
-  // 3. Front Splitter
-  const splitterGeo = new THREE.BoxGeometry(length * 0.16, height * 0.06, width * 0.92);
+  // 3. Extended Front Carbon Splitter with Endplates
+  const splitterGeo = new THREE.BoxGeometry(length * 0.18, height * 0.05, width * 0.94);
   const splitter = new THREE.Mesh(splitterGeo, carbonMat);
-  splitter.position.set(length * 0.46, height * 0.14, 0);
+  splitter.position.set(length * 0.46, height * 0.12, 0);
   splitter.castShadow = true;
   carBodyGroup.add(splitter);
 
-  // 4. Rear Racing Wing / Spoiler
-  const wingGeo = new THREE.BoxGeometry(length * 0.15, height * 0.06, width * 0.96);
+  // Left & right splitter dive-planes
+  const diveGeo = new THREE.BoxGeometry(length * 0.08, height * 0.12, 0.6);
+  const diveL = new THREE.Mesh(diveGeo, carbonMat);
+  diveL.position.set(length * 0.48, height * 0.18, -width * 0.46);
+  const diveR = new THREE.Mesh(diveGeo, carbonMat);
+  diveR.position.set(length * 0.48, height * 0.18, width * 0.46);
+  carBodyGroup.add(diveL);
+  carBodyGroup.add(diveR);
+
+  // 4. Sculpted Front Wheel Arches (Fenders)
+  const fArchGeo = new THREE.BoxGeometry(length * 0.24, height * 0.34, width * 0.12);
+  const fArchL = new THREE.Mesh(fArchGeo, liveryMat);
+  fArchL.position.set(length * 0.32, height * 0.42, -width * 0.41);
+  fArchL.castShadow = true;
+  const fArchR = new THREE.Mesh(fArchGeo, liveryMat);
+  fArchR.position.set(length * 0.32, height * 0.42, width * 0.41);
+  fArchR.castShadow = true;
+  carBodyGroup.add(fArchL);
+  carBodyGroup.add(fArchR);
+
+  // 5. Flared Rear Wheel Arches (Wide Hips over rear competition tires)
+  const rArchGeo = new THREE.BoxGeometry(length * 0.26, height * 0.38, width * 0.14);
+  const rArchL = new THREE.Mesh(rArchGeo, liveryMat);
+  rArchL.position.set(-length * 0.32, height * 0.45, -width * 0.41);
+  rArchL.castShadow = true;
+  const rArchR = new THREE.Mesh(rArchGeo, liveryMat);
+  rArchR.position.set(-length * 0.32, height * 0.45, width * 0.41);
+  rArchR.castShadow = true;
+  carBodyGroup.add(rArchL);
+  carBodyGroup.add(rArchR);
+
+  // 6. Carbon Ground-Effect Side Skirts
+  const skirtGeo = new THREE.BoxGeometry(length * 0.40, height * 0.05, width * 0.08);
+  const skirtL = new THREE.Mesh(skirtGeo, carbonMat);
+  skirtL.position.set(0, height * 0.14, -width * 0.42);
+  const skirtR = new THREE.Mesh(skirtGeo, carbonMat);
+  skirtR.position.set(0, height * 0.14, width * 0.42);
+  carBodyGroup.add(skirtL);
+  carBodyGroup.add(skirtR);
+
+  // 7. Fastback GT Cockpit Greenhouse
+  const cabinGeo = new THREE.BoxGeometry(length * 0.44, height * 0.42, width * 0.62);
+  const cabinMesh = new THREE.Mesh(cabinGeo, glassMat);
+  cabinMesh.position.set(-length * 0.02, height * 0.74, 0);
+  cabinMesh.castShadow = true;
+  carBodyGroup.add(cabinMesh);
+
+  // Roof panel in Rosso red
+  const roofGeo = new THREE.BoxGeometry(length * 0.36, 0.4, width * 0.58);
+  const roofMesh = new THREE.Mesh(roofGeo, liveryMat);
+  roofMesh.position.set(-length * 0.02, height * 0.95, 0);
+  roofMesh.castShadow = true;
+  carBodyGroup.add(roofMesh);
+
+  // 8. Aggressive Rear Carbon Diffuser with Aero Strakes
+  const diffGeo = new THREE.BoxGeometry(length * 0.14, height * 0.08, width * 0.88);
+  const diffMesh = new THREE.Mesh(diffGeo, carbonMat);
+  diffMesh.position.set(-length * 0.44, height * 0.14, 0);
+  diffMesh.rotation.z = 0.20;
+  carBodyGroup.add(diffMesh);
+
+  // 9. GT Airfoil Rear Wing with Vertical Endplates
+  const wingGeo = new THREE.BoxGeometry(length * 0.16, height * 0.05, width * 0.96);
   const wing = new THREE.Mesh(wingGeo, carbonMat);
-  wing.position.set(-length * 0.44, height * 1.05, 0);
+  wing.position.set(-length * 0.45, height * 1.05, 0);
   wing.castShadow = true;
   carBodyGroup.add(wing);
 
+  // Dual aerodynamic wing endplates
+  const endplateGeo = new THREE.BoxGeometry(length * 0.22, height * 0.20, 0.6);
+  const epL = new THREE.Mesh(endplateGeo, carbonMat);
+  epL.position.set(-length * 0.45, height * 1.05, -width * 0.48);
+  const epR = new THREE.Mesh(endplateGeo, carbonMat);
+  epR.position.set(-length * 0.45, height * 1.05, width * 0.48);
+  carBodyGroup.add(epL);
+  carBodyGroup.add(epR);
+
+  // Swan-neck wing pylons
   const wingPillarGeo = new THREE.BoxGeometry(length * 0.04, height * 0.36, width * 0.04);
   const pL = new THREE.Mesh(wingPillarGeo, carbonMat);
-  pL.position.set(-length * 0.44, height * 0.84, -width * 0.30);
+  pL.position.set(-length * 0.44, height * 0.84, -width * 0.28);
   const pR = new THREE.Mesh(wingPillarGeo, carbonMat);
-  pR.position.set(-length * 0.44, height * 0.84, width * 0.30);
+  pR.position.set(-length * 0.44, height * 0.84, width * 0.28);
   carBodyGroup.add(pL);
   carBodyGroup.add(pR);
 
-  // 5. Dual Front Headlights
+  // 10. Aggressive Dual Front LED Headlights with Cyan Accents
   const headLightMat = new THREE.MeshBasicMaterial({ color: 0xe0f7fa });
-  const headGeo = new THREE.BoxGeometry(length * 0.04, height * 0.10, width * 0.16);
+  const headAccentMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const headGeo = new THREE.BoxGeometry(length * 0.04, height * 0.08, width * 0.15);
   const hL = new THREE.Mesh(headGeo, headLightMat);
-  hL.position.set(length * 0.45, height * 0.40, -width * 0.28);
+  hL.position.set(length * 0.45, height * 0.38, -width * 0.28);
   const hR = new THREE.Mesh(headGeo, headLightMat);
-  hR.position.set(length * 0.45, height * 0.40, width * 0.28);
+  hR.position.set(length * 0.45, height * 0.38, width * 0.28);
   carBodyGroup.add(hL);
   carBodyGroup.add(hR);
 
-  // 6. Rear Emissive Active LED Taillights
+  const dRLGeo = new THREE.BoxGeometry(length * 0.05, 0.5, width * 0.14);
+  const dRLL = new THREE.Mesh(dRLGeo, headAccentMat);
+  dRLL.position.set(length * 0.45, height * 0.33, -width * 0.28);
+  const dRLR = new THREE.Mesh(dRLGeo, headAccentMat);
+  dRLR.position.set(length * 0.45, height * 0.33, width * 0.28);
+  carBodyGroup.add(dRLL);
+  carBodyGroup.add(dRLR);
+
+  // 11. Rear Emissive Active LED Taillights
   const brakeLightMat = new THREE.MeshStandardMaterial({
     color: 0xff1128,
     emissive: 0xff1128,
-    emissiveIntensity: 1.2,
+    emissiveIntensity: 1.5,
   });
-  const brakeLightGeo = new THREE.BoxGeometry(0.8, 1.4, 4.6);
+  const brakeLightGeo = new THREE.BoxGeometry(0.8, 1.4, 4.8);
   const brakeL = new THREE.Mesh(brakeLightGeo, brakeLightMat);
   brakeL.position.set(-length * 0.44 - 0.2, height * 0.48, -width * 0.28);
   const brakeR = new THREE.Mesh(brakeLightGeo, brakeLightMat);
@@ -1076,7 +1299,7 @@ function buildProceduralVehicle() {
   carBodyGroup.add(brakeR);
   rearBrakeLights.push(brakeL, brakeR);
 
-  // 7. Rangefinder Sensor Emitter Discs & Stalks (matching concept video)
+  // 12. Rangefinder Sensor Emitter Discs & Stalks (matching concept video)
   const stalkMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
   const emitterRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
   const emitterCenterMat = new THREE.MeshBasicMaterial({ color: 0x111620 });
@@ -1115,7 +1338,7 @@ function buildProceduralVehicle() {
     carEmitterNodes.push(emitterNodeGroup);
   });
 
-  // 8. Four Wheels & Rims with Yellow Brake Calipers (matching reference_25s.png)
+  // 13. Four GT Wheels & Rims with Yellow Brake Calipers
   const wheelRadius = 5.2;
   const wheelWidth = 3.6;
   const wheelRubberMat = new THREE.MeshStandardMaterial({
@@ -1128,6 +1351,7 @@ function buildProceduralVehicle() {
     metalness: 0.88,
     roughness: 0.22,
   });
+  const wheelHubMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff }); // Anodized cyan centerlock nut
   const caliperMat = new THREE.MeshStandardMaterial({
     color: 0xffd600, // Vibrant Yellow Calipers
     metalness: 0.4,
@@ -1137,7 +1361,7 @@ function buildProceduralVehicle() {
   function createWheel() {
     const wheelGroup = new THREE.Group();
 
-    // Spinning portion (tire + rim)
+    // Spinning portion (tire + rim + spokes)
     const spinGroup = new THREE.Group();
 
     const tireGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 20);
@@ -1150,6 +1374,12 @@ function buildProceduralVehicle() {
     rimGeo.rotateX(Math.PI / 2);
     const rimMesh = new THREE.Mesh(rimGeo, wheelRimMat);
     spinGroup.add(rimMesh);
+
+    // Central hub nut
+    const hubGeo = new THREE.CylinderGeometry(0.8, 0.8, wheelWidth + 0.25, 8);
+    hubGeo.rotateX(Math.PI / 2);
+    const hubMesh = new THREE.Mesh(hubGeo, wheelHubMat);
+    spinGroup.add(hubMesh);
 
     wheelGroup.add(spinGroup);
 
