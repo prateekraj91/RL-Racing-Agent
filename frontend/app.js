@@ -156,7 +156,8 @@ function initThreeJS() {
 
   // 2. Camera Setup (natural 48 deg FOV for reduced distortion and sharp framing)
   camera = new THREE.PerspectiveCamera(48, width / height, 2.0, 5000);
-  camera.position.set(0, 300, 450);
+  camera.position.set(0, 45, 140);
+  camera.lookAt(0, 6, 0);
 
   // 3. WebGL Renderer with High-Fidelity Color Pipeline
   renderer = new THREE.WebGLRenderer({
@@ -189,6 +190,12 @@ function initThreeJS() {
   // 5. Scene Hierarchy Groups
   trackGroup = new THREE.Group();
   scene.add(trackGroup);
+
+  window.renderer = renderer;
+  window.scene = scene;
+  window.camera = camera;
+  window.trackGroup = trackGroup;
+  window.carGroup = carGroup;
 
   propsGroup = new THREE.Group();
   scene.add(propsGroup);
@@ -660,6 +667,7 @@ function buildBarrierWall(boundaryPts, offsetDistance, wallHeight) {
   const n = boundaryPts.length;
   const wallGeo = new THREE.BufferGeometry();
   const vertices = [];
+  const colors = [];
   const indices = [];
 
   for (let i = 0; i < n; i++) {
@@ -677,7 +685,10 @@ function buildBarrierWall(boundaryPts, offsetDistance, wallHeight) {
     const pos = envToWorld(pt[0] + nx, pt[1] + ny);
 
     vertices.push(pos.x, -0.40, pos.z);
+    colors.push(0.96, 0.96, 0.98); // White lower concrete wall
+
     vertices.push(pos.x, wallHeight, pos.z);
+    colors.push(0.08, 0.45, 0.95); // Racing Blue top cap (concept match)
 
     const next = (i + 1) % n;
     const i0 = i * 2;
@@ -692,13 +703,14 @@ function buildBarrierWall(boundaryPts, offsetDistance, wallHeight) {
   if (vertices.length < 12) return null;
 
   wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  wallGeo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   wallGeo.setIndex(indices);
   wallGeo.computeVertexNormals();
 
   const wallMat = new THREE.MeshStandardMaterial({
-    color: 0x222a38,
-    metalness: 0.6,
-    roughness: 0.35,
+    vertexColors: true,
+    metalness: 0.3,
+    roughness: 0.4,
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(wallGeo, wallMat);
@@ -1888,6 +1900,14 @@ let lastFrameTime = performance.now();
 let frameCount = 0;
 let lastFpsUpdate = performance.now();
 let currentFPS = 60;
+let isAnimationLoopRunning = false;
+
+function startAnimationLoop() {
+  if (isAnimationLoopRunning) return;
+  isAnimationLoopRunning = true;
+  lastFrameTime = performance.now();
+  requestAnimationFrame(animate);
+}
 
 function animate(currentTime) {
   requestAnimationFrame(animate);
@@ -1902,6 +1922,7 @@ function animate(currentTime) {
     lastFpsUpdate = currentTime;
     const fpsEl = document.getElementById("fpsCounter");
     if (fpsEl) fpsEl.innerText = `${currentFPS} FPS`;
+    window.currentFPS = currentFPS;
   }
 
   // Playback Clock Advance: decoupled from network speed
@@ -2152,9 +2173,85 @@ function syncPlaybackCommentary(allCommentary, currentStep) {
 // Simulation Backend Communication (FastAPI Client)
 // ==============================================================================
 
+function showLoadingOverlay(title = "GENERATING DETERMINISTIC EPISODE", subtitle = "Executing policy rollout on server...") {
+  const overlay = document.getElementById("simulationLoadingOverlay");
+  const tEl = document.getElementById("loadingTitle");
+  const sEl = document.getElementById("loadingSubtitle");
+  const errBox = document.getElementById("loadingErrorBox");
+  const spinner = document.querySelector(".loading-spinner-ring");
+
+  if (tEl) tEl.innerText = title;
+  if (sEl) sEl.innerText = subtitle;
+  if (errBox) errBox.style.display = "none";
+  if (spinner) spinner.style.display = "block";
+  if (overlay) {
+    overlay.style.display = "flex";
+    overlay.style.opacity = "1";
+    overlay.style.pointerEvents = "auto";
+  }
+  setPlaybackControlsEnabled(false);
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById("simulationLoadingOverlay");
+  if (overlay) {
+    overlay.style.opacity = "0";
+    overlay.style.pointerEvents = "none";
+    setTimeout(() => {
+      if (overlay && overlay.style.opacity === "0") {
+        overlay.style.display = "none";
+      }
+    }, 250);
+  }
+  setPlaybackControlsEnabled(true);
+}
+
+function showLoadingError(errMsg = "Rollout generation failed.") {
+  const overlay = document.getElementById("simulationLoadingOverlay");
+  const tEl = document.getElementById("loadingTitle");
+  const sEl = document.getElementById("loadingSubtitle");
+  const errBox = document.getElementById("loadingErrorBox");
+  const errText = document.getElementById("loadingErrorText");
+  const spinner = document.querySelector(".loading-spinner-ring");
+
+  if (tEl) tEl.innerText = "SIMULATION FAILED";
+  if (sEl) sEl.innerText = "Unable to generate episode rollout.";
+  if (spinner) spinner.style.display = "none";
+  if (errBox) errBox.style.display = "flex";
+  if (errText) errText.innerText = errMsg;
+
+  if (overlay) {
+    overlay.style.display = "flex";
+    overlay.style.opacity = "1";
+    overlay.style.pointerEvents = "auto";
+  }
+  setPlaybackControlsEnabled(false);
+}
+
+function setPlaybackControlsEnabled(enabled) {
+  const btnStartPause = document.getElementById("btnStartPause");
+  const btnStep = document.getElementById("btnStep");
+  const btnStepBack = document.getElementById("btnStepBack");
+  const btnReset = document.getElementById("btnReset");
+  const scrubber = document.getElementById("pbScrubber");
+
+  [btnStartPause, btnStep, btnStepBack, btnReset].forEach((btn) => {
+    if (btn) {
+      btn.disabled = !enabled;
+      btn.style.opacity = enabled ? "1" : "0.5";
+      btn.style.pointerEvents = enabled ? "auto" : "none";
+    }
+  });
+  if (scrubber) {
+    scrubber.disabled = !enabled;
+    scrubber.style.opacity = enabled ? "1" : "0.5";
+  }
+}
+
 async function startSimulation(presetId = STATE.presetId, trackSeed = STATE.trackSeed) {
   try {
-    updateStatusPill("SIMULATING ROLLOUT...", "amber");
+    updateStatusPill("GENERATING EPISODE...", "amber");
+    showLoadingOverlay("GENERATING DETERMINISTIC EPISODE", `Simulating ${presetId} (seed ${trackSeed})...`);
     STATE.playback.isLoading = true;
     STATE.presetId = presetId;
     STATE.trackSeed = trackSeed;
@@ -2197,8 +2294,8 @@ async function startSimulation(presetId = STATE.presetId, trackSeed = STATE.trac
       const heading = carGroup.rotation.y;
       const forward = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
       const backward = forward.clone().negate();
-      const followDist = 175.0;
-      const followHeight = 60.0;
+      const followDist = 130.0;
+      const followHeight = 45.0;
       STATE.cameraPos.set(
         carGroup.position.x + backward.x * followDist,
         followHeight,
@@ -2223,10 +2320,12 @@ async function startSimulation(presetId = STATE.presetId, trackSeed = STATE.trac
       if (text) text.innerText = "Start Simulation";
     }
 
+    hideLoadingOverlay();
     updateStatusPill("READY (ROLLOUT LOADED)", "cyan");
   } catch (err) {
     console.error("Simulation start / rollout loading failed:", err);
     STATE.playback.isLoading = false;
+    showLoadingError(err.message || "Failed to load rollout from server.");
     updateStatusPill("ROLLOUT ERROR", "red");
   }
 }
@@ -3081,7 +3180,7 @@ window.getRenderStats = function() {
   };
 };
 
-window.addEventListener("DOMContentLoaded", async () => {
+window.addEventListener("DOMContentLoaded", () => {
   initThreeJS();
   initEventHandlers();
   loadHistoricalSaliency();
@@ -3096,9 +3195,17 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (container) container.appendChild(debugBox);
   }
 
-  // Start initial default simulation
-  await startSimulation(STATE.presetId, STATE.trackSeed);
+  // Hook up Retry button if present
+  const btnRetry = document.getElementById("btnRetryRollout");
+  if (btnRetry) {
+    btnRetry.addEventListener("click", () => {
+      startSimulation(STATE.presetId, STATE.trackSeed);
+    });
+  }
 
-  // Start animation loop
-  requestAnimationFrame(animate);
+  // Start animation loop immediately (Non-blocking startup: 3D scene renders within milliseconds)
+  startAnimationLoop();
+
+  // Initiate simulation rollout asynchronously in background without blocking the render loop
+  startSimulation(STATE.presetId, STATE.trackSeed);
 });
