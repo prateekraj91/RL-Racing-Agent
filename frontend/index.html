@@ -7,6 +7,20 @@
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/vendor/three.min.js"></script>
   <script src="/static/vendor/OrbitControls.js"></script>
+  <script src="/static/vendor/RGBELoader.js"></script>
+  <script src="/static/vendor/DRACOLoader.js"></script>
+  <script src="/static/vendor/GLTFLoader.js"></script>
+  <script src="/static/vendor/CopyShader.js"></script>
+  <script src="/static/vendor/LuminosityHighPassShader.js"></script>
+  <script src="/static/vendor/SSAOShader.js"></script>
+  <script src="/static/vendor/SMAAShader.js"></script>
+  <script src="/static/vendor/SimplexNoise.js"></script>
+  <script src="/static/vendor/EffectComposer.js"></script>
+  <script src="/static/vendor/RenderPass.js"></script>
+  <script src="/static/vendor/ShaderPass.js"></script>
+  <script src="/static/vendor/UnrealBloomPass.js"></script>
+  <script src="/static/vendor/SSAOPass.js"></script>
+  <script src="/static/vendor/SMAAPass.js"></script>
   <script src="/static/world.js"></script>
   <script>
     if (typeof THREE === 'undefined') {
@@ -53,6 +67,14 @@
         <button class="pill pill-debug" id="btnDebugToggle" title="Toggle 3D Debug Overlay (Key: D)">
           <span class="pill-dot amber"></span>
           <span>DEBUG (D)</span>
+        </button>
+        <button class="pill pill-quality" id="btnQualityToggle" title="Toggle Graphics Quality (High / Low)">
+          <span class="pill-dot green" id="qualityDot"></span>
+          <span id="qualityText">QUALITY: HIGH</span>
+        </button>
+        <button class="pill pill-cinematic" id="btnCinematicToggle" title="Toggle Cinematic Mode / Clean Viewport [Key: H]">
+          <span class="pill-dot cyan" id="cinematicDot"></span>
+          <span id="cinematicText">CINEMATIC (H)</span>
         </button>
         <div class="pill pill-fps">
           <span id="fpsCounter">60 FPS</span>
@@ -191,6 +213,37 @@
               <p id="overlayMessage">Clean lap finished at step 431.</p>
               <div class="modal-stats" id="modalStats"></div>
               <button class="btn btn-primary" id="btnOverlayRestart">Drive Again</button>
+            </div>
+          </div>
+
+          <!-- Cinematic Mode Floating Bottom HUD (Key: H) -->
+          <div class="cinematic-bottom-hud" id="cinematicBottomHud" style="display: none;">
+            <div class="hud-cluster">
+              <div class="hud-item hud-speed">
+                <span class="hud-speed-num" id="hudSpeedVal">0.0</span>
+                <span class="hud-unit">PX/STEP</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-item">
+                <span class="hud-label">STEER</span>
+                <span class="hud-val hud-mono" id="hudSteerVal">0.0°</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-item">
+                <span class="hud-label">THROTTLE</span>
+                <span class="hud-val hud-mono" id="hudThrottleVal">+0.00</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-item hud-progress-cluster">
+                <span class="hud-label">LAP PROGRESS</span>
+                <div class="hud-prog-bar"><div class="hud-prog-fill" id="hudProgFill" style="width: 0%;"></div></div>
+                <span class="hud-val hud-mono" id="hudProgVal">0.0%</span>
+              </div>
+              <div class="hud-divider"></div>
+              <div class="hud-item hud-hint">
+                <span class="hud-key-pill">[H]</span>
+                <span class="hud-hint-text">RESTORE PANELS</span>
+              </div>
             </div>
           </div>
         </div>
