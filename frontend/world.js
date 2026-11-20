@@ -46,6 +46,11 @@ function envHeadingToWorld(angleDeg) {
   return deg * (Math.PI / 180.0);
 }
 
+function envSteerToWorld(steerDeg) {
+  const deg = Number(steerDeg) || 0.0;
+  return deg * (Math.PI / 180.0);
+}
+
 function worldToEnv(worldX, worldZ) {
   return {
     x: (Number(worldX) / PX_TO_WORLD) + WORLD_STATE.trackCenter.x,
@@ -61,6 +66,7 @@ if (typeof module !== "undefined" && module.exports) {
     setWorldTrackCenter,
     envToWorld,
     envHeadingToWorld,
+    envSteerToWorld,
     worldToEnv,
   };
 }
