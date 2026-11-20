@@ -193,3 +193,21 @@ class SimulationResetRequest(BaseModel):
 
     preset_id: Optional[str] = Field(None, description="Optional new track preset")
     track_seed: Optional[int] = Field(None, description="Optional new track seed")
+
+
+class SimulationRolloutRequest(BaseModel):
+    """Request for deterministic episode rollout."""
+
+    preset_id: str = Field("standard_medium", description="Track preset identifier")
+    track_seed: Optional[int] = Field(1001, description="Procedural track generator seed")
+    max_steps: Optional[int] = Field(
+        None, ge=1, le=1000, description="Maximum episode steps to simulate (defaults to preset limit)"
+    )
+    steer_penalty_coeff: float = Field(0.01, description="Steering penalty coefficient")
+    saliency_interval: int = Field(
+        5, ge=1, le=50, description="Step interval for calculating input-gradient saliency"
+    )
+    commentary_mode: Literal["offline", "gemini"] = Field(
+        "offline", description="Commentary mode: offline deterministic or live Gemini"
+    )
+

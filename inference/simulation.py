@@ -313,6 +313,7 @@ class SimulationSession:
         preset_id: str = "standard_medium",
         track_seed: Optional[int] = None,
         steer_penalty_coeff: float = 0.01,
+        max_steps: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Initialize and start a fresh simulation session."""
         if preset_id not in TRACK_PRESETS:
@@ -328,10 +329,14 @@ class SimulationSession:
 
         # Build fresh RacingEnv instance
         track_kwargs = dict(self.preset_info.get("track_kwargs", {}))
-        max_steps = self.preset_info.get("max_steps", 700)
+        env_max_steps = (
+            int(max_steps)
+            if max_steps is not None and max_steps > 0
+            else self.preset_info.get("max_steps", 700)
+        )
 
         self.env = RacingEnv(
-            max_steps=max_steps,
+            max_steps=env_max_steps,
             track_kwargs=track_kwargs,
             grip_limit=False,
             domain_randomize=False,
@@ -372,6 +377,140 @@ class SimulationSession:
     def reset(self, actor: Optional[SACActor] = None) -> Dict[str, Any]:
         """Reset the current simulation with the same preset and seed."""
         return self.start(preset_id=self.preset_id, track_seed=self.track_seed)
+
+    def rollout(
+        self,
+        actor: SACActor,
+        preset_id: str = "standard_medium",
+        track_seed: Optional[int] = None,
+        max_steps: Optional[int] = None,
+        steer_penalty_coeff: float = 0.01,
+        saliency_interval: int = 5,
+        commentary_mode: Literal["offline", "gemini"] = "offline",
+        gemini_api_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Execute complete episode rollout for deterministic client-side playback.
+
+        Reuses start() and step() directly to maintain exact behavioral and physical parity
+        with the live simulation loop while compiling sequential step frames for smooth rendering.
+        """
+        # 1. Initialize simulation session with target preset and seed
+        self.start(
+            preset_id=preset_id,
+            track_seed=track_seed,
+            steer_penalty_coeff=steer_penalty_coeff,
+            max_steps=max_steps,
+        )
+
+        steps_data: List[Dict[str, Any]] = []
+
+        # Step 0: Initial frame
+        car = self.env.car
+        ray_distances = self.current_obs[4:9] if self.current_obs else [200.0] * 5
+        ray_data = compute_ray_geometry(
+            car_x=float(car.x),
+            car_y=float(car.y),
+            car_angle=float(car.angle),
+            ray_angles=RAY_ANGLES,
+            ray_distances=ray_distances,
+        )
+
+        initial_saliency = None
+        if saliency_interval > 0:
+            try:
+                initial_saliency = compute_online_saliency(
+                    actor=actor, observation=self.current_obs
+                )
+                self.current_saliency = initial_saliency
+            except Exception as exc:
+                logger.warning("Could not compute step 0 saliency: %s", exc)
+
+        initial_events = list(self.commentary_log)
+
+        steps_data.append({
+            "step": 0,
+            "vehicle": {
+                "x": round(float(car.x), 2),
+                "y": round(float(car.y), 2),
+                "angle": round(float(car.angle), 2),
+                "velocity": round(float(car.velocity), 3),
+                "steering": round(float(self.current_action[0]), 4),
+                "steering_angle_deg": round(float(car.steering), 2),
+                "throttle": round(float(self.current_action[1]), 4),
+                "action_mode": "coasting",
+                "lap_progress": round(float(self.env.lap_progress), 4),
+            },
+            "telemetry": {
+                "heading_error": round(float(self.current_obs[1]), 2) if self.current_obs else 0.0,
+                "signed_distance": round(float(self.current_obs[2]), 2) if self.current_obs else 0.0,
+                "slip_angle": round(float(self.current_obs[3]), 2) if self.current_obs else 0.0,
+                "rays": [round(float(r), 2) for r in ray_distances],
+            },
+            "rays": ray_data,
+            "observation": list(self.current_obs),
+            "action": [0.0, 0.0],
+            "reward": 0.0,
+            "saliency": initial_saliency,
+            "events": initial_events,
+        })
+
+        limit = max_steps if max_steps is not None else self.env.max_steps
+
+        # 2. Advance step-by-step using existing self.step()
+        while self.env.step_count < limit:
+            if self.is_crashed or self.is_completed:
+                break
+
+            prev_events_len = len(self.commentary_log)
+            calc_saliency = bool(saliency_interval > 0 and (self.env.step_count + 1) % saliency_interval == 0)
+
+            # Advance 1 step using existing step implementation
+            state = self.step(
+                actor=actor,
+                steps=1,
+                calculate_saliency=calc_saliency,
+                commentary_mode=commentary_mode,
+                gemini_api_key=gemini_api_key,
+            )
+
+            # Extract current step state directly from state
+            car_state = state["vehicle"]
+            telemetry_state = state["telemetry"]
+            ray_state = state["rays"]
+            new_events = self.commentary_log[prev_events_len:]
+            latest_reward = self.history[-1]["reward"] if self.history else 0.0
+
+            steps_data.append({
+                "step": self.env.step_count,
+                "vehicle": car_state,
+                "telemetry": telemetry_state,
+                "rays": ray_state,
+                "observation": list(self.current_obs),
+                "action": list(self.current_action),
+                "reward": round(float(latest_reward), 4),
+                "saliency": self.current_saliency if calc_saliency else None,
+                "events": new_events,
+            })
+
+        return {
+            "status": "ok",
+            "session": {
+                "preset_id": self.preset_id,
+                "preset_name": self.preset_info["name"],
+                "track_seed": self.track_seed,
+                "is_running": self.is_running,
+                "is_crashed": self.is_crashed,
+                "is_completed": self.is_completed,
+                "step_count": self.env.step_count,
+                "max_steps": self.env.max_steps,
+                "total_steps": len(steps_data),
+            },
+            "track": self.track_geometry,
+            "steps": steps_data,
+            "lap_review": self.get_lap_review(),
+            "commentary": list(self.commentary_log),
+        }
+
 
     def step(
         self,

@@ -28,6 +28,18 @@ const STATE = {
   graphicsQuality: "high", // high | low
   cinematicMode: false,
 
+  // Deterministic Rollout Playback Engine
+  playback: {
+    rolloutData: null,
+    isPlaying: false,
+    playhead: 0.0, // Floating simulation step index [0.0 .. maxStep]
+    speed: 1.0, // Playback speed multiplier (0.5, 1.0, 2.0, 3.0, 5.0)
+    nominalDt: 0.030, // Nominal step duration in seconds (33.3 steps/sec)
+    maxStep: 0,
+    lastStepIndex: -1,
+    isLoading: false,
+  },
+
   // 60 FPS Pose Interpolation state
   interp: {
     active: false,
@@ -65,6 +77,9 @@ const STATE = {
   historicalSaliency: null,
   saliencyTab: "steer", // steer | long | hist
 };
+
+window.STATE = STATE;
+
 
 const FEATURE_NAMES = [
   "velocity",
@@ -1505,7 +1520,7 @@ function updateTrajectoryRibbon(car) {
 // Cinematic Camera Director (Rule 6: Cockpit Mode Hides Body Mesh)
 // ==============================================================================
 
-function updateCameraDirector(car, velocity) {
+function updateCameraDirector(car, velocity, delta = 0.016) {
   if (!carGroup || !camera) return;
 
   const carPos = carGroup.position;
@@ -1572,8 +1587,13 @@ function updateCameraDirector(car, velocity) {
         carPos.z + forward.z * 45.0
       );
 
-      STATE.cameraPos.lerp(targetCamPos, 0.12);
-      STATE.cameraTarget.lerp(lookTarget, 0.15);
+      // Frame-delta-based camera smoothing: 1 - exp(-decay * delta)
+      const safeDelta = Math.min(Math.max(delta || 0.016, 0.001), 0.1);
+      const camLerp = 1.0 - Math.exp(-7.5 * safeDelta);
+      const targetLerp = 1.0 - Math.exp(-9.0 * safeDelta);
+
+      STATE.cameraPos.lerp(targetCamPos, camLerp);
+      STATE.cameraTarget.lerp(lookTarget, targetLerp);
 
       camera.position.copy(STATE.cameraPos);
       camera.lookAt(STATE.cameraTarget);
@@ -1768,7 +1788,7 @@ let currentFPS = 60;
 function animate(currentTime) {
   requestAnimationFrame(animate);
 
-  const delta = (currentTime - lastFrameTime) * 0.001;
+  const delta = Math.min(Math.max((currentTime - lastFrameTime) * 0.001, 0.0001), 0.1);
   lastFrameTime = currentTime;
 
   frameCount++;
@@ -1780,61 +1800,34 @@ function animate(currentTime) {
     if (fpsEl) fpsEl.innerText = `${currentFPS} FPS`;
   }
 
-  // 60 FPS Pose Interpolation (position lerp, heading slerp) & Continuous Wheel Animation
-  let curSteer = 0.0;
-  let curVel = STATE.lastCarVelocity || 0.0;
-
-  if (STATE.interp && STATE.interp.active && carGroup && STATE.simRunning) {
-    const elapsed = currentTime - STATE.interp.startTime;
-    const progress = Math.min(Math.max(elapsed / STATE.interp.duration, 0.0), 1.0);
-
-    // Position lerp
-    carGroup.position.x = THREE.MathUtils.lerp(STATE.interp.prevPos.x, STATE.interp.targetPos.x, progress);
-    carGroup.position.z = THREE.MathUtils.lerp(STATE.interp.prevPos.z, STATE.interp.targetPos.z, progress);
-
-    // Heading slerp (shortest arc)
-    let diff = STATE.interp.targetHeading - STATE.interp.prevHeading;
-    while (diff > Math.PI) diff -= 2 * Math.PI;
-    while (diff < -Math.PI) diff += 2 * Math.PI;
-    carGroup.rotation.y = STATE.interp.prevHeading + diff * progress;
-
-    curSteer = THREE.MathUtils.lerp(STATE.interp.prevSteer, STATE.interp.targetSteer, progress);
-    curVel = THREE.MathUtils.lerp(STATE.interp.prevVelocity, STATE.interp.targetVelocity, progress);
-  } else if (STATE.interp) {
-    curSteer = STATE.interp.targetSteer || 0.0;
-  }
-
-  // Wheel spin angular velocity = speed_px_per_step / wheel_radius_px (per step)
-  // Wheel radius: 6.755 px. Nominal step duration: 0.030 s.
-  const wheelRadiusPx = 6.755;
-  const spinDelta = (curVel / wheelRadiusPx) * (delta / 0.030);
-  wheelSpinAngle -= spinDelta;
-
-  // Animate front wheel steering: yaw uses steering_angle_deg from step telemetry via world.js
-  const steerRad = -envSteerToWorld(curSteer);
-  if (gltfRig) {
-    if (gltfRig.flPivot) gltfRig.flPivot.rotation.y = steerRad;
-    if (gltfRig.frPivot) gltfRig.frPivot.rotation.y = steerRad;
-    if (gltfRig.steeringWheel) gltfRig.steeringWheel.rotation.z = -steerRad * 2.5;
-    if (gltfRig.wheels) {
-      gltfRig.wheels.forEach((wheel) => {
-        wheel.rotation.x = wheelSpinAngle;
-      });
+  // Playback Clock Advance: decoupled from network speed
+  if (STATE.playback.isPlaying && STATE.playback.rolloutData && STATE.playback.rolloutData.steps) {
+    const stepDelta = (delta / STATE.playback.nominalDt) * STATE.playback.speed;
+    STATE.playback.playhead += stepDelta;
+    if (STATE.playback.playhead >= STATE.playback.maxStep) {
+      STATE.playback.playhead = STATE.playback.maxStep;
+      STATE.playback.isPlaying = false;
+      STATE.simRunning = false;
+      const startIcon = document.getElementById("startIcon");
+      const startText = document.getElementById("startText");
+      if (startIcon) startIcon.innerText = "↺";
+      if (startText) startText.innerText = "Replay";
+      const startBtn = document.getElementById("btnStartPause");
+      if (startBtn) startBtn.classList.remove("active");
+      const isCrashed = STATE.playback.rolloutData.session.is_crashed;
+      const isCompleted = STATE.playback.rolloutData.session.is_completed;
+      updateStatusPill(isCrashed ? "CRASHED" : (isCompleted ? "COMPLETED" : "ENDED"), isCrashed ? "red" : "green");
+      if (isCompleted) {
+        showOverlayModal("LAP COMPLETED!", `Clean lap finished at step ${STATE.playback.maxStep}.`, STATE.playback.rolloutData.lap_review);
+      } else if (isCrashed) {
+        showOverlayModal("CRASH DETECTED", `Vehicle departed track boundary at step ${STATE.playback.maxStep}.`, STATE.playback.rolloutData.lap_review);
+      }
     }
-  } else {
-    if (frontLeftSteerPivot) frontLeftSteerPivot.rotation.y = steerRad;
-    if (frontRightSteerPivot) frontRightSteerPivot.rotation.y = steerRad;
-    wheelMeshes.forEach((wheel) => {
-      wheel.rotation.x = wheelSpinAngle;
-    });
   }
 
-  // Continuously update camera director every frame (smooth lerp, orbit controls update)
-  if (carGroup) {
-    updateCameraDirector(
-      { x: carGroup.position.x, y: carGroup.position.z, angle: (carGroup.rotation.y * 180.0) / Math.PI },
-      STATE.lastCarVelocity || 0.0
-    );
+  // Deterministic Rollout Playback Rendering
+  if (STATE.playback.rolloutData && STATE.playback.rolloutData.steps && STATE.playback.rolloutData.steps.length > 0) {
+    renderPlaybackFrame(STATE.playback.playhead, delta);
   }
 
   // Keep sunlight and shadow camera centered around vehicle for crisp shadows
@@ -1852,26 +1845,248 @@ function animate(currentTime) {
 }
 
 // ==============================================================================
+// Deterministic Rollout Playback & Pose Interpolation
+// ==============================================================================
+
+function renderPlaybackFrame(playhead, delta = 0.016) {
+  const rollout = STATE.playback.rolloutData;
+  if (!rollout || !rollout.steps || rollout.steps.length === 0) return;
+
+  const steps = rollout.steps;
+  const clampedHead = Math.min(Math.max(playhead, 0.0), steps.length - 1);
+  const baseIdx = Math.floor(clampedHead);
+  const nextIdx = Math.min(baseIdx + 1, steps.length - 1);
+  const alpha = clampedHead - baseIdx;
+
+  const s0 = steps[baseIdx];
+  const s1 = steps[nextIdx];
+  const car0 = s0.vehicle;
+  const car1 = s1.vehicle;
+
+  // 1. Position interpolation (world units)
+  const pos0 = envToWorld(car0.x, car0.y);
+  const pos1 = envToWorld(car1.x, car1.y);
+  const curX = THREE.MathUtils.lerp(pos0.x, pos1.x, alpha);
+  const curZ = THREE.MathUtils.lerp(pos0.z, pos1.z, alpha);
+
+  if (carGroup) {
+    carGroup.position.set(curX, 0.0, curZ);
+  }
+
+  // 2. Shortest-angle heading interpolation (slerp)
+  const h0 = envHeadingToWorld(car0.angle);
+  const h1 = envHeadingToWorld(car1.angle);
+  let diff = h1 - h0;
+  while (diff > Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  const curHeadingRad = h0 + diff * alpha;
+
+  if (carGroup) {
+    carGroup.rotation.y = curHeadingRad;
+  }
+
+  // 3. Speed & steering interpolation
+  const curVelocity = THREE.MathUtils.lerp(car0.velocity, car1.velocity, alpha);
+  const curSteerDeg = THREE.MathUtils.lerp(car0.steering_angle_deg, car1.steering_angle_deg, alpha);
+  const curThrottle = THREE.MathUtils.lerp(car0.throttle, car1.throttle, alpha);
+  STATE.lastCarVelocity = curVelocity;
+
+  // 4. Smooth continuous wheel rotation using interpolated speed
+  const wheelRadiusPx = 6.755;
+  const spinDelta = (curVelocity / wheelRadiusPx) * (delta / 0.030);
+  wheelSpinAngle -= spinDelta;
+
+  const steerRad = -envSteerToWorld(curSteerDeg);
+  if (gltfRig) {
+    if (gltfRig.flPivot) gltfRig.flPivot.rotation.y = steerRad;
+    if (gltfRig.frPivot) gltfRig.frPivot.rotation.y = steerRad;
+    if (gltfRig.steeringWheel) gltfRig.steeringWheel.rotation.z = -steerRad * 2.5;
+    if (gltfRig.wheels) {
+      gltfRig.wheels.forEach((wheel) => {
+        wheel.rotation.x = wheelSpinAngle;
+      });
+    }
+  } else {
+    if (frontLeftSteerPivot) frontLeftSteerPivot.rotation.y = steerRad;
+    if (frontRightSteerPivot) frontRightSteerPivot.rotation.y = steerRad;
+    wheelMeshes.forEach((wheel) => {
+      wheel.rotation.x = wheelSpinAngle;
+    });
+  }
+
+  // 5. Dynamic brake lights
+  const isDecel = curThrottle < -0.05 || car0.action_mode === "deceleration";
+  if (gltfRig && gltfRig.brakeMaterials) {
+    gltfRig.brakeMaterials.forEach((mat) => {
+      mat.emissive.setHex(isDecel ? 0xff0020 : 0x220004);
+      mat.emissiveIntensity = isDecel ? 2.5 : 0.4;
+    });
+  }
+  rearBrakeLights.forEach((light) => {
+    light.material.color.setHex(isDecel ? 0xff0020 : 0x440008);
+    light.material.emissive.setHex(isDecel ? 0xff0020 : 0x220004);
+    light.material.emissiveIntensity = isDecel ? 1.5 : 0.4;
+  });
+
+  // 6. Rangefinder sensor rays
+  if (s0.rays) {
+    updateLidarVisuals(s0.rays, { x: curX, y: curZ });
+  }
+
+  // 7. Trajectory ribbon (synchronized up to baseIdx + current interpolated pose)
+  updatePlaybackTrajectory(steps, baseIdx, curX, curZ);
+
+  // 8. Frame-delta-based camera smoothing
+  if (carGroup) {
+    updateCameraDirector(
+      { x: carGroup.position.x, y: carGroup.position.z, angle: (carGroup.rotation.y * 180.0) / Math.PI },
+      curVelocity,
+      delta
+    );
+  }
+
+  // 9. Synchronize digital UI, dials, step counter, charts, saliency, and engineer feed
+  const curEnvX = THREE.MathUtils.lerp(car0.x, car1.x, alpha);
+  const curEnvY = THREE.MathUtils.lerp(car0.y, car1.y, alpha);
+  const curEnvAngle = THREE.MathUtils.lerp(car0.angle, car1.angle, alpha);
+  const curProgress = THREE.MathUtils.lerp(car0.lap_progress, car1.lap_progress, alpha);
+
+  const interpolatedVehicle = {
+    x: curEnvX,
+    y: curEnvY,
+    angle: curEnvAngle,
+    velocity: curVelocity,
+    steering: THREE.MathUtils.lerp(car0.steering, car1.steering, alpha),
+    steering_angle_deg: curSteerDeg,
+    throttle: curThrottle,
+    action_mode: curThrottle > 0 ? "throttle" : (curThrottle < 0 ? "deceleration" : "coasting"),
+    lap_progress: curProgress,
+  };
+
+  const currentSession = {
+    ...rollout.session,
+    step_count: baseIdx,
+    max_steps: rollout.session.max_steps || steps.length - 1,
+  };
+
+  syncCockpitAndGauges(interpolatedVehicle, currentSession, s0.telemetry);
+
+  // Discrete step updates (saliency, commentary feed, minimap)
+  if (baseIdx !== STATE.playback.lastStepIndex) {
+    STATE.playback.lastStepIndex = baseIdx;
+
+    if (s0.saliency) {
+      STATE.currentSaliency = s0.saliency;
+      renderSaliencyBars();
+    }
+
+    if (rollout.commentary) {
+      syncPlaybackCommentary(rollout.commentary, baseIdx);
+    }
+
+    if (STATE.trackData && minimapCtx) {
+      renderRadarMinimap(STATE.trackData, interpolatedVehicle);
+    }
+
+    if (STATE.debugMode) {
+      updateDebugOverlay(interpolatedVehicle);
+    }
+  }
+}
+
+function updatePlaybackTrajectory(steps, baseIdx, curX, curZ) {
+  const windowStart = Math.max(0, baseIdx - 400);
+  const pts = [];
+  for (let i = windowStart; i <= baseIdx; i++) {
+    const s = steps[i];
+    if (s && s.vehicle && isValidNumber(s.vehicle.x) && isValidNumber(s.vehicle.y)) {
+      const w = envToWorld(s.vehicle.x, s.vehicle.y);
+      pts.push(new THREE.Vector3(w.x, 0.64, w.z));
+    }
+  }
+  pts.push(new THREE.Vector3(curX, 0.64, curZ));
+
+  if (pts.length < 2) return;
+
+  if (!trajectoryMesh) {
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.65,
+      linewidth: 2,
+    });
+    trajectoryMesh = new THREE.Line(geo, mat);
+    scene.add(trajectoryMesh);
+  } else {
+    trajectoryMesh.geometry.setFromPoints(pts);
+  }
+}
+
+function syncPlaybackCommentary(allCommentary, currentStep) {
+  const feed = document.getElementById("commentaryFeed");
+  if (!feed || !Array.isArray(allCommentary)) return;
+
+  const visibleEvents = allCommentary.filter((item) => item.step <= currentStep);
+  feed.innerHTML = "";
+  for (const item of visibleEvents.slice(-50)) {
+    const div = document.createElement("div");
+    div.className = "commentary-item";
+    const src = (item.source || "OFFLINE").toUpperCase().replace(/_/g, " ");
+    const text = item.commentary || item.text || "";
+    div.innerHTML = `
+      <span class="c-step">[STEP ${item.step}]</span>
+      <span class="c-source">[${src}]</span>
+      <span class="c-text">${text}</span>
+    `;
+    feed.appendChild(div);
+  }
+  feed.scrollTop = feed.scrollHeight;
+}
+
+// ==============================================================================
 // Simulation Backend Communication (FastAPI Client)
 // ==============================================================================
 
-async function startSimulation(presetId, trackSeed) {
+async function startSimulation(presetId = STATE.presetId, trackSeed = STATE.trackSeed) {
   try {
-    updateStatusPill("INITIALIZING", "amber");
-    const res = await fetch("/simulation/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ preset_id: presetId, track_seed: trackSeed }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    updateStatusPill("SIMULATING ROLLOUT...", "amber");
+    STATE.playback.isLoading = true;
     STATE.presetId = presetId;
     STATE.trackSeed = trackSeed;
+
+    const res = await fetch("/simulation/rollout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        preset_id: presetId,
+        track_seed: trackSeed,
+        commentary_mode: STATE.commentaryMode,
+        saliency_interval: 5,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.steps || data.steps.length === 0) {
+      throw new Error("Empty rollout returned from server.");
+    }
+
+    STATE.playback.rolloutData = data;
+    STATE.playback.maxStep = data.steps.length - 1;
+    STATE.playback.playhead = 0.0;
+    STATE.playback.lastStepIndex = -1;
+    STATE.playback.isPlaying = false;
+    STATE.simRunning = false;
+    STATE.playback.isLoading = false;
+
     clearTrajectoryTrail();
     resetCommentaryFeed();
-
     build3DTrack(data.track);
-    syncUIWithState(data);
+
+    // Render initial frame at step 0
+    renderPlaybackFrame(0.0, 0.016);
 
     // Snap chase camera immediately on initial session load to start framing
     if (STATE.activeCameraMode === "chase" && carGroup) {
@@ -1895,77 +2110,52 @@ async function startSimulation(presetId, trackSeed) {
       camera.up.set(0, 1, 0);
     }
 
-    updateStatusPill("READY", "cyan");
-  } catch (err) {
-    console.error("Simulation start failed:", err);
-    updateStatusPill("ERROR", "red");
-  }
-}
-
-async function stepSimulation() {
-  if (!STATE.simRunning) return;
-
-  try {
-    const res = await fetch("/simulation/step", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        steps: STATE.simSpeed,
-        calculate_saliency: STATE.calculateSaliency,
-        commentary_mode: STATE.commentaryMode,
-      }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    syncUIWithState(data);
-
-    if (STATE.simRunning && !data.session.is_crashed && !data.session.is_completed) {
-      setTimeout(stepSimulation, 30);
-    }
-  } catch (err) {
-    console.error("Simulation step failed:", err);
-    pauseSimulation();
-    updateStatusPill("STEP ERROR", "red");
-  }
-}
-
-async function resetSimulation() {
-  try {
-    const res = await fetch("/simulation/reset", { method: "POST" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    clearTrajectoryTrail();
-    resetCommentaryFeed();
-    syncUIWithState(data);
-
-    // Snap chase camera immediately on reset
-    if (STATE.activeCameraMode === "chase" && carGroup) {
-      const heading = carGroup.rotation.y;
-      const forward = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
-      const backward = forward.clone().negate();
-      const followDist = 175.0;
-      const followHeight = 60.0;
-      STATE.cameraPos.set(
-        carGroup.position.x + backward.x * followDist,
-        followHeight,
-        carGroup.position.z + backward.z * followDist
-      );
-      STATE.cameraTarget.set(
-        carGroup.position.x + forward.x * 45.0,
-        12.0,
-        carGroup.position.z + forward.z * 45.0
-      );
-      camera.position.copy(STATE.cameraPos);
-      camera.lookAt(STATE.cameraTarget);
-      camera.up.set(0, 1, 0);
+    const startBtn = document.getElementById("btnStartPause");
+    if (startBtn) {
+      startBtn.classList.remove("active");
+      const icon = document.getElementById("startIcon");
+      const text = document.getElementById("startText");
+      if (icon) icon.innerText = "▶";
+      if (text) text.innerText = "Start Simulation";
     }
 
-    updateStatusPill("RESET", "cyan");
-    hideOverlayModal();
+    updateStatusPill("READY (ROLLOUT LOADED)", "cyan");
   } catch (err) {
-    console.error("Simulation reset failed:", err);
+    console.error("Simulation start / rollout loading failed:", err);
+    STATE.playback.isLoading = false;
+    updateStatusPill("ROLLOUT ERROR", "red");
   }
 }
+
+function stepSimulation() {
+  if (!STATE.playback.rolloutData || !STATE.playback.rolloutData.steps) return;
+  pauseSimulation();
+  const nextStep = Math.min(STATE.playback.maxStep, Math.floor(STATE.playback.playhead) + 1);
+  STATE.playback.playhead = nextStep;
+  renderPlaybackFrame(STATE.playback.playhead, 0.016);
+}
+
+function resetSimulation() {
+  STATE.playback.isPlaying = false;
+  STATE.simRunning = false;
+  STATE.playback.playhead = 0.0;
+  STATE.playback.lastStepIndex = -1;
+  clearTrajectoryTrail();
+  resetCommentaryFeed();
+  renderPlaybackFrame(0.0, 0.016);
+
+  const startBtn = document.getElementById("btnStartPause");
+  if (startBtn) {
+    startBtn.classList.remove("active");
+    const icon = document.getElementById("startIcon");
+    const text = document.getElementById("startText");
+    if (icon) icon.innerText = "▶";
+    if (text) text.innerText = "Start Simulation";
+  }
+  updateStatusPill("READY", "cyan");
+  hideOverlayModal();
+}
+
 
 // ==============================================================================
 // State Synchronization & UI Updating
@@ -2087,11 +2277,15 @@ function syncCockpitAndGauges(car, session, telemetry) {
   // Speed
   const vel = Number(car.velocity) || 0.0;
   const valSpeed = document.getElementById("valSpeed");
+  const valVelocity = document.getElementById("valVelocity");
   const barSpeed = document.getElementById("barSpeed");
+  const barVelocity = document.getElementById("barVelocity");
   const cockpitSpeed = document.getElementById("cockpitSpeed");
   if (valSpeed) valSpeed.innerText = vel.toFixed(2);
+  if (valVelocity) valVelocity.innerHTML = `${vel.toFixed(2)} <span class="unit">px/step</span>`;
   if (cockpitSpeed) cockpitSpeed.innerText = vel.toFixed(2);
   if (barSpeed) barSpeed.style.width = `${Math.min(100, Math.max(0, (vel / 4.0) * 100))}%`;
+  if (barVelocity) barVelocity.style.width = `${Math.min(100, Math.max(0, (vel / 4.0) * 100))}%`;
 
   // Steering
   const steerAct = Number(car.steering) || 0.0;
@@ -2419,10 +2613,16 @@ function renderRadarMinimap(trackData, car) {
 
 function pauseSimulation() {
   STATE.simRunning = false;
+  if (STATE.playback) {
+    STATE.playback.isPlaying = false;
+  }
   const btn = document.getElementById("btnStartPause");
   if (btn) {
-    btn.innerHTML = '<span class="icon">▶</span> START';
     btn.classList.remove("active");
+    const icon = document.getElementById("startIcon");
+    const text = document.getElementById("startText");
+    if (icon) icon.innerText = "▶";
+    if (text) text.innerText = "Resume";
   }
   updateStatusPill("PAUSED", "amber");
 }
@@ -2568,37 +2768,32 @@ function initEventHandlers() {
   const btnStartPause = document.getElementById("btnStartPause");
   if (btnStartPause) {
     btnStartPause.addEventListener("click", () => {
-      STATE.simRunning = !STATE.simRunning;
-      if (STATE.simRunning) {
-        btnStartPause.innerHTML = '<span class="icon">⏸</span> PAUSE';
-        btnStartPause.classList.add("active");
-        updateStatusPill("RUNNING", "green");
-        hideOverlayModal();
-        stepSimulation();
-      } else {
+      if (STATE.playback.isPlaying) {
         pauseSimulation();
+      } else {
+        if (STATE.playback.playhead >= STATE.playback.maxStep) {
+          STATE.playback.playhead = 0.0;
+          clearTrajectoryTrail();
+        }
+        STATE.playback.isPlaying = true;
+        STATE.simRunning = true;
+        btnStartPause.classList.add("active");
+        const icon = document.getElementById("startIcon");
+        const text = document.getElementById("startText");
+        if (icon) icon.innerText = "⏸";
+        if (text) text.innerText = "Pause";
+        updateStatusPill("PLAYING", "green");
+        hideOverlayModal();
       }
     });
   }
 
-  // Step 1 Button
+  // Step Button
   const btnStep1 = document.getElementById("btnStep") || document.getElementById("btnStep1");
   if (btnStep1) {
-    btnStep1.addEventListener("click", async () => {
+    btnStep1.addEventListener("click", () => {
       pauseSimulation();
-      const res = await fetch("/simulation/step", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          steps: 1,
-          calculate_saliency: true,
-          commentary_mode: STATE.commentaryMode,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        syncUIWithState(data);
-      }
+      stepSimulation();
     });
   }
 
@@ -2611,35 +2806,51 @@ function initEventHandlers() {
     });
   }
 
-  // Preset Selector
-  const selTrack = document.getElementById("selectTrackPreset");
-  if (selTrack) {
-    selTrack.addEventListener("change", (e) => {
-      pauseSimulation();
-      const val = e.target.value;
-      const seedInput = document.getElementById("inputSeed");
-      const seed = seedInput ? parseInt(seedInput.value, 10) || 1001 : 1001;
-      startSimulation(val, seed);
-    });
+  // Track Selector & Seed Controls
+  const selTrack = document.getElementById("trackPreset") || document.getElementById("selectTrackPreset");
+  const seedInput = document.getElementById("trackSeed") || document.getElementById("inputSeed");
+  const btnLoadTrack = document.getElementById("btnLoadTrack");
+
+  function triggerLoadTrack() {
+    pauseSimulation();
+    const preset = selTrack ? selTrack.value : "standard_medium";
+    const seed = seedInput ? parseInt(seedInput.value, 10) || 1001 : 1001;
+    startSimulation(preset, seed);
   }
 
-  // Seed Input & New Seed Button
+  if (btnLoadTrack) {
+    btnLoadTrack.addEventListener("click", triggerLoadTrack);
+  }
+  if (selTrack) {
+    selTrack.addEventListener("change", triggerLoadTrack);
+  }
+
   const btnNewSeed = document.getElementById("btnNewSeed");
   if (btnNewSeed) {
     btnNewSeed.addEventListener("click", () => {
-      const seedInput = document.getElementById("inputSeed");
       const newSeed = Math.floor(Math.random() * 900000) + 1000;
       if (seedInput) seedInput.value = newSeed;
-      pauseSimulation();
-      const preset = selTrack ? selTrack.value : "standard_medium";
-      startSimulation(preset, newSeed);
+      triggerLoadTrack();
     });
   }
 
-  // Sim Speed Buttons
+  // Speed Slider & Speed Buttons
+  const speedRange = document.getElementById("speedRange");
+  const speedVal = document.getElementById("speedVal");
+  if (speedRange) {
+    speedRange.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      const speeds = [0.5, 1.0, 2.0, 3.0, 5.0];
+      const spd = speeds[Math.min(speeds.length - 1, Math.max(0, val - 1))];
+      STATE.playback.speed = spd;
+      STATE.simSpeed = Math.round(spd);
+      if (speedVal) speedVal.innerText = `${spd}x`;
+    });
+  }
+
   ["btnSpeed1x", "btnSpeed2x", "btnSpeed4x"].forEach((id, idx) => {
     const btn = document.getElementById(id);
-    const speeds = [1, 2, 4];
+    const speeds = [1.0, 2.0, 4.0];
     if (btn) {
       btn.addEventListener("click", () => {
         ["btnSpeed1x", "btnSpeed2x", "btnSpeed4x"].forEach((bId) => {
@@ -2647,7 +2858,9 @@ function initEventHandlers() {
           if (b) b.classList.remove("active");
         });
         btn.classList.add("active");
-        STATE.simSpeed = speeds[idx];
+        STATE.playback.speed = speeds[idx];
+        STATE.simSpeed = Math.round(speeds[idx]);
+        if (speedVal) speedVal.innerText = `${speeds[idx]}x`;
       });
     }
   });

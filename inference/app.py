@@ -37,6 +37,7 @@ from inference.schemas import (
     HealthResponse,
     ObservationRequest,
     SimulationResetRequest,
+    SimulationRolloutRequest,
     SimulationStartRequest,
     SimulationStepRequest,
 )
@@ -283,6 +284,34 @@ def step_simulation_endpoint(
         commentary_mode=payload.commentary_mode,
         gemini_api_key=gemini_key,
     )
+
+
+@app.post(
+    "/simulation/rollout",
+    summary="Execute full deterministic simulation rollout",
+    description=(
+        "Executes complete episode server-side using frozen SACActor deterministically, "
+        "and returns sequence of step telemetry for smooth client-side playback."
+    ),
+)
+def rollout_simulation_endpoint(
+    payload: SimulationRolloutRequest,
+    actor_bundle: Tuple[SACActor, dict] = Depends(get_actor_and_metadata),
+) -> dict:
+    """Execute complete episode rollout for client-side playback."""
+    actor, _ = actor_bundle
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    return simulation_manager.rollout(
+        actor=actor,
+        preset_id=payload.preset_id,
+        track_seed=payload.track_seed,
+        max_steps=payload.max_steps,
+        steer_penalty_coeff=payload.steer_penalty_coeff,
+        saliency_interval=payload.saliency_interval,
+        commentary_mode=payload.commentary_mode,
+        gemini_api_key=gemini_key,
+    )
+
 
 
 @app.post(
