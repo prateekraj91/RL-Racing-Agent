@@ -1,0 +1,60 @@
+{
+  "1_lap_completion": true,
+  "2_total_simulation_steps": 7520,
+  "3_lap_time_s": 125.33,
+  "4_average_speed": {
+    "px_per_step": 3.978,
+    "km_per_h": 147.32
+  },
+  "5_maximum_speed": {
+    "px_per_step": 4.0,
+    "km_per_h": 148.11
+  },
+  "6_minimum_speed": {
+    "px_per_step": 0.049,
+    "km_per_h": 1.81,
+    "steady_minimum_km_per_h": 56.08
+  },
+  "7_distance_from_centerline_px": {
+    "mean": 0.348,
+    "rms": 0.845,
+    "p95": 2.178,
+    "max": 5.811
+  },
+  "7_distance_from_centerline_m": {
+    "mean": 0.06,
+    "rms": 0.145,
+    "p95": 0.373,
+    "max": 0.996
+  },
+  "8_track_departures_count": 0,
+  "8_total_off_track_steps": 0,
+  "9_collisions": 0,
+  "10_steering_magnitude": {
+    "mean": 0.0968,
+    "max": 0.9997
+  },
+  "11_steering_variation_consecutive_steps": {
+    "mean": 0.0541,
+    "max": 1.5854
+  },
+  "12_heading_error_deg": {
+    "mean": 0.418,
+    "rms": 1.149,
+    "p95": 2.302,
+    "max": 12.447
+  },
+  "13_episode_termination_reason": "lap_completed",
+  "14_deterministic_reproducibility": "verified_bitwise",
+  "metadata": {
+    "track_name": "Buddh International Circuit",
+    "model_checkpoint": "models/generalist_v1.pth",
+    "options": {
+      "heading_offset_deg": -10.0
+    },
+    "dt_seconds": 0.016666666666666666,
+    "wall_clock_time_s": 42.64,
+    "total_distance_m": 5131.01,
+    "total_reward": -8886.8
+  }
+}

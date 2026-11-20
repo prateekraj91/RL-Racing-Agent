@@ -24,4 +24,5 @@ analysis/results/hairpin_candidate_*.csv
 
 # Media recordings and concept renders
 *.mp4
+scratch/
 

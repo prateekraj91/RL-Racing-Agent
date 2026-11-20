@@ -1,0 +1,26 @@
+{
+  "source": "OpenStreetMap",
+  "source_url": "https://api.openstreetmap.org/api/0.6/relation/2532569/full.json",
+  "osm_relation_id": 2532569,
+  "relation_name": "Buddh International Circuit",
+  "relation_type": "circuit",
+  "retrieval_date_utc": "2026-11-20T20:53:45.754645+00:00",
+  "licence": "Open Database License 1.0 (ODbL 1.0)",
+  "attribution": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://www.openstreetmap.org/copyright",
+  "copyright": "OpenStreetMap and contributors",
+  "element_counts": {
+    "nodes": 206,
+    "ways": 7,
+    "relations": 1
+  },
+  "circuit_ways": [
+    188020619,
+    169886195,
+    188020614,
+    188020617,
+    188020613,
+    188020620
+  ],
+  "pit_lane_way": 188019426,
+  "start_node": 1986414860
+}
