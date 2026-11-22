@@ -117,7 +117,7 @@ function initThreeJS() {
 
   // 1. Scene & Atmosphere
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x9bc2e0, 1400.0, 4200.0);
+  scene.fog = new THREE.Fog(0xa9c4de, 1400.0, 4200.0); // near/far rescaled per-track in build3DTrack
 
   // 2. Camera Setup (46 deg FOV for sharp, natural perspective matching concept)
   camera = new THREE.PerspectiveCamera(46, width / height, 2.0, 5000);
@@ -133,11 +133,11 @@ function initThreeJS() {
   renderer.setSize(width, height, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-  // PBR Tone Mapping & Color Management
+  // PBR Tone Mapping & Color Management (concept: ACES @ exposure 0.62)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.72;
   renderer.outputEncoding = THREE.sRGBEncoding;
-  renderer.physicallyCorrectLights = true;
+  renderer.physicallyCorrectLights = false;
 
   // High-Resolution PCF Soft Shadows
   renderer.shadowMap.enabled = true;
@@ -176,9 +176,9 @@ function initThreeJS() {
   debugGroup.visible = false;
   scene.add(debugGroup);
 
-  // 6. Lighting & HDRI Skybox Environment
+  // 6. Lighting & Physical Sky Environment
   setupLighting();
-  loadHDRIEnvironment();
+  setupSkyEnvironment();
   loadPBRTextures();
 
   // 7. Post-Processing Pipeline
@@ -228,53 +228,133 @@ function onCanvasResize(width, height) {
 }
 
 function setupLighting() {
-  const ambient = new THREE.AmbientLight(0xfff6ee, 0.25);
-  scene.add(ambient);
+  // Sky/ground hemisphere fill (concept: 0xcfe3ff over 0x4a5a32 @ 0.55)
+  const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x4a5a32, 0.55);
+  scene.add(hemi);
 
-  mainSun = new THREE.DirectionalLight(0xfff8ee, 1.20);
+  // Warm key sun with soft shadows. A tight frustum follows the car (see animate()).
+  mainSun = new THREE.DirectionalLight(0xfff1dc, 3.1);
   mainSun.position.set(260, 440, 200);
   mainSun.castShadow = true;
   mainSun.shadow.mapSize.width = 2048;
   mainSun.shadow.mapSize.height = 2048;
-  mainSun.shadow.camera.near = 50;
-  mainSun.shadow.camera.far = 1200;
+  mainSun.shadow.camera.near = 10;
+  mainSun.shadow.camera.far = 1400;
 
-  mainSun.shadow.camera.left = -110;
-  mainSun.shadow.camera.right = 110;
-  mainSun.shadow.camera.top = 110;
-  mainSun.shadow.camera.bottom = -110;
-  mainSun.shadow.bias = -0.00015;
-  mainSun.shadow.normalBias = 0.02;
+  // Tight shadow frustum around the car for crisp contact shadows
+  mainSun.shadow.camera.left = -150;
+  mainSun.shadow.camera.right = 150;
+  mainSun.shadow.camera.top = 150;
+  mainSun.shadow.camera.bottom = -150;
+  mainSun.shadow.bias = -0.0004;
+  mainSun.shadow.normalBias = 0.6;
   scene.add(mainSun);
+  scene.add(mainSun.target);
 }
 
-function loadHDRIEnvironment() {
-  if (!THREE.RGBELoader) {
-    scene.background = new THREE.Color(0x8ecae6);
-    return;
-  }
+// Shared sun direction (concept: elevation ~26 deg, azimuth 215 deg).
+const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(
+  1,
+  THREE.MathUtils.degToRad(90 - 26),
+  THREE.MathUtils.degToRad(215)
+);
+let skyMesh = null;
 
-  const rgbeLoader = new THREE.RGBELoader();
-  rgbeLoader.setDataType(THREE.UnsignedByteType);
-  rgbeLoader.load(
-    "/static/assets/hdr/kloofendal_48d_partly_cloudy_puresky_2k.hdr",
-    (texture) => {
-      const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      pmremGenerator.compileEquirectangularShader();
-      hdrEnvMap = pmremGenerator.fromEquirectangular(texture).texture;
-
-      scene.background = hdrEnvMap;
-      scene.environment = hdrEnvMap;
-
-      texture.dispose();
-      pmremGenerator.dispose();
+// three.js Preetham Sky shader, inlined (vendored three r128 has no Sky addon).
+function makeSkyMaterial() {
+  const vert = `
+    uniform vec3 sunPosition; uniform float rayleigh; uniform float turbidity; uniform float mieCoefficient; uniform vec3 up;
+    varying vec3 vWorldPosition; varying vec3 vSunDirection; varying float vSunfade; varying vec3 vBetaR; varying vec3 vBetaM; varying float vSunE;
+    const float e = 2.71828182845904523536028747135266249775724709369995957;
+    const vec3 totalRayleigh = vec3( 5.804542996261093E-6, 1.3562911419845635E-5, 3.0265902468824876E-5 );
+    const vec3 MieConst = vec3( 1.8399918514433978E14, 2.7798023919660528E14, 4.0790479543861094E14 );
+    const float cutoffAngle = 1.6110731556870734; const float steepness = 1.5; const float EE = 1000.0;
+    float sunIntensity( float zac ) { zac = clamp( zac, -1.0, 1.0 ); return EE * max( 0.0, 1.0 - pow( e, -( ( cutoffAngle - acos( zac ) ) / steepness ) ) ); }
+    vec3 totalMie( float T ) { float c = ( 0.2 * T ) * 10E-18; return 0.434 * c * MieConst; }
+    void main() {
+      vec4 wp = modelMatrix * vec4( position, 1.0 ); vWorldPosition = wp.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); gl_Position.z = gl_Position.w;
+      vSunDirection = normalize( sunPosition ); vSunE = sunIntensity( dot( vSunDirection, up ) );
+      vSunfade = 1.0 - clamp( 1.0 - exp( ( sunPosition.y / 450000.0 ) ), 0.0, 1.0 );
+      float rc = rayleigh - ( 1.0 * ( 1.0 - vSunfade ) );
+      vBetaR = totalRayleigh * rc; vBetaM = totalMie( turbidity ) * mieCoefficient;
+    }`;
+  const frag = `
+    varying vec3 vWorldPosition; varying vec3 vSunDirection; varying float vSunfade; varying vec3 vBetaR; varying vec3 vBetaM; varying float vSunE;
+    uniform float mieDirectionalG; uniform vec3 up;
+    const float pi = 3.141592653589793238462643383279502884197169;
+    const float rayleighZenithLength = 8.4E3; const float mieZenithLength = 1.25E3;
+    const float sunAngularDiameterCos = 0.999956676946448443553574619906976478926848692873900859324;
+    const float THREE_OVER_SIXTEENPI = 0.05968310365946075; const float ONE_OVER_FOURPI = 0.07957747154594767;
+    float rayleighPhase( float c ) { return THREE_OVER_SIXTEENPI * ( 1.0 + pow( c, 2.0 ) ); }
+    float hgPhase( float c, float g ) { float g2 = pow( g, 2.0 ); float inv = 1.0 / pow( 1.0 - 2.0 * g * c + g2, 1.5 ); return ONE_OVER_FOURPI * ( ( 1.0 - g2 ) * inv ); }
+    void main() {
+      vec3 direction = normalize( vWorldPosition - cameraPosition );
+      float zenithAngle = acos( max( 0.0, dot( up, direction ) ) );
+      float inv = 1.0 / ( cos( zenithAngle ) + 0.15 * pow( 93.885 - ( ( zenithAngle * 180.0 ) / pi ), -1.253 ) );
+      float sR = rayleighZenithLength * inv; float sM = mieZenithLength * inv;
+      vec3 Fex = exp( -( vBetaR * sR + vBetaM * sM ) );
+      float cosTheta = dot( direction, vSunDirection );
+      float rPhase = rayleighPhase( cosTheta * 0.5 + 0.5 ); vec3 betaRTheta = vBetaR * rPhase;
+      float mPhase = hgPhase( cosTheta, mieDirectionalG ); vec3 betaMTheta = vBetaM * mPhase;
+      vec3 Lin = pow( vSunE * ( ( betaRTheta + betaMTheta ) / ( vBetaR + vBetaM ) ) * ( 1.0 - Fex ), vec3( 1.5 ) );
+      Lin *= mix( vec3( 1.0 ), pow( vSunE * ( ( betaRTheta + betaMTheta ) / ( vBetaR + vBetaM ) ) * Fex, vec3( 1.0 / 2.0 ) ), clamp( pow( 1.0 - dot( up, vSunDirection ), 5.0 ), 0.0, 1.0 ) );
+      vec3 L0 = vec3( 0.1 ) * Fex;
+      float sundisk = smoothstep( sunAngularDiameterCos, sunAngularDiameterCos + 0.00002, cosTheta );
+      L0 += ( vSunE * 19000.0 * Fex ) * sundisk;
+      vec3 texColor = ( Lin + L0 ) * 0.04 + vec3( 0.0, 0.0003, 0.00075 );
+      vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
+      gl_FragColor = vec4( retColor, 1.0 );
+    }`;
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      turbidity: { value: 2.6 },
+      rayleigh: { value: 2.2 },
+      mieCoefficient: { value: 0.004 },
+      mieDirectionalG: { value: 0.82 },
+      sunPosition: { value: SUN_DIR.clone().multiplyScalar(450000) },
+      up: { value: new THREE.Vector3(0, 1, 0) },
     },
-    undefined,
-    (err) => {
-      console.warn("HDRI load notice: using procedural sky fallback", err);
-      scene.background = new THREE.Color(0x8ecae6);
-    }
-  );
+    vertexShader: vert,
+    fragmentShader: frag,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+}
+
+function setupSkyEnvironment() {
+  const skyMat = makeSkyMaterial();
+  skyMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), skyMat);
+  skyMesh.scale.setScalar(8000);
+  scene.add(skyMesh);
+  scene.background = null; // sky mesh is the background
+
+  // PMREM environment baked from the sky for soft image-based lighting
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    const sky2 = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), makeSkyMaterial());
+    sky2.scale.setScalar(8000);
+    envScene.add(sky2);
+    hdrEnvMap = pmrem.fromScene(envScene, 0.02).texture;
+    scene.environment = hdrEnvMap;
+    pmrem.dispose();
+  } catch (err) {
+    console.warn("Sky PMREM env notice:", err);
+  }
+}
+
+// Generic canvas texture helper (ported from concept main.js)
+function canvasTex(w, h, draw, repeat) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (repeat) t.repeat.set(repeat[0], repeat[1]);
+  t.anisotropy = renderer ? Math.min(renderer.capabilities.getMaxAnisotropy(), 8) : 4;
+  return t;
 }
 
 // ==============================================================================
@@ -282,33 +362,72 @@ function loadHDRIEnvironment() {
 // ==============================================================================
 
 function createProceduralGrassTexture() {
+  // Concept-style lawn: saturated base + high-frequency blade speckle (hides tiling).
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
 
-  // Rich base lawn green (manicured racing circuit grass)
-  ctx.fillStyle = "#388434";
+  ctx.fillStyle = "#56763a"; // concept base green
   ctx.fillRect(0, 0, 512, 512);
 
-  // Micro-contrast natural blade tone patches
-  const colors = ["#2d6d2a", "#3f923b", "#499e44", "#357c32", "#52aa4c", "#32772f"];
-  for (let i = 0; i < 4500; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const r = Math.random() * 3.5 + 1.2;
-    ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
+  for (let i = 0; i < 30000; i++) {
+    const r = 60 + Math.random() * 40;
+    const g = 100 + Math.random() * 60;
+    const b = 35 + Math.random() * 25;
+    ctx.fillStyle = `rgba(${r | 0},${g | 0},${b | 0},0.55)`;
+    ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2 + Math.random() * 3);
   }
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(40, 40);
+  tex.repeat.set(90, 90); // large plane; repeat tuned in build3DTrack-independent of normal maps
   tex.anisotropy = renderer ? Math.min(renderer.capabilities.getMaxAnisotropy(), 8) : 4;
   return tex;
+}
+
+// Low-frequency tonal variation layer to break up grass tiling (second scale).
+function createGrassMacroTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#56763a";
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * 256, y = Math.random() * 256, r = 30 + Math.random() * 70;
+    const light = Math.random() > 0.5;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, light ? "rgba(120,150,70,0.30)" : "rgba(40,60,28,0.30)");
+    g.addColorStop(1, "rgba(86,118,58,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  return tex;
+}
+
+// Concept asphalt: grain + a rubbered-in dark racing line across the ribbon width (u).
+function createProceduralAsphaltTexture() {
+  return canvasTex(512, 512, (g, w, h) => {
+    g.fillStyle = "#3f4249"; // dark charcoal asphalt: high contrast vs grass (concept)
+    g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26000; i++) {
+      const v = (40 + Math.random() * 50) | 0;
+      g.fillStyle = `rgba(${v},${v + 2},${v + 5},${0.35 + Math.random() * 0.5})`;
+      g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    }
+    // rubbered racing line darkening down the centre of the ribbon (u = x)
+    const gr = g.createLinearGradient(0, 0, w, 0);
+    gr.addColorStop(0.25, "rgba(0,0,0,0)");
+    gr.addColorStop(0.5, "rgba(10,10,12,0.30)");
+    gr.addColorStop(0.75, "rgba(0,0,0,0)");
+    g.fillStyle = gr;
+    g.fillRect(0, 0, w, h);
+  }, [1, 1]);
 }
 
 function createProceduralBuildingTexture() {
@@ -355,7 +474,9 @@ function createProceduralBuildingTexture() {
 }
 
 let proceduralGrassTex = null;
+let proceduralGrassMacroTex = null;
 let proceduralBuildingTex = null;
+let proceduralAsphaltTex = null;
 
 function loadPBRTextures() {
   const loader = new THREE.TextureLoader();
@@ -373,10 +494,10 @@ function loadPBRTextures() {
   pbrTextures.asphaltRough = loader.load("/static/assets/textures/asphalt/asphalt_rough_1k.jpg", (tex) => configureTexture(tex, 1, 16));
 
   proceduralGrassTex = createProceduralGrassTexture();
+  proceduralGrassMacroTex = createGrassMacroTexture();
+  proceduralAsphaltTex = createProceduralAsphaltTexture();
   proceduralBuildingTex = createProceduralBuildingTexture();
   pbrTextures.groundDiff = proceduralGrassTex;
-  pbrTextures.groundNor = loader.load("/static/assets/textures/ground/ground_nor_1k.jpg", (tex) => configureTexture(tex, 32, 32));
-  pbrTextures.groundRough = loader.load("/static/assets/textures/ground/ground_rough_1k.jpg", (tex) => configureTexture(tex, 32, 32));
 }
 
 function initEffectComposer(width, height) {
@@ -430,70 +551,39 @@ function build3DTrack(trackData) {
 
   if (n < 4) return;
 
-  // 1. PBR Asphalt Road Surface Quad Strip
-  const roadGeo = new THREE.BufferGeometry();
-  const roadVertices = [];
-  const roadNormals = [];
-  const roadUvs = [];
-  const roadIndices = [];
-
-  let accumulatedV = 0.0;
-  for (let i = 0; i < n; i++) {
-    const pIn = innerPts[i];
-    const pOut = outerPts[i];
-
-    if (!isValidVector2(pIn) || !isValidVector2(pOut)) continue;
-
-    const inW = envToWorld(pIn[0], pIn[1]);
-    const outW = envToWorld(pOut[0], pOut[1]);
-
-    roadVertices.push(inW.x, 0.60, inW.z);
-    roadVertices.push(outW.x, 0.60, outW.z);
-    roadNormals.push(0, 1, 0, 0, 1, 0);
-
-    if (i > 0) {
-      const prevIn = envToWorld(innerPts[i - 1][0], innerPts[i - 1][1]);
-      accumulatedV += Math.hypot(inW.x - prevIn.x, inW.z - prevIn.z) / 22.0;
-    }
-
-    roadUvs.push(0.0, accumulatedV, 1.0, accumulatedV);
-
-    const next = (i + 1) % n;
-    const i0 = i * 2;
-    const i1 = i * 2 + 1;
-    const i2 = next * 2;
-    const i3 = next * 2 + 1;
-
-    roadIndices.push(i0, i1, i2);
-    roadIndices.push(i1, i3, i2);
-  }
-
-  roadGeo.setAttribute("position", new THREE.Float32BufferAttribute(roadVertices, 3));
-  roadGeo.setAttribute("normal", new THREE.Float32BufferAttribute(roadNormals, 3));
-  roadGeo.setAttribute("uv", new THREE.Float32BufferAttribute(roadUvs, 2));
-  roadGeo.setIndex(roadIndices);
-
-  const roadMat = new THREE.MeshStandardMaterial({
-    color: 0x24272e, // Deep charcoal racetrack asphalt
-    map: pbrTextures.asphaltDiff,
-    normalMap: pbrTextures.asphaltNor,
-    roughnessMap: pbrTextures.asphaltRough,
-    roughness: 0.76,
-    metalness: 0.05,
+  // 1a. Darker tarmac runoff apron (slightly wider than the corridor, just above ground)
+  const runoffMat = new THREE.MeshStandardMaterial({
+    color: 0x55595f,
+    roughness: 0.95,
+    metalness: 0.0,
+    envMapIntensity: 0.4,
     side: THREE.DoubleSide,
   });
-  roadMesh = new THREE.Mesh(roadGeo, roadMat);
-  roadMesh.receiveShadow = true;
-  trackGroup.add(roadMesh);
+  const runoffMesh = buildTrackRibbon(innerPts, outerPts, 7.0, 0.30, runoffMat, 100);
+  if (runoffMesh) {
+    runoffMesh.receiveShadow = true;
+    trackGroup.add(runoffMesh);
+  }
+
+  // 1b. Asphalt road surface with rubbered-in racing line (concept canvas texture)
+  const roadMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: proceduralAsphaltTex || pbrTextures.asphaltDiff,
+    roughness: 0.82,
+    metalness: 0.0,
+    envMapIntensity: 0.5,
+    side: THREE.DoubleSide,
+  });
+  roadMesh = buildTrackRibbon(innerPts, outerPts, 0.0, 0.60, roadMat, 24);
+  if (roadMesh) {
+    roadMesh.receiveShadow = true;
+    trackGroup.add(roadMesh);
+  }
 
   // 2. Continuous Solid White Edge Markings (Inner & Outer boundaries)
   buildTrackEdgeLines(innerPts, outerPts);
 
-  // 3. Vibrant Glowing Cyan Autonomous Guidance Centerline
-  if (centerPts.length > 2) {
-    centerLineMesh = buildCenterline(centerPts);
-    trackGroup.add(centerLineMesh);
-  }
+  // 3. (No painted centreline — concept has none; the rubbered racing line reads instead.)
 
   // 4. Red/White Corner Curbs
   const curvatures = computeCenterlineCurvature(centerPts);
@@ -508,31 +598,106 @@ function build3DTrack(trackData) {
   if (barrierOuterMesh) trackGroup.add(barrierOuterMesh);
   if (barrierInnerMesh) trackGroup.add(barrierInnerMesh);
 
-  // 6. Start / Finish Line Banner
-  if (innerPts.length > 0 && outerPts.length > 0) {
-    buildStartFinishMarker(innerPts[0], outerPts[0]);
-  }
+  // 6. Start / finish checker line + gantry with glowing panel at the real start pose
+  buildStartGantry(trackData);
 
-  // 7. Ground Runoff Plane (Lush natural lawn green)
-  const groundGeo = new THREE.PlaneGeometry(4200, 4200);
+  // 7. Ground: huge grass plane receiving shadows (base), plus a low-frequency
+  //    tonal overlay to break up texture tiling (concept "second scale").
+  const groundGeo = new THREE.PlaneGeometry(16000, 16000);
   groundGeo.rotateX(-Math.PI / 2);
+  if (proceduralGrassTex) proceduralGrassTex.repeat.set(120, 120);
   const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x388334, // Natural lush circuit lawn green matching concept video
+    color: 0xffffff,
     map: proceduralGrassTex || pbrTextures.groundDiff,
-    normalMap: pbrTextures.groundNor,
-    roughnessMap: pbrTextures.groundRough,
-    roughness: 0.82,
-    metalness: 0.02,
+    roughness: 1.0,
+    metalness: 0.0,
+    envMapIntensity: 0.6,
   });
   groundPlaneMesh = new THREE.Mesh(groundGeo, groundMat);
   groundPlaneMesh.position.y = -0.40;
   groundPlaneMesh.receiveShadow = true;
   trackGroup.add(groundPlaneMesh);
 
-  // 8. Procedural Props: Faceted Pine/Oak Trees, Lamp Posts, and Distant Horizon Skyline
+  if (proceduralGrassMacroTex) {
+    const macroGeo = new THREE.PlaneGeometry(16000, 16000);
+    macroGeo.rotateX(-Math.PI / 2);
+    const macroMat = new THREE.MeshBasicMaterial({
+      map: proceduralGrassMacroTex,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+    });
+    const macroMesh = new THREE.Mesh(macroGeo, macroMat);
+    macroMesh.position.y = -0.38;
+    trackGroup.add(macroMesh);
+  }
+
+  // Rescale fog to the real track size (concept Fog(0xa9c4de, 3000, 11000)).
+  const spanX = bounds.max_x - bounds.min_x;
+  const spanY = bounds.max_y - bounds.min_y;
+  const diag = Math.hypot(spanX, spanY) || 800;
+  if (scene.fog) {
+    scene.fog.near = diag * 1.1;
+    scene.fog.far = diag * 4.2;
+  }
+
+  // 8. Procedural Props: trees, lamps, skyline
   buildEnvironmentProps(trackData);
 
   clearTrajectoryTrail();
+}
+
+// Build a quad-strip ribbon between inner/outer boundary point lists (concept ribbon()).
+// `widen` expands both edges outward across the track; UV u spans width, v = length/vDivisor.
+function buildTrackRibbon(innerPts, outerPts, widen, y, material, vDivisor) {
+  const n = Math.min(innerPts.length, outerPts.length);
+  if (n < 4) return null;
+  const geo = new THREE.BufferGeometry();
+  const pos = [];
+  const uv = [];
+  const idx = [];
+  let cum = 0.0;
+  let prevInW = null;
+
+  for (let i = 0; i < n; i++) {
+    const pIn = innerPts[i];
+    const pOut = outerPts[i];
+    if (!isValidVector2(pIn) || !isValidVector2(pOut)) continue;
+
+    let inW = envToWorld(pIn[0], pIn[1]);
+    let outW = envToWorld(pOut[0], pOut[1]);
+
+    if (widen && widen !== 0) {
+      const ax = outW.x - inW.x;
+      const az = outW.z - inW.z;
+      const al = Math.hypot(ax, az) || 1.0;
+      const ux = ax / al;
+      const uz = az / al;
+      inW = { x: inW.x - ux * widen, z: inW.z - uz * widen };
+      outW = { x: outW.x + ux * widen, z: outW.z + uz * widen };
+    }
+
+    if (prevInW) cum += Math.hypot(inW.x - prevInW.x, inW.z - prevInW.z) / (vDivisor || 24);
+    prevInW = inW;
+
+    pos.push(inW.x, y, inW.z);
+    pos.push(outW.x, y, outW.z);
+    uv.push(0.0, cum, 1.0, cum);
+
+    const next = (i + 1) % n;
+    const i0 = i * 2, i1 = i * 2 + 1, i2 = next * 2, i3 = next * 2 + 1;
+    idx.push(i0, i1, i2, i1, i3, i2);
+  }
+
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  // Flatten normals to up so the flat ribbon lights evenly
+  const nr = geo.attributes.normal;
+  for (let i = 0; i < nr.count; i++) nr.setXYZ(i, 0, 1, 0);
+  nr.needsUpdate = true;
+  return new THREE.Mesh(geo, material);
 }
 
 function buildTrackEdgeLines(innerPts, outerPts) {
@@ -645,7 +810,8 @@ function buildCurvatureBasedCurbs(boundaryPts, centerCurvatures, offsetDistance,
     vertices.push(ext.x, 0.62 + height, ext.z);
 
     const isRed = Math.floor(i / 2) % 2 === 0;
-    const col = isRed ? [0.95, 0.12, 0.22] : [0.96, 0.96, 0.98];
+    // Concept curb red #d8231d (low blue) — avoids the magenta cast under bloom
+    const col = isRed ? [0.847, 0.137, 0.113] : [0.96, 0.96, 0.98];
     colors.push(...col, ...col);
 
     const nextCurv = Math.abs(centerCurvatures[(i + 1) % n] || 0.0);
@@ -672,8 +838,9 @@ function buildCurvatureBasedCurbs(boundaryPts, centerCurvatures, offsetDistance,
 
   const curbMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.65,
-    metalness: 0.15,
+    roughness: 0.6,
+    metalness: 0.0,
+    envMapIntensity: 0.3,
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(curbGeo, curbMat);
@@ -785,24 +952,75 @@ function buildCenterline(centerPts) {
   return mesh;
 }
 
-function buildStartFinishMarker(inPt, outPt) {
-  if (!isValidVector2(inPt) || !isValidVector2(outPt)) return;
-  const inW = envToWorld(inPt[0], inPt[1]);
-  const outW = envToWorld(outPt[0], outPt[1]);
+function buildStartGantry(trackData) {
+  const inner = trackData.inner_boundary || [];
+  const outer = trackData.outer_boundary || [];
+  if (inner.length < 1 || outer.length < 1) return;
+  if (!isValidVector2(inner[0]) || !isValidVector2(outer[0])) return;
 
-  const sfGeo = new THREE.BufferGeometry();
-  const vertices = [
-    inW.x, 0.70, inW.z,
-    outW.x, 0.70, outW.z,
-    inW.x + 3.0, 0.70, inW.z,
-    outW.x + 3.0, 0.70, outW.z,
-  ];
-  sfGeo.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-  sfGeo.setIndex([0, 1, 2, 1, 3, 2]);
+  const inW = envToWorld(inner[0][0], inner[0][1]);
+  const outW = envToWorld(outer[0][0], outer[0][1]);
+  const cx = (inW.x + outW.x) / 2;
+  const cz = (inW.z + outW.z) / 2;
 
-  const sfMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const mesh = new THREE.Mesh(sfGeo, sfMat);
-  trackGroup.add(mesh);
+  // across = edge-to-edge (start line), tangent = along the track
+  let ax = outW.x - inW.x, az = outW.z - inW.z;
+  const aLen = Math.hypot(ax, az) || 1; ax /= aLen; az /= aLen;
+  const tx = -az, tz = ax; // perpendicular (track forward)
+  const halfW = aLen / 2;
+  const acrossAngle = Math.atan2(az, ax);
+
+  // Checkered start/finish line across the corridor
+  const checkTex = canvasTex(256, 32, (g, w, h) => {
+    for (let x = 0; x < 16; x++) for (let y = 0; y < 2; y++) {
+      g.fillStyle = (x + y) % 2 ? "#111" : "#f5f5f5";
+      g.fillRect(x * 16, y * 16, 16, 16);
+    }
+  }, [1, 1]);
+  const checkGeo = new THREE.PlaneGeometry(aLen + 2, 9);
+  checkGeo.rotateX(-Math.PI / 2);
+  const checkMesh = new THREE.Mesh(checkGeo, new THREE.MeshStandardMaterial({ map: checkTex, roughness: 0.7 }));
+  checkMesh.position.set(cx, 0.9, cz);
+  checkMesh.rotation.y = -acrossAngle;
+  checkMesh.receiveShadow = true;
+  trackGroup.add(checkMesh);
+
+  // Gantry: two posts just outside the corridor, a beam, and a glowing cyan panel
+  const gm = new THREE.MeshStandardMaterial({ color: 0x23272e, roughness: 0.5, metalness: 0.6 });
+  const postH = 46;
+  for (const s of [-1, 1]) {
+    const px = cx + ax * (halfW + 7) * s;
+    const pz = cz + az * (halfW + 7) * s;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(4, postH, 4), gm);
+    post.position.set(px, postH / 2, pz);
+    post.castShadow = true;
+    trackGroup.add(post);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(5, 9, aLen + 22), gm);
+  beam.position.set(cx, postH, cz);
+  beam.rotation.y = -Math.atan2(tz, tx);
+  beam.castShadow = true;
+  trackGroup.add(beam);
+
+  const panel = new THREE.Mesh(
+    new THREE.BoxGeometry(5.5, 5.5, aLen + 2),
+    new THREE.MeshStandardMaterial({ color: 0x0a0d12, emissive: 0x18d4ff, emissiveIntensity: 1.4 })
+  );
+  panel.position.set(cx, postH - 0.5, cz);
+  panel.rotation.y = -Math.atan2(tz, tx);
+  trackGroup.add(panel);
+}
+
+// Coarse distance from an env-space point to the nearest centerline vertex (px).
+function trackDistEnv(centerPts, x, y) {
+  let best = 1e9;
+  for (let i = 0; i < centerPts.length; i += 3) {
+    const p = centerPts[i];
+    const dx = p[0] - x, dy = p[1] - y;
+    const d = dx * dx + dy * dy;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
 }
 
 // ==============================================================================
@@ -823,61 +1041,34 @@ function buildEnvironmentProps(trackData) {
   const n = outerPts.length;
   if (n < 4) return;
 
+  const bounds = trackData.bounds || { min_x: 100, max_x: 700, min_y: 100, max_y: 500 };
+  const ecx = (bounds.min_x + bounds.max_x) / 2;
+  const ecy = (bounds.min_y + bounds.max_y) / 2;
+
   const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
 
-  // 1. Instanced Pine Trees (Faceted Cones + Trunk)
-  const pineTrunkGeo = new THREE.CylinderGeometry(0.8, 1.2, 8.0, 6);
-  pineTrunkGeo.translate(0, 4.0, 0);
-  const pineFoliageGeo = new THREE.ConeGeometry(6.4, 13.5, 6);
-  pineFoliageGeo.translate(0, 12.5, 0);
+  // Deterministic RNG (seeded) so scenery is stable across reloads.
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
-  const trunkMat = new THREE.MeshStandardMaterial({
-    color: 0x4a2e18,
-    roughness: 0.9,
-    metalness: 0.05,
-  });
+  // Shared trunk + two foliage silhouettes (pine cone / round). Foliage base white
+  // so the per-instance green tint (setColorAt + instanceColor) shows directly.
+  const trunkGeo = new THREE.CylinderGeometry(0.9, 1.3, 9.0, 6);
+  trunkGeo.translate(0, 4.5, 0);
+  const pineGeo = new THREE.ConeGeometry(7.0, 15.0, 7);
+  pineGeo.translate(0, 13.0, 0);
+  const roundGeo = new THREE.IcosahedronGeometry(8.0, 1);
+  roundGeo.translate(0, 12.5, 0);
 
-  const pineMat1 = new THREE.MeshStandardMaterial({ color: 0x1b4332, roughness: 0.78 }); // Forest Pine
-  const pineMat2 = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.75 }); // Emerald Pine
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b4330, roughness: 1.0, envMapIntensity: 0.4 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true, envMapIntensity: 0.5 });
 
-  // 2. Instanced Deciduous Oak Trees (Faceted Dodecahedrons + Trunk)
-  const oakTrunkGeo = new THREE.CylinderGeometry(0.9, 1.3, 9.0, 6);
-  oakTrunkGeo.translate(0, 4.5, 0);
-  const oakFoliageGeo = new THREE.DodecahedronGeometry(6.8, 1);
-  oakFoliageGeo.translate(0, 13.0, 0);
-
-  const oakMat1 = new THREE.MeshStandardMaterial({ color: 0x40916c, roughness: 0.74 }); // Mint Green
-  const oakMat2 = new THREE.MeshStandardMaterial({ color: 0x52796f, roughness: 0.78 }); // Olive Green
-
-  // 3. Lamp Posts
-  const poleGeo = new THREE.CylinderGeometry(0.4, 0.6, 20.0, 6);
-  poleGeo.translate(0, 10.0, 0);
-  const lampFixtureGeo = new THREE.BoxGeometry(3.5, 0.6, 1.4);
-  lampFixtureGeo.translate(1.5, 20.0, 0);
-
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a404d, metalness: 0.7, roughness: 0.3 });
-  const lampFixtureMat = new THREE.MeshStandardMaterial({
-    color: 0xfffae0,
-    emissive: 0xfff3b0,
-    emissiveIntensity: 1.8,
-  });
-
-  // 4. Tecpro Corner Runoff Barriers
-  const blockGeo = new THREE.BoxGeometry(6.5, 3.8, 3.2);
-  blockGeo.translate(0, 1.9, 0);
-  const redBlockMat = new THREE.MeshStandardMaterial({ color: 0xd90429, roughness: 0.5, metalness: 0.1 });
-  const whiteBlockMat = new THREE.MeshStandardMaterial({ color: 0xf8f9fa, roughness: 0.5, metalness: 0.1 });
-
-  const pine1Transforms = [];
-  const pine2Transforms = [];
-  const oak1Transforms = [];
-  const oak2Transforms = [];
-  const lampTransforms = [];
-  const tecproTransforms = [];
-
-  const curvatures = computeCenterlineCurvature(centerPts);
-
-  for (let i = 0; i < n; i++) {
+  // Gather tree placements OUTSIDE the corridor (>=150 px from centerline),
+  // scattered outward from the outer boundary so the infield stays open.
+  const trees = []; // { x, z, scale, rotY, round }
+  const MAX_TREES = 620;
+  for (let i = 0; i < n && trees.length < MAX_TREES; i++) {
     const pt = outerPts[i];
     const nextPt = outerPts[(i + 1) % n];
     if (!isValidVector2(pt) || !isValidVector2(nextPt)) continue;
@@ -885,142 +1076,84 @@ function buildEnvironmentProps(trackData) {
     const dx = nextPt[0] - pt[0];
     const dy = nextPt[1] - pt[1];
     const len = Math.hypot(dx, dy) || 1.0;
-    const nx = -dy / len;
-    const ny = dx / len;
+    let nx = -dy / len;
+    let ny = dx / len;
+    // Force the normal to point away from the track centre (outward).
+    if ((pt[0] - ecx) * nx + (pt[1] - ecy) * ny < 0) { nx = -nx; ny = -ny; }
 
-    const curv = Math.abs(curvatures[i] || 0.0);
-    const isCorner = curv > 0.0028;
-
-    // Lamp posts along track perimeter
-    if (i % 7 === 0) {
-      const lx = pt[0] + nx * 30.0;
-      const ly = pt[1] + ny * 30.0;
-      const w = envToWorld(lx, ly);
-      const angle = Math.atan2(ny, nx) + Math.PI;
-      lampTransforms.push({ x: w.x, z: w.z, rotY: angle });
-    }
-
-    // Tecpro barriers on corner exits outside barrier
-    if (isCorner && i % 2 === 0) {
-      const bx = pt[0] + nx * 24.0;
-      const by = pt[1] + ny * 24.0;
-      const w = envToWorld(bx, by);
-      const angle = Math.atan2(dy, dx);
-      tecproTransforms.push({ x: w.x, z: w.z, rotY: angle, isRed: (i / 2) % 2 === 0 });
-    }
-
-    // Trees scattered outside track
-    if (i % 2 === 0) {
-      const hash = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
-      const frac = hash - Math.floor(hash);
-      const treeOffset = 28.0 + frac * 65.0;
-      const tx = pt[0] + nx * treeOffset;
-      const ty = pt[1] + ny * treeOffset;
+    const perTree = 3;
+    for (let k = 0; k < perTree && trees.length < MAX_TREES; k++) {
+      const offset = 45 + rnd() * 430;
+      const jitter = (rnd() - 0.5) * len * 2.2;
+      const tx = pt[0] + nx * offset + (dx / len) * jitter;
+      const ty = pt[1] + ny * offset + (dy / len) * jitter;
+      if (trackDistEnv(centerPts, tx, ty) < 150) continue; // keep off the track
       const w = envToWorld(tx, ty);
-      const s = 0.95 + frac * 0.45;
-      const rot = frac * Math.PI * 2;
-
-      const pick = i % 4;
-      if (pick === 0) pine1Transforms.push({ x: w.x, z: w.z, scale: s, rotY: rot });
-      else if (pick === 1) pine2Transforms.push({ x: w.x, z: w.z, scale: s, rotY: rot });
-      else if (pick === 2) oak1Transforms.push({ x: w.x, z: w.z, scale: s, rotY: rot });
-      else oak2Transforms.push({ x: w.x, z: w.z, scale: s, rotY: rot });
+      trees.push({
+        x: w.x,
+        z: w.z,
+        scale: 0.7 + rnd() * 0.8,
+        rotY: rnd() * Math.PI * 2,
+        round: rnd() < 0.55,
+      });
     }
   }
 
-  // Helper to instantiate tree meshes
-  function instantiateTrees(trunkGeo, foliageGeo, foliageMat, transforms) {
-    if (transforms.length === 0) return;
-    const count = transforms.length;
+  if (trees.length > 0) {
+    const count = trees.length;
     const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-    const foliageMesh = new THREE.InstancedMesh(foliageGeo, foliageMat, count);
-    trunkMesh.castShadow = true;
-    trunkMesh.receiveShadow = true;
-    foliageMesh.castShadow = true;
-    foliageMesh.receiveShadow = true;
+    const pineMesh = new THREE.InstancedMesh(pineGeo, leafMat, count);
+    const roundMesh = new THREE.InstancedMesh(roundGeo, leafMat, count);
+    [trunkMesh, pineMesh, roundMesh].forEach((m) => { m.castShadow = true; m.receiveShadow = true; });
 
-    transforms.forEach((t, idx) => {
+    let pineN = 0, roundN = 0;
+    trees.forEach((t) => {
       dummy.position.set(t.x, 0, t.z);
       dummy.rotation.set(0, t.rotY, 0);
       dummy.scale.set(t.scale, t.scale, t.scale);
       dummy.updateMatrix();
-      trunkMesh.setMatrixAt(idx, dummy.matrix);
-      foliageMesh.setMatrixAt(idx, dummy.matrix);
+      // Green HSL ramp per instance (concept main.js)
+      col.setHSL(0.24 + rnd() * 0.08, 0.45 + rnd() * 0.2, 0.22 + rnd() * 0.12);
+      // Trunk follows the same transform slot index as its foliage mesh
+      if (t.round) {
+        roundMesh.setMatrixAt(roundN, dummy.matrix);
+        roundMesh.setColorAt(roundN, col);
+        trunkMesh.setMatrixAt(pineN + roundN, dummy.matrix);
+        roundN++;
+      } else {
+        pineMesh.setMatrixAt(pineN, dummy.matrix);
+        pineMesh.setColorAt(pineN, col);
+        trunkMesh.setMatrixAt(pineN + roundN, dummy.matrix);
+        pineN++;
+      }
     });
+    pineMesh.count = pineN;
+    roundMesh.count = roundN;
+    trunkMesh.count = count;
 
     trunkMesh.instanceMatrix.needsUpdate = true;
-    foliageMesh.instanceMatrix.needsUpdate = true;
-    propsGroup.add(trunkMesh);
-    propsGroup.add(foliageMesh);
+    pineMesh.instanceMatrix.needsUpdate = true;
+    roundMesh.instanceMatrix.needsUpdate = true;
+    if (pineMesh.instanceColor) pineMesh.instanceColor.needsUpdate = true;
+    if (roundMesh.instanceColor) roundMesh.instanceColor.needsUpdate = true;
+
+    propsGroup.add(trunkMesh, pineMesh, roundMesh);
   }
 
-  instantiateTrees(pineTrunkGeo, pineFoliageGeo, pineMat1, pine1Transforms);
-  instantiateTrees(pineTrunkGeo, pineFoliageGeo, pineMat2, pine2Transforms);
-  instantiateTrees(oakTrunkGeo, oakFoliageGeo, oakMat1, oak1Transforms);
-  instantiateTrees(oakTrunkGeo, oakFoliageGeo, oakMat2, oak2Transforms);
-
-  // Lamp Posts
-  if (lampTransforms.length > 0) {
-    const poleMesh = new THREE.InstancedMesh(poleGeo, poleMat, lampTransforms.length);
-    const fixtureMesh = new THREE.InstancedMesh(lampFixtureGeo, lampFixtureMat, lampTransforms.length);
-    poleMesh.castShadow = true;
-    lampTransforms.forEach((t, idx) => {
-      dummy.position.set(t.x, 0, t.z);
-      dummy.rotation.set(0, t.rotY, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      poleMesh.setMatrixAt(idx, dummy.matrix);
-      fixtureMesh.setMatrixAt(idx, dummy.matrix);
-    });
-    poleMesh.instanceMatrix.needsUpdate = true;
-    fixtureMesh.instanceMatrix.needsUpdate = true;
-    propsGroup.add(poleMesh);
-    propsGroup.add(fixtureMesh);
-  }
-
-  // Tecpro Barriers
-  const tecproRed = tecproTransforms.filter((t) => t.isRed);
-  const tecproWhite = tecproTransforms.filter((t) => !t.isRed);
-  if (tecproRed.length > 0) {
-    const redMesh = new THREE.InstancedMesh(blockGeo, redBlockMat, tecproRed.length);
-    redMesh.castShadow = true;
-    tecproRed.forEach((t, idx) => {
-      dummy.position.set(t.x, 0, t.z);
-      dummy.rotation.set(0, t.rotY, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      redMesh.setMatrixAt(idx, dummy.matrix);
-    });
-    redMesh.instanceMatrix.needsUpdate = true;
-    propsGroup.add(redMesh);
-  }
-  if (tecproWhite.length > 0) {
-    const whiteMesh = new THREE.InstancedMesh(blockGeo, whiteBlockMat, tecproWhite.length);
-    whiteMesh.castShadow = true;
-    tecproWhite.forEach((t, idx) => {
-      dummy.position.set(t.x, 0, t.z);
-      dummy.rotation.set(0, t.rotY, 0);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      whiteMesh.setMatrixAt(idx, dummy.matrix);
-    });
-    whiteMesh.instanceMatrix.needsUpdate = true;
-    propsGroup.add(whiteMesh);
-  }
-
-  // Distant City Skyline Skyscrapers on Horizon (Creates depth matching concept)
+  // Distant City Skyline Skyscrapers on Horizon (depth / backdrop)
   buildDistantCitySkyline();
 }
 
 function buildDistantCitySkyline() {
   const buildingMat = new THREE.MeshStandardMaterial({
-    color: 0x3d4b60,
+    color: 0x8396ad, // paler blue-grey so the skyline reads under exposure 0.72
     map: proceduralBuildingTex,
-    emissive: 0x354458,
+    emissive: 0x6b7f99,
     emissiveMap: proceduralBuildingTex,
-    emissiveIntensity: 0.35,
-    metalness: 0.40,
-    roughness: 0.45,
+    emissiveIntensity: 0.55,
+    metalness: 0.30,
+    roughness: 0.55,
+    envMapIntensity: 0.5,
   });
 
   const spireMat = new THREE.MeshStandardMaterial({
@@ -1115,11 +1248,13 @@ function buildProceduralVehicle() {
   const height = 12.0;
 
   // Materials
-  const liveryMat = new THREE.MeshStandardMaterial({
-    color: 0x8a0c20, // Deep crimson sports car red matching concept reference frames
-    metalness: 0.0,
-    roughness: 0.48,
-    envMapIntensity: 0.0,
+  const liveryMat = new THREE.MeshPhysicalMaterial({
+    color: 0xb3150e, // concept Rosso red (low blue → stays red, not pink, under bright sun)
+    metalness: 0.15,
+    roughness: 0.44,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 0.35,
   });
 
   const carbonMat = new THREE.MeshStandardMaterial({
@@ -1286,9 +1421,9 @@ function buildProceduralVehicle() {
 
   // 11. Rear Emissive Active LED Taillights
   const brakeLightMat = new THREE.MeshStandardMaterial({
-    color: 0xff1128,
-    emissive: 0xff1128,
-    emissiveIntensity: 1.5,
+    color: 0x3a0000,
+    emissive: 0xff1a12, // concept tail-light red (low blue so bloom stays red, not pink)
+    emissiveIntensity: 1.4,
   });
   const brakeLightGeo = new THREE.BoxGeometry(0.8, 1.4, 4.8);
   const brakeL = new THREE.Mesh(brakeLightGeo, brakeLightMat);
@@ -1446,7 +1581,8 @@ function buildLidarBeams() {
   }
   rayBeamObjects = [];
 
-  const colors = [0xff2a5f, 0xffb700, 0x00f0ff, 0xffb700, 0xff2a5f];
+  // Concept ray tiers: red (<45px), amber (<90px), cyan (far). Low-blue reds avoid magenta.
+  const colors = [0xff4d4d, 0xffb02e, 0x67e3ff, 0xffb02e, 0xff4d4d];
 
   for (let i = 0; i < 5; i++) {
     const beamColor = colors[i];
@@ -1509,11 +1645,11 @@ function updateLidarVisuals(rays, car) {
     const hit = new THREE.Vector3(hitWorld.x, 1.2, hitWorld.z);
 
     // Color coding matching concept: Red (<45 px), Amber (<90 px), Cyan (>=90 px)
-    let beamColor = 0x00f0ff;
+    let beamColor = 0x67e3ff;
     if (ray.distance < 45.0) {
-      beamColor = 0xff2a5f;
+      beamColor = 0xff4d4d;
     } else if (ray.distance < 90.0) {
-      beamColor = 0xffb700;
+      beamColor = 0xffb02e;
     }
 
     // Orient and scale 3D laser cylinder between rayOrigin and hit
@@ -1607,6 +1743,13 @@ window.setCameraMode = setCameraMode;
 
 function updateCameraDirector(car, velocity, delta = 0.016) {
   if (!carGroup || !camera) return;
+
+  // Near plane: tight only in cockpit (0.4), safely back (>=2) elsewhere to avoid z-fighting.
+  const desiredNear = STATE.activeCameraMode === "cockpit" ? 0.4 : 2.0;
+  if (camera.near !== desiredNear) {
+    camera.near = desiredNear;
+    camera.updateProjectionMatrix();
+  }
 
   const carPos = carGroup.position;
   const heading = carGroup.rotation.y;
@@ -1738,10 +1881,13 @@ function animate(currentTime) {
     renderPlaybackFrame(STATE.playback.playhead, delta);
   }
 
-  // Center shadow camera on car
+  // Sun + tight shadow frustum follow the car, along the shared sun direction
   if (mainSun && carGroup) {
-    mainSun.position.set(carGroup.position.x + 280, 440, carGroup.position.z + 180);
-    mainSun.target = carGroup;
+    const cx = carGroup.position.x;
+    const cz = carGroup.position.z;
+    mainSun.position.set(cx + SUN_DIR.x * 900, SUN_DIR.y * 900, cz + SUN_DIR.z * 900);
+    mainSun.target.position.set(cx, 0, cz);
+    mainSun.target.updateMatrixWorld();
   }
 
   // Render 3D Scene
@@ -1813,9 +1959,9 @@ function renderPlaybackFrame(playhead, delta = 0.016) {
   // 5. Dynamic brake lights
   const isDecel = curThrottle < -0.05 || car0.action_mode === "deceleration";
   rearBrakeLights.forEach((light) => {
-    light.material.color.setHex(isDecel ? 0xff0020 : 0xaa0015);
-    light.material.emissive.setHex(isDecel ? 0xff0020 : 0xcc0015);
-    light.material.emissiveIntensity = isDecel ? 2.8 : 0.8;
+    light.material.color.setHex(0x3a0000);
+    light.material.emissive.setHex(isDecel ? 0xff1a12 : 0xbb1109);
+    light.material.emissiveIntensity = isDecel ? 2.2 : 0.7;
   });
 
   // 6. Rangefinder sensor beams
