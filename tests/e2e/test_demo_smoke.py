@@ -110,3 +110,23 @@ def test_quality_and_cinematic_mode_toggles(shared_page: Page):
     assert "drawCalls" in stats
     assert "triangles" in stats
     assert stats["drawCalls"] < 400
+
+
+def test_scenery_props_clear_of_centerline(shared_page: Page):
+    """Every scenery prop (trees, skyline, grandstand, pit) must sit far from the track.
+
+    Nothing may intrude on the 70 px corridor or the walls; we assert a stronger
+    >= 100 px clearance from the centerline for every prop in propsGroup.
+    """
+    # The scene/track is built after the async rollout fetch; wait for it.
+    shared_page.wait_for_function(
+        "() => !!(window.__minPropClearancePx && window.STATE && window.STATE.trackData"
+        " && window.__minPropClearancePx() !== null)",
+        timeout=30000,
+    )
+    clearance = shared_page.evaluate("window.__minPropClearancePx()")
+    assert clearance is not None, "prop clearance unavailable (scene not built)"
+    assert clearance >= 100.0, (
+        f"A scenery prop is only {clearance:.1f} px from the centerline (must be >= 100 px; "
+        f"corridor is 70 px wide)"
+    )

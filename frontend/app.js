@@ -120,7 +120,7 @@ function initThreeJS() {
   scene.fog = new THREE.Fog(0xa9c4de, 1400.0, 4200.0); // near/far rescaled per-track in build3DTrack
 
   // 2. Camera Setup (46 deg FOV for sharp, natural perspective matching concept)
-  camera = new THREE.PerspectiveCamera(46, width / height, 2.0, 5000);
+  camera = new THREE.PerspectiveCamera(46, width / height, 2.0, 9000);
   camera.position.set(0, 45, 140);
   camera.lookAt(0, 6, 0);
 
@@ -135,7 +135,7 @@ function initThreeJS() {
 
   // PBR Tone Mapping & Color Management (concept: ACES @ exposure 0.62)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.72;
+  renderer.toneMappingExposure = 0.62;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.physicallyCorrectLights = false;
 
@@ -281,7 +281,7 @@ function makeSkyMaterial() {
     }`;
   const frag = `
     varying vec3 vWorldPosition; varying vec3 vSunDirection; varying float vSunfade; varying vec3 vBetaR; varying vec3 vBetaM; varying float vSunE;
-    uniform float mieDirectionalG; uniform vec3 up;
+    uniform float mieDirectionalG; uniform vec3 up; uniform float exposure;
     const float pi = 3.141592653589793238462643383279502884197169;
     const float rayleighZenithLength = 8.4E3; const float mieZenithLength = 1.25E3;
     const float sunAngularDiameterCos = 0.999956676946448443553574619906976478926848692873900859324;
@@ -304,7 +304,12 @@ function makeSkyMaterial() {
       L0 += ( vSunE * 19000.0 * Fex ) * sundisk;
       vec3 texColor = ( Lin + L0 ) * 0.04 + vec3( 0.0, 0.0003, 0.00075 );
       vec3 retColor = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
-      gl_FragColor = vec4( retColor, 1.0 );
+      // Tone-map + encode to match the rest of the scene (raw ShaderMaterial isn't auto-processed).
+      vec3 col = retColor * exposure;
+      col = ( col * ( 2.51 * col + 0.03 ) ) / ( col * ( 2.43 * col + 0.59 ) + 0.14 ); // ACES
+      col = clamp( col, 0.0, 1.0 );
+      col = pow( col, vec3( 1.0 / 2.2 ) ); // sRGB OETF
+      gl_FragColor = vec4( col, 1.0 );
     }`;
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -314,6 +319,10 @@ function makeSkyMaterial() {
       mieDirectionalG: { value: 0.82 },
       sunPosition: { value: SUN_DIR.clone().multiplyScalar(450000) },
       up: { value: new THREE.Vector3(0, 1, 0) },
+      // Maps the Preetham HDR sky radiance into display range (separate from the
+      // renderer's 0.62 scene exposure, since this raw ShaderMaterial self-tonemaps).
+      // Tuned so the sky reads as the concept's pale blue (~#b3bcc0) vs ref_11s.
+      exposure: { value: 0.30 },
     },
     vertexShader: vert,
     fragmentShader: frag,
@@ -325,7 +334,7 @@ function makeSkyMaterial() {
 function setupSkyEnvironment() {
   const skyMat = makeSkyMaterial();
   skyMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), skyMat);
-  skyMesh.scale.setScalar(8000);
+  skyMesh.scale.setScalar(20000);
   scene.add(skyMesh);
   scene.background = null; // sky mesh is the background
 
@@ -351,6 +360,8 @@ function canvasTex(w, h, draw, repeat) {
   c.height = h;
   draw(c.getContext("2d"), w, h);
   const t = new THREE.CanvasTexture(c);
+  // Canvas is authored in sRGB; without this it is read as linear and washes out.
+  t.encoding = THREE.sRGBEncoding;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (repeat) t.repeat.set(repeat[0], repeat[1]);
   t.anisotropy = renderer ? Math.min(renderer.capabilities.getMaxAnisotropy(), 8) : 4;
@@ -380,6 +391,7 @@ function createProceduralGrassTexture() {
   }
 
   const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(90, 90); // large plane; repeat tuned in build3DTrack-independent of normal maps
@@ -405,6 +417,7 @@ function createGrassMacroTexture() {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
   const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 3);
   return tex;
@@ -436,37 +449,24 @@ function createProceduralBuildingTexture() {
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
 
-  // Dark slate-blue architectural facade
-  ctx.fillStyle = "#222c3d";
+  // Pale blue-grey facade so the distant skyline reads as a soft hazy backdrop
+  ctx.fillStyle = "#7c8794";
   ctx.fillRect(0, 0, 256, 512);
 
-  // Vertical architectural mullions
-  ctx.fillStyle = "#18202c";
-  for (let x = 0; x < 256; x += 16) {
-    ctx.fillRect(x, 0, 2, 512);
-  }
-
-  // Window grid with warm white and cool cyan lit office windows
-  const rows = 32;
-  const cols = 16;
+  // Window grid: cool/warm lit panes over a mid blue-grey (concept winTex)
+  const rows = 23;
+  const cols = 13;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const isLit = Math.sin(r * 12.3 + c * 34.5) > 0.15;
-      if (isLit) {
-        const warm = Math.sin(r * 5.1 + c * 9.2) > -0.2;
-        ctx.fillStyle = warm ? "#ffeaa7" : "#a8e6cf";
-        ctx.globalAlpha = 0.65 + Math.random() * 0.35;
-        ctx.fillRect(c * 16 + 3, r * 16 + 3, 9, 10);
-      } else {
-        ctx.fillStyle = "#111722";
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(c * 16 + 3, r * 16 + 3, 9, 10);
-      }
+      const v = Math.random();
+      ctx.fillStyle = v > 0.82 ? "#e9e2c4" : v > 0.4 ? "#3c4d61" : "#55697f";
+      ctx.fillRect(c * 20 + 8, r * 22 + 8, 13, 14);
     }
   }
   ctx.globalAlpha = 1.0;
 
   const tex = new THREE.CanvasTexture(canvas);
+  tex.encoding = THREE.sRGBEncoding;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 6);
@@ -616,8 +616,6 @@ function build3DTrack(trackData) {
   // 6. Start / finish checker line + gantry with glowing panel at the real start pose
   buildStartGantry(trackData);
 
-  // 6b. Grandstand + pit building along the start straight
-  buildGrandstand(trackData);
 
   // 7. Ground: huge grass plane receiving shadows (base), plus a low-frequency
   //    tonal overlay to break up texture tiling (concept "second scale").
@@ -655,12 +653,15 @@ function build3DTrack(trackData) {
   const spanY = bounds.max_y - bounds.min_y;
   const diag = Math.hypot(spanX, spanY) || 800;
   if (scene.fog) {
-    scene.fog.near = diag * 1.1;
-    scene.fog.far = diag * 4.2;
+    scene.fog.near = diag * 1.4;
+    scene.fog.far = diag * 6.5;
   }
 
-  // 8. Procedural Props: trees, lamps, skyline
+  // 8. Procedural Props: trees + skyline (into propsGroup)
   buildEnvironmentProps(trackData);
+  // 8b. Grandstand + pit along the start straight (also into propsGroup, after the
+  //     clear in buildEnvironmentProps, so the prop-clearance test covers them too)
+  buildGrandstand(trackData);
 
   clearTrajectoryTrail();
 }
@@ -1037,27 +1038,28 @@ function buildGrandstand(trackData) {
   if (inner.length < 1 || outer.length < 1) return;
   if (!isValidVector2(inner[0]) || !isValidVector2(outer[0])) return;
 
-  const center = envToWorld((bounds.min_x + bounds.max_x) / 2, (bounds.min_y + bounds.max_y) / 2);
+  const startInner = envToWorld(inner[0][0], inner[0][1]);
   const startOuter = envToWorld(outer[0][0], outer[0][1]);
 
-  // out = outward (away from track centre); fwd = along the track at the start.
-  let ox = startOuter.x - center.x, oz = startOuter.z - center.z;
+  // out = the true outward perpendicular (inner -> outer across the track), NOT the
+  // radial from the bounds centre (which can run nearly tangent at the start).
+  let ox = startOuter.x - startInner.x, oz = startOuter.z - startInner.z;
   const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
-  const fx = -oz, fz = ox;
+  const fx = -oz, fz = ox; // tangent (along the track)
   const ry = Math.atan2(-fz, fx); // aligns a box's local +X with fwd
 
-  const STAND_LEN = 260;
+  const STAND_LEN = 170; // compact so it doesn't wrap into the curved track
 
   // --- Pit building: long white block + cyan light band, just outside the wall ---
   const pit = new THREE.Mesh(
     new THREE.BoxGeometry(STAND_LEN - 20, 18, 14),
     new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.5, metalness: 0.05 })
   );
-  const pitX = startOuter.x + ox * 52, pitZ = startOuter.z + oz * 52;
+  const pitX = startOuter.x + ox * 90, pitZ = startOuter.z + oz * 90; // ~125px from centerline
   pit.position.set(pitX, 9, pitZ);
   pit.rotation.y = ry;
   pit.castShadow = true; pit.receiveShadow = true;
-  trackGroup.add(pit);
+  propsGroup.add(pit);
 
   const band = new THREE.Mesh(
     new THREE.BoxGeometry(STAND_LEN - 18, 3, 15),
@@ -1065,10 +1067,10 @@ function buildGrandstand(trackData) {
   );
   band.position.set(pitX, 19, pitZ);
   band.rotation.y = ry;
-  trackGroup.add(band);
+  propsGroup.add(band);
 
   // --- Grandstand: tiered crowd rows + roof, further out ---
-  const standBase = { x: startOuter.x + ox * 110, z: startOuter.z + oz * 110 };
+  const standBase = { x: startOuter.x + ox * 142, z: startOuter.z + oz * 142 };
   const crowdMat = new THREE.MeshStandardMaterial({ map: proceduralCrowdTex, roughness: 0.9 });
   const concreteMat = new THREE.MeshStandardMaterial({ color: 0xd9dde2, roughness: 0.7 });
   const ROWS = 6;
@@ -1080,7 +1082,7 @@ function buildGrandstand(trackData) {
     seg.position.set(standBase.x + ox * (r * 13), h / 2, standBase.z + oz * (r * 13));
     seg.rotation.y = ry;
     seg.castShadow = true; seg.receiveShadow = true;
-    trackGroup.add(seg);
+    propsGroup.add(seg);
   }
   // Roof slab over the stand
   const roof = new THREE.Mesh(
@@ -1091,16 +1093,16 @@ function buildGrandstand(trackData) {
   roof.position.set(standBase.x + ox * roofOut, topY + 26, standBase.z + oz * roofOut);
   roof.rotation.y = ry;
   roof.castShadow = true;
-  trackGroup.add(roof);
+  propsGroup.add(roof);
   // Roof support pillars at the front
   const pillarMat = concreteMat;
   for (let i = -1; i <= 1; i++) {
-    const px = standBase.x + fx * (i * STAND_LEN * 0.4);
-    const pz = standBase.z + fz * (i * STAND_LEN * 0.4);
+    const px = standBase.x + fx * (i * STAND_LEN * 0.1);
+    const pz = standBase.z + fz * (i * STAND_LEN * 0.1);
     const pil = new THREE.Mesh(new THREE.BoxGeometry(4, topY + 26, 4), pillarMat);
     pil.position.set(px, (topY + 26) / 2, pz);
     pil.castShadow = true;
-    trackGroup.add(pil);
+    propsGroup.add(pil);
   }
 }
 
@@ -1185,7 +1187,7 @@ function buildEnvironmentProps(trackData) {
       trees.push({
         x: w.x,
         z: w.z,
-        scale: 0.7 + rnd() * 0.8,
+        scale: 0.7 + rnd() * 0.7,
         rotY: rnd() * Math.PI * 2,
         round: rnd() < 0.55,
       });
@@ -1238,82 +1240,61 @@ function buildEnvironmentProps(trackData) {
 }
 
 function buildDistantCitySkyline() {
+  // Pale, self-lit blue-grey towers so they read as a soft hazy skyline even when
+  // back-lit; pushed far out and fogged, they sit low behind the tree line.
   const buildingMat = new THREE.MeshStandardMaterial({
-    color: 0x8396ad, // paler blue-grey so the skyline reads under exposure 0.72
+    color: 0xb6c2d1,
     map: proceduralBuildingTex,
-    emissive: 0x6b7f99,
+    emissive: 0x9fb0c4,
     emissiveMap: proceduralBuildingTex,
-    emissiveIntensity: 0.55,
-    metalness: 0.30,
-    roughness: 0.55,
-    envMapIntensity: 0.5,
+    emissiveIntensity: 0.85,
+    metalness: 0.10,
+    roughness: 0.65,
+    envMapIntensity: 0.6,
   });
 
-  const spireMat = new THREE.MeshStandardMaterial({
-    color: 0x90a4ae,
-    metalness: 0.85,
-    roughness: 0.20,
-  });
-
-  const buildingCount = 36;
+  const COUNT = 80;
   const dummy = new THREE.Object3D();
-
-  // Instanced main towers
   const towerGeo = new THREE.BoxGeometry(1, 1, 1);
-  const towerMesh = new THREE.InstancedMesh(towerGeo, buildingMat, buildingCount);
-  towerMesh.castShadow = false;
-  towerMesh.receiveShadow = false;
-
-  // Instanced setback crown towers
+  const towerMesh = new THREE.InstancedMesh(towerGeo, buildingMat, COUNT);
   const crownGeo = new THREE.BoxGeometry(1, 1, 1);
-  const crownMesh = new THREE.InstancedMesh(crownGeo, buildingMat, buildingCount);
-  crownMesh.castShadow = false;
+  const crownMesh = new THREE.InstancedMesh(crownGeo, buildingMat, COUNT);
+  towerMesh.castShadow = crownMesh.castShadow = false;
+  towerMesh.receiveShadow = crownMesh.receiveShadow = false;
 
-  // Instanced spire needles
-  const spireGeo = new THREE.CylinderGeometry(0.12, 0.4, 1.0, 8);
-  const spireMesh = new THREE.InstancedMesh(spireGeo, spireMat, buildingCount);
+  // Seeded RNG for a stable skyline.
+  let s = 1337;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
 
-  for (let i = 0; i < buildingCount; i++) {
-    const angle = (i / buildingCount) * Math.PI * 2;
-    const dist = 780.0 + (Math.sin(i * 3.3) * 0.5 + 0.5) * 420.0;
+  for (let i = 0; i < COUNT; i++) {
+    // Bias the cluster toward the far side, with some all around.
+    const angle = (i < 56)
+      ? (-2.4 + rnd() * 2.2)              // back arc
+      : (rnd() * Math.PI * 2);           // scattered
+    const dist = 2000 + rnd() * 1500;    // 2000–3500 world units (far)
     const x = Math.cos(angle) * dist;
     const z = Math.sin(angle) * dist;
 
-    const bWidth = 38.0 + (i % 5) * 10.0;
-    const bDepth = 38.0 + ((i + 2) % 4) * 10.0;
-    const bHeight = 80.0 + (Math.sin(i * 1.7) * 0.5 + 0.5) * 95.0;
+    const bW = 90 + rnd() * 170;
+    const bD = 90 + rnd() * 170;
+    const bH = 120 + rnd() * 520;        // 120–640
 
-    // Main base tower
-    dummy.position.set(x, bHeight / 2 - 2, z);
-    dummy.rotation.set(0, angle, 0);
-    dummy.scale.set(bWidth, bHeight, bDepth);
+    dummy.position.set(x, bH / 2 - 2, z);
+    dummy.rotation.set(0, rnd() * 0.6, 0);
+    dummy.scale.set(bW, bH, bD);
     dummy.updateMatrix();
     towerMesh.setMatrixAt(i, dummy.matrix);
 
-    // Architectural setback crown
-    const crownWidth = bWidth * 0.65;
-    const crownDepth = bDepth * 0.65;
-    const crownHeight = bHeight * 0.35;
-    dummy.position.set(x, bHeight + crownHeight / 2 - 2, z);
-    dummy.scale.set(crownWidth, crownHeight, crownDepth);
+    const cW = bW * 0.6, cD = bD * 0.6, cH = bH * 0.3;
+    dummy.position.set(x, bH + cH / 2 - 2, z);
+    dummy.scale.set(cW, cH, cD);
     dummy.updateMatrix();
     crownMesh.setMatrixAt(i, dummy.matrix);
-
-    // Rooftop antenna spire
-    const spireHeight = 18.0 + (i % 3) * 10.0;
-    dummy.position.set(x, bHeight + crownHeight + spireHeight / 2 - 2, z);
-    dummy.scale.set(1.0, spireHeight, 1.0);
-    dummy.updateMatrix();
-    spireMesh.setMatrixAt(i, dummy.matrix);
   }
 
   towerMesh.instanceMatrix.needsUpdate = true;
   crownMesh.instanceMatrix.needsUpdate = true;
-  spireMesh.instanceMatrix.needsUpdate = true;
-
-  propsGroup.add(towerMesh);
-  propsGroup.add(crownMesh);
-  propsGroup.add(spireMesh);
+  propsGroup.add(towerMesh, crownMesh);
 }
 
 // ==============================================================================
@@ -3144,6 +3125,45 @@ window.getRenderStats = function() {
 };
 
 window.getRenderDebugInfo = window.getRenderStats;
+
+// Minimum distance (env px) from any scenery prop (trees, skyline, grandstand, pit)
+// to the track centerline. Used by the e2e prop-clearance test. Returns null until
+// the scene + track are built.
+window.__minPropClearancePx = function () {
+  if (!propsGroup || !STATE.trackData || !STATE.trackData.centerline) return null;
+  const cl = STATE.trackData.centerline;
+  if (!cl.length) return null;
+
+  const m = new THREE.Matrix4();
+  const p = new THREE.Vector3();
+  let min = Infinity;
+
+  function consider(worldX, worldZ) {
+    const env = worldToEnv(worldX, worldZ); // {x, y} in env px
+    let best = Infinity;
+    for (let i = 0; i < cl.length; i++) {
+      const dx = cl[i][0] - env.x, dy = cl[i][1] - env.y;
+      const d = dx * dx + dy * dy;
+      if (d < best) best = d;
+    }
+    const dist = Math.sqrt(best);
+    if (dist < min) min = dist;
+  }
+
+  propsGroup.traverse((obj) => {
+    if (obj.isInstancedMesh) {
+      for (let i = 0; i < obj.count; i++) {
+        obj.getMatrixAt(i, m);
+        p.setFromMatrixPosition(m);
+        consider(p.x, p.z);
+      }
+    } else if (obj.isMesh) {
+      consider(obj.position.x, obj.position.z);
+    }
+  });
+
+  return (min === Infinity) ? null : min;
+};
 
 // Initialize Application
 window.addEventListener("DOMContentLoaded", () => {
