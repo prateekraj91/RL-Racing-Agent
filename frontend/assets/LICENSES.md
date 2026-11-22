@@ -39,13 +39,15 @@ All external 3D, texture, and environmental assets included in this repository a
 
 ## 4. Vehicle 3D Model
 
-* **Asset**: `car.glb`
-* **Source**: [Three.js Examples (webgl_materials_car)](https://threejs.org/examples/webgl_materials_car.html) / [GitHub mrdoob/three.js](https://raw.githubusercontent.com/mrdoob/three.js/r128/examples/models/gltf/ferrari.glb)
-* **Author**: `vicent091036` (original Ferrari 458 Italia 3D model)
-* **License**: [Creative Commons Attribution 4.0 International (CC-BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
-* **Format**: Binary glTF (.glb) with Draco mesh compression (~1.6 MB)
-* **Hierarchy**: Contains named sub-objects `wheel_fl`, `wheel_fr`, `wheel_rl`, `wheel_rr`, `steering_wheel`, `body`, `lights_red`.
-* **Usage**: Autonomous racing agent vehicle representation in 3D simulator.
+* **Asset**: Procedural (no external model file).
+* **Source**: Parametric Three.js geometry ported from `docs/concept_reference/main.js`
+  (the project's own concept render) — a generic, unbranded stylized sports coupe.
+* **Author**: RL Racing Agent Team.
+* **License**: [CC0 1.0 Universal (Public Domain Dedication)](https://creativecommons.org/publicdomain/zero/1.0/)
+* **Note**: A previous `car.glb` (a third-party, branded sports-car model under CC-BY)
+  was removed; no branded vehicle model, texture, logo, or badge ships in this repo.
+* **Usage**: Autonomous racing agent vehicle, built in `frontend/app.js`
+  (`buildProceduralVehicle`), wheelbase scaled to the env's 50 px.
 
 ---
 
@@ -68,9 +70,11 @@ All external 3D, texture, and environmental assets included in this repository a
 * **License**: [CC0 1.0 Universal (Public Domain Dedication)](https://creativecommons.org/publicdomain/zero/1.0/)
 * **Technique**: High-efficiency GPU instancing (`THREE.InstancedMesh`)
 * **Components**:
-  * **Pine Trees**: Dual-cone foliage + cylindrical wooden trunk.
-  * **Deciduous Oak Trees**: Low-poly dodecahedral canopy + cylindrical trunk.
-  * **Stadium / Track Lamp Posts**: Metal poles + emissive warm white fixtures.
-  * **Tecpro Runoff Barriers**: High-visibility impact foam cushions (alternating red and white).
-  * **Grandstands**: Modular covered spectator grandstands positioned along straightaways.
-* **Spatial Constraint**: All environment props are placed at an offset of $\ge 25\text{ px}$ outside track collision barriers, strictly preserving the $70\text{ px}$ drivable corridor.
+  * **Trees**: Instanced pine (cone) + round (icosahedron) canopies with per-instance
+    green tint and a shared trunk, scattered outside the track.
+  * **Skyline**: Instanced windowed blue-grey towers on the far horizon.
+  * **Grandstand + Pit**: Tiered crowd stand, roof, pillars and a pit building with a
+    cyan light band, along the start straight.
+* **Spatial Constraint**: Trees are kept $\ge 150\text{ px}$ from the centerline and every
+  scenery prop $\ge 100\text{ px}$, strictly preserving the $70\text{ px}$ drivable
+  corridor (asserted by `tests/e2e/test_demo_smoke.py::test_scenery_props_clear_of_centerline`).

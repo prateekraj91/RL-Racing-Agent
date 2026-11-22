@@ -99,6 +99,7 @@ let wheelSpinMeshes = [];
 let rearBrakeLights = [];
 let carEmitterNodes = [];
 let wheelSpinAngle = 0.0;
+let prevCarWorldX = null, prevCarWorldZ = null; // for distance-based wheel spin
 let rayBeamObjects = [];
 let roadMesh, curbInnerMesh, curbOuterMesh, barrierMesh, groundPlaneMesh;
 let innerEdgeMesh, outerEdgeMesh, centerLineMesh;
@@ -1301,6 +1302,13 @@ function buildDistantCitySkyline() {
 // 3D Racing Vehicle (Unbranded Stylized Sports Coupe Matching Concept Video)
 // ==============================================================================
 
+// Env physics constants (see env.car / world.js): wheelbase 50 px, nominal width 30 px.
+const CAR_WHEELBASE_PX = 50.0;
+const CAR_WIDTH_PX = 30.0;
+const CAR_WHEEL_RADIUS = 9.0;
+const CAR_TRACK_Z = 17.0; // left/right wheel offset
+const ROAD_TOP_Y = 0.60;  // asphalt ribbon top (cars sit here)
+
 function buildProceduralVehicle() {
   if (carBodyGroup) {
     while (carBodyGroup.children.length > 0) {
@@ -1312,326 +1320,145 @@ function buildProceduralVehicle() {
     carBodyGroup = new THREE.Group();
     carGroup.add(carBodyGroup);
   }
+  // Clear previously added wheels / footprint from carGroup
+  [frontLeftSteerPivot, frontRightSteerPivot, carPhysicsFootprint].forEach((o) => {
+    if (o && o.parent) o.parent.remove(o);
+  });
+  carGroup.children
+    .filter((c) => c.userData && c.userData.isWheel)
+    .forEach((c) => carGroup.remove(c));
 
   wheelSpinMeshes = [];
   rearBrakeLights = [];
-  carEmitterNodes = [];
+  carEmitterNodes = []; // rays originate from the car centre (fallback) — no visible emitters
 
-  const length = 50.0; // Wheelbase
-  const width = 27.0;
-  const height = 12.0;
-
-  // Materials
-  const liveryMat = new THREE.MeshPhysicalMaterial({
-    color: 0xb3150e, // concept Rosso red (low blue → stays red, not pink, under bright sun)
-    metalness: 0.15,
-    roughness: 0.44,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.12,
-    envMapIntensity: 0.35,
+  // ---- Materials (concept main.js) ----
+  const paint = new THREE.MeshPhysicalMaterial({
+    color: 0xb3150e, metalness: 0.15, roughness: 0.42,
+    clearcoat: 0.6, clearcoatRoughness: 0.1, envMapIntensity: 0.4,
   });
+  const black = new THREE.MeshStandardMaterial({ color: 0x0d0e10, roughness: 0.55, metalness: 0.3, envMapIntensity: 0.3 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x0a0f16, metalness: 0.2, roughness: 0.04, clearcoat: 1.0, envMapIntensity: 0.6 });
 
-  const carbonMat = new THREE.MeshStandardMaterial({
-    color: 0x16181c, // Matte carbon fiber
-    metalness: 0.60,
-    roughness: 0.40,
-    envMapIntensity: 0.15,
-  });
+  // ---- Smooth extruded body (side profile x,y extruded across width z) ----
+  const sh = new THREE.Shape();
+  [[-41, 4], [-42, 12], [-35, 15.5], [-20, 16.5], [-4, 16.5], [16, 15.5], [33, 12.5], [41.5, 8.5], [41, 3.5]]
+    .forEach((p, i) => (i ? sh.lineTo(p[0], p[1]) : sh.moveTo(p[0], p[1])));
+  sh.closePath();
+  const bodyGeo = new THREE.ExtrudeGeometry(sh, { depth: CAR_WIDTH_PX, bevelEnabled: true, bevelThickness: 3, bevelSize: 2.5, bevelSegments: 5, curveSegments: 10 });
+  bodyGeo.translate(0, 0, -CAR_WIDTH_PX / 2);
+  const body = new THREE.Mesh(bodyGeo, paint);
+  body.castShadow = true; body.receiveShadow = true;
+  carBodyGroup.add(body);
 
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x0e131d, // Dark GT cockpit glass
-    metalness: 0.85,
-    roughness: 0.12,
-    transparent: true,
-    opacity: 0.92,
-  });
+  // ---- Glass canopy ----
+  const cs = new THREE.Shape();
+  [[-22, 16], [-9, 25.5], [6, 25.5], [19, 15.5]].forEach((p, i) => (i ? cs.lineTo(p[0], p[1]) : cs.moveTo(p[0], p[1])));
+  cs.closePath();
+  const cabGeo = new THREE.ExtrudeGeometry(cs, { depth: 22, bevelEnabled: true, bevelThickness: 2, bevelSize: 1.5, bevelSegments: 4 });
+  cabGeo.translate(0, 0, -11);
+  const cab = new THREE.Mesh(cabGeo, glass);
+  cab.castShadow = true;
+  carBodyGroup.add(cab);
 
-  // 1. Lower Cockpit Tub & Chassis
-  const tubGeo = new THREE.BoxGeometry(length * 0.86, height * 0.36, width * 0.78);
-  const tubMesh = new THREE.Mesh(tubGeo, liveryMat);
-  tubMesh.position.y = height * 0.36;
-  tubMesh.castShadow = true;
-  tubMesh.receiveShadow = true;
-  carBodyGroup.add(tubMesh);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 20), paint);
+  roof.position.set(-1.5, 27.2, 0);
+  carBodyGroup.add(roof);
 
-  // 1b. Rear Fastback Deck & Fascia (sculpts the vertical rear body matching concept)
-  const rearDeckGeo = new THREE.BoxGeometry(length * 0.28, height * 0.38, width * 0.76);
-  const rearDeckMesh = new THREE.Mesh(rearDeckGeo, liveryMat);
-  rearDeckMesh.position.set(-length * 0.30, height * 0.48, 0);
-  rearDeckMesh.castShadow = true;
-  rearDeckMesh.receiveShadow = true;
-  carBodyGroup.add(rearDeckMesh);
-
-  // 2. Sculpted Sloping Front Hood & Low Nose
-  const hoodGeo = new THREE.BoxGeometry(length * 0.28, height * 0.24, width * 0.74);
-  const hoodMesh = new THREE.Mesh(hoodGeo, liveryMat);
-  hoodMesh.position.set(length * 0.35, height * 0.34, 0);
-  hoodMesh.rotation.z = -0.16;
-  hoodMesh.castShadow = true;
-  carBodyGroup.add(hoodMesh);
-
-  // Twin hood air extraction louvers in carbon
-  const ventGeo = new THREE.BoxGeometry(length * 0.12, 0.4, width * 0.22);
-  const ventL = new THREE.Mesh(ventGeo, carbonMat);
-  ventL.position.set(length * 0.32, height * 0.44, -width * 0.20);
-  ventL.rotation.z = -0.16;
-  const ventR = new THREE.Mesh(ventGeo, carbonMat);
-  ventR.position.set(length * 0.32, height * 0.44, width * 0.20);
-  ventR.rotation.z = -0.16;
-  carBodyGroup.add(ventL);
-  carBodyGroup.add(ventR);
-
-  // 3. Extended Front Carbon Splitter with Endplates
-  const splitterGeo = new THREE.BoxGeometry(length * 0.18, height * 0.05, width * 0.94);
-  const splitter = new THREE.Mesh(splitterGeo, carbonMat);
-  splitter.position.set(length * 0.46, height * 0.12, 0);
-  splitter.castShadow = true;
-  carBodyGroup.add(splitter);
-
-  // Left & right splitter dive-planes
-  const diveGeo = new THREE.BoxGeometry(length * 0.08, height * 0.12, 0.6);
-  const diveL = new THREE.Mesh(diveGeo, carbonMat);
-  diveL.position.set(length * 0.48, height * 0.18, -width * 0.46);
-  const diveR = new THREE.Mesh(diveGeo, carbonMat);
-  diveR.position.set(length * 0.48, height * 0.18, width * 0.46);
-  carBodyGroup.add(diveL);
-  carBodyGroup.add(diveR);
-
-  // 4. Sculpted Front Wheel Arches (Fenders)
-  const fArchGeo = new THREE.BoxGeometry(length * 0.24, height * 0.34, width * 0.12);
-  const fArchL = new THREE.Mesh(fArchGeo, liveryMat);
-  fArchL.position.set(length * 0.32, height * 0.42, -width * 0.41);
-  fArchL.castShadow = true;
-  const fArchR = new THREE.Mesh(fArchGeo, liveryMat);
-  fArchR.position.set(length * 0.32, height * 0.42, width * 0.41);
-  fArchR.castShadow = true;
-  carBodyGroup.add(fArchL);
-  carBodyGroup.add(fArchR);
-
-  // 5. Flared Rear Wheel Arches (Wide Hips over rear competition tires)
-  const rArchGeo = new THREE.BoxGeometry(length * 0.26, height * 0.38, width * 0.14);
-  const rArchL = new THREE.Mesh(rArchGeo, liveryMat);
-  rArchL.position.set(-length * 0.32, height * 0.45, -width * 0.41);
-  rArchL.castShadow = true;
-  const rArchR = new THREE.Mesh(rArchGeo, liveryMat);
-  rArchR.position.set(-length * 0.32, height * 0.45, width * 0.41);
-  rArchR.castShadow = true;
-  carBodyGroup.add(rArchL);
-  carBodyGroup.add(rArchR);
-
-  // 6. Carbon Ground-Effect Side Skirts
-  const skirtGeo = new THREE.BoxGeometry(length * 0.40, height * 0.05, width * 0.08);
-  const skirtL = new THREE.Mesh(skirtGeo, carbonMat);
-  skirtL.position.set(0, height * 0.14, -width * 0.42);
-  const skirtR = new THREE.Mesh(skirtGeo, carbonMat);
-  skirtR.position.set(0, height * 0.14, width * 0.42);
-  carBodyGroup.add(skirtL);
-  carBodyGroup.add(skirtR);
-
-  // 7. Fastback GT Cockpit Greenhouse
-  const cabinGeo = new THREE.BoxGeometry(length * 0.44, height * 0.42, width * 0.62);
-  const cabinMesh = new THREE.Mesh(cabinGeo, glassMat);
-  cabinMesh.position.set(-length * 0.02, height * 0.74, 0);
-  cabinMesh.castShadow = true;
-  carBodyGroup.add(cabinMesh);
-
-  // Roof panel in Rosso red
-  const roofGeo = new THREE.BoxGeometry(length * 0.36, 0.4, width * 0.58);
-  const roofMesh = new THREE.Mesh(roofGeo, liveryMat);
-  roofMesh.position.set(-length * 0.02, height * 0.95, 0);
-  roofMesh.castShadow = true;
-  carBodyGroup.add(roofMesh);
-
-  // 8. Aggressive Rear Carbon Diffuser with Aero Strakes
-  const diffGeo = new THREE.BoxGeometry(length * 0.14, height * 0.08, width * 0.88);
-  const diffMesh = new THREE.Mesh(diffGeo, carbonMat);
-  diffMesh.position.set(-length * 0.44, height * 0.14, 0);
-  diffMesh.rotation.z = 0.20;
-  carBodyGroup.add(diffMesh);
-
-  // 9. GT Airfoil Rear Wing with Vertical Endplates
-  const wingGeo = new THREE.BoxGeometry(length * 0.16, height * 0.05, width * 0.96);
-  const wing = new THREE.Mesh(wingGeo, carbonMat);
-  wing.position.set(-length * 0.45, height * 1.05, 0);
-  wing.castShadow = true;
+  // ---- Rear wing + struts, diffuser, splitter, skirts ----
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(7, 1.2, 32), black);
+  wing.position.set(-38, 21.5, 0); wing.rotation.z = 0.08; wing.castShadow = true;
   carBodyGroup.add(wing);
-
-  // Dual aerodynamic wing endplates
-  const endplateGeo = new THREE.BoxGeometry(length * 0.22, height * 0.20, 0.6);
-  const epL = new THREE.Mesh(endplateGeo, carbonMat);
-  epL.position.set(-length * 0.45, height * 1.05, -width * 0.48);
-  const epR = new THREE.Mesh(endplateGeo, carbonMat);
-  epR.position.set(-length * 0.45, height * 1.05, width * 0.48);
-  carBodyGroup.add(epL);
-  carBodyGroup.add(epR);
-
-  // Swan-neck wing pylons
-  const wingPillarGeo = new THREE.BoxGeometry(length * 0.04, height * 0.36, width * 0.04);
-  const pL = new THREE.Mesh(wingPillarGeo, carbonMat);
-  pL.position.set(-length * 0.44, height * 0.84, -width * 0.28);
-  const pR = new THREE.Mesh(wingPillarGeo, carbonMat);
-  pR.position.set(-length * 0.44, height * 0.84, width * 0.28);
-  carBodyGroup.add(pL);
-  carBodyGroup.add(pR);
-
-  // 10. Aggressive Dual Front LED Headlights with Cyan Accents
-  const headLightMat = new THREE.MeshBasicMaterial({ color: 0xe0f7fa });
-  const headAccentMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-  const headGeo = new THREE.BoxGeometry(length * 0.04, height * 0.08, width * 0.15);
-  const hL = new THREE.Mesh(headGeo, headLightMat);
-  hL.position.set(length * 0.45, height * 0.38, -width * 0.28);
-  const hR = new THREE.Mesh(headGeo, headLightMat);
-  hR.position.set(length * 0.45, height * 0.38, width * 0.28);
-  carBodyGroup.add(hL);
-  carBodyGroup.add(hR);
-
-  const dRLGeo = new THREE.BoxGeometry(length * 0.05, 0.5, width * 0.14);
-  const dRLL = new THREE.Mesh(dRLGeo, headAccentMat);
-  dRLL.position.set(length * 0.45, height * 0.33, -width * 0.28);
-  const dRLR = new THREE.Mesh(dRLGeo, headAccentMat);
-  dRLR.position.set(length * 0.45, height * 0.33, width * 0.28);
-  carBodyGroup.add(dRLL);
-  carBodyGroup.add(dRLR);
-
-  // 11. Rear Emissive Active LED Taillights
-  const brakeLightMat = new THREE.MeshStandardMaterial({
-    color: 0x3a0000,
-    emissive: 0xff1a12, // concept tail-light red (low blue so bloom stays red, not pink)
-    emissiveIntensity: 1.4,
-  });
-  const brakeLightGeo = new THREE.BoxGeometry(0.8, 1.4, 4.8);
-  const brakeL = new THREE.Mesh(brakeLightGeo, brakeLightMat);
-  brakeL.position.set(-length * 0.44 - 0.2, height * 0.48, -width * 0.28);
-  const brakeR = new THREE.Mesh(brakeLightGeo, brakeLightMat);
-  brakeR.position.set(-length * 0.44 - 0.2, height * 0.48, width * 0.28);
-  carBodyGroup.add(brakeL);
-  carBodyGroup.add(brakeR);
-  rearBrakeLights.push(brakeL, brakeR);
-
-  // 12. Rangefinder Sensor Emitter Discs & Stalks (matching concept video)
-  const stalkMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 });
-  const emitterRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const emitterCenterMat = new THREE.MeshBasicMaterial({ color: 0x111620 });
-
-  const emitterConfigs = [
-    { x: -2.0, y: 5.5, z: -width * 0.52 },         // L -90°
-    { x: length * 0.36, y: 5.5, z: -width * 0.46 }, // DL -45°
-    { x: length * 0.49, y: 5.5, z: 0.0 },           // FWD 0°
-    { x: length * 0.36, y: 5.5, z: width * 0.46 },  // DR +45°
-    { x: -2.0, y: 5.5, z: width * 0.52 },          // R +90°
-  ];
-
-  emitterConfigs.forEach((cfg) => {
-    const emitterNodeGroup = new THREE.Group();
-    emitterNodeGroup.position.set(cfg.x, cfg.y, cfg.z);
-
-    // Stalk connecting node to chassis
-    const stalkGeo = new THREE.CylinderGeometry(0.35, 0.35, 2.2, 8);
-    stalkGeo.rotateZ(Math.PI / 2);
-    const stalk = new THREE.Mesh(stalkGeo, stalkMat);
-    emitterNodeGroup.add(stalk);
-
-    // White circular ring/disc
-    const ringGeo = new THREE.RingGeometry(0.6, 1.4, 20);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ring = new THREE.Mesh(ringGeo, emitterRingMat);
-    emitterNodeGroup.add(ring);
-
-    // Inner dark center
-    const centerGeo = new THREE.CircleGeometry(0.58, 16);
-    centerGeo.rotateX(-Math.PI / 2);
-    const center = new THREE.Mesh(centerGeo, emitterCenterMat);
-    emitterNodeGroup.add(center);
-
-    carBodyGroup.add(emitterNodeGroup);
-    carEmitterNodes.push(emitterNodeGroup);
-  });
-
-  // 13. Four GT Wheels & Rims with Yellow Brake Calipers
-  const wheelRadius = 5.2;
-  const wheelWidth = 3.6;
-  const wheelRubberMat = new THREE.MeshStandardMaterial({
-    color: 0x18181a,
-    roughness: 0.85,
-    metalness: 0.08,
-  });
-  const wheelRimMat = new THREE.MeshStandardMaterial({
-    color: 0xdcdfe4, // Satin Silver / Gunmetal Rims
-    metalness: 0.88,
-    roughness: 0.22,
-  });
-  const wheelHubMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff }); // Anodized cyan centerlock nut
-  const caliperMat = new THREE.MeshStandardMaterial({
-    color: 0xffd600, // Vibrant Yellow Calipers
-    metalness: 0.4,
-    roughness: 0.3,
-  });
-
-  function createWheel() {
-    const wheelGroup = new THREE.Group();
-
-    // Spinning portion (tire + rim + spokes)
-    const spinGroup = new THREE.Group();
-
-    const tireGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 20);
-    tireGeo.rotateX(Math.PI / 2);
-    const tireMesh = new THREE.Mesh(tireGeo, wheelRubberMat);
-    tireMesh.castShadow = true;
-    spinGroup.add(tireMesh);
-
-    const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.66, wheelRadius * 0.66, wheelWidth + 0.12, 14);
-    rimGeo.rotateX(Math.PI / 2);
-    const rimMesh = new THREE.Mesh(rimGeo, wheelRimMat);
-    spinGroup.add(rimMesh);
-
-    // Central hub nut
-    const hubGeo = new THREE.CylinderGeometry(0.8, 0.8, wheelWidth + 0.25, 8);
-    hubGeo.rotateX(Math.PI / 2);
-    const hubMesh = new THREE.Mesh(hubGeo, wheelHubMat);
-    spinGroup.add(hubMesh);
-
-    wheelGroup.add(spinGroup);
-
-    // Static brake caliper (stays upright inside rim while wheel spins)
-    const caliperGeo = new THREE.BoxGeometry(1.6, 2.6, 1.2);
-    const caliperMesh = new THREE.Mesh(caliperGeo, caliperMat);
-    caliperMesh.position.set(0, 2.2, 0);
-    wheelGroup.add(caliperMesh);
-
-    return { group: wheelGroup, spin: spinGroup };
+  for (const s of [-1, 1]) {
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(2.4, 5, 1.2), black);
+    strut.position.set(-37, 18.5, 8 * s);
+    carBodyGroup.add(strut);
+  }
+  const diff = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 26), black);
+  diff.position.set(-42.5, 3.5, 0);
+  carBodyGroup.add(diff);
+  const split = new THREE.Mesh(new THREE.BoxGeometry(6, 1.2, 32), black);
+  split.position.set(41, 2.4, 0);
+  carBodyGroup.add(split);
+  for (const s of [-1, 1]) {
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(46, 3, 1.5), black);
+    skirt.position.set(0, 3.5, 17.6 * s);
+    carBodyGroup.add(skirt);
   }
 
-  // Front Left Steering Pivot
-  frontLeftSteerPivot = new THREE.Group();
-  frontLeftSteerPivot.position.set(length * 0.32, wheelRadius, -width * 0.46);
-  const wFL = createWheel();
-  frontLeftSteerPivot.add(wFL.group);
-  carGroup.add(frontLeftSteerPivot);
-  wheelSpinMeshes.push(wFL.spin);
+  // ---- Emissive tail lights (brighten on braking) + head lights ----
+  for (const s of [-1, 1]) {
+    const tl = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 2.2, 10),
+      new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff1a12, emissiveIntensity: 1.2 })
+    );
+    tl.position.set(-44.2, 12.3, 10 * s);
+    carBodyGroup.add(tl);
+    rearBrakeLights.push(tl);
 
-  // Front Right Steering Pivot
-  frontRightSteerPivot = new THREE.Group();
-  frontRightSteerPivot.position.set(length * 0.32, wheelRadius, width * 0.46);
-  const wFR = createWheel();
-  frontRightSteerPivot.add(wFR.group);
-  carGroup.add(frontRightSteerPivot);
-  wheelSpinMeshes.push(wFR.spin);
+    const hl = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1.8, 8),
+      new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xeaf6ff, emissiveIntensity: 2.0 })
+    );
+    hl.position.set(43, 9.5, 11 * s); hl.rotation.y = -0.25 * s;
+    carBodyGroup.add(hl);
+  }
 
-  // Rear Left Wheel
-  const rearLeftGroup = new THREE.Group();
-  rearLeftGroup.position.set(-length * 0.32, wheelRadius, -width * 0.46);
-  const wRL = createWheel();
-  rearLeftGroup.add(wRL.group);
-  carGroup.add(rearLeftGroup);
-  wheelSpinMeshes.push(wRL.spin);
+  // ---- Wheels: wheelbase 50 px (axles at +/-25), radius 9 ----
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.9, envMapIntensity: 0.2 });
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0xb8bec6, metalness: 1.0, roughness: 0.25, envMapIntensity: 0.6 });
+  const calMat = new THREE.MeshStandardMaterial({ color: 0xffc400, roughness: 0.4 });
 
-  // Rear Right Wheel
-  const rearRightGroup = new THREE.Group();
-  rearRightGroup.position.set(-length * 0.32, wheelRadius, width * 0.46);
-  const wRR = createWheel();
-  rearRightGroup.add(wRR.group);
-  carGroup.add(rearRightGroup);
-  wheelSpinMeshes.push(wRR.spin);
+  function createWheel() {
+    const group = new THREE.Group();
+    const spin = new THREE.Group();
+    const tg = new THREE.CylinderGeometry(CAR_WHEEL_RADIUS, CAR_WHEEL_RADIUS, 7, 28); tg.rotateX(Math.PI / 2);
+    const tire = new THREE.Mesh(tg, tireMat); tire.castShadow = true; spin.add(tire);
+    const rg = new THREE.CylinderGeometry(6.2, 6.2, 7.4, 24); rg.rotateX(Math.PI / 2);
+    spin.add(new THREE.Mesh(rg, rimMat));
+    for (let i = 0; i < 5; i++) {
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(1.8, 11, 8), black);
+      sp.rotation.z = (i * Math.PI * 2) / 5; spin.add(sp);
+    }
+    group.add(spin);
+    const cal = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 8.2), calMat);
+    cal.position.set(3, 2, 0); group.add(cal); // static caliper
+    return { group, spin };
+  }
+
+  // [x, z, isFront]
+  const wheelDefs = [
+    [CAR_WHEELBASE_PX / 2, CAR_TRACK_Z, true],
+    [CAR_WHEELBASE_PX / 2, -CAR_TRACK_Z, true],
+    [-CAR_WHEELBASE_PX / 2, CAR_TRACK_Z, false],
+    [-CAR_WHEELBASE_PX / 2, -CAR_TRACK_Z, false],
+  ];
+  const fronts = [];
+  for (const [x, z, isFront] of wheelDefs) {
+    const piv = new THREE.Group();
+    piv.position.set(x, CAR_WHEEL_RADIUS, z);
+    piv.userData.isWheel = true;
+    const w = createWheel();
+    piv.add(w.group);
+    carGroup.add(piv);
+    wheelSpinMeshes.push(w.spin);
+    if (isFront) fronts.push(piv);
+  }
+  frontLeftSteerPivot = fronts[0];
+  frontRightSteerPivot = fronts[1];
+
+  // ---- Debug-only physics footprint wireframe: 30 (z) x 50 (x) px ----
+  // Drawn over the model (depthTest off) so the collision box is always visible in debug.
+  const fpGeo = new THREE.BoxGeometry(CAR_WHEELBASE_PX, 14, CAR_WIDTH_PX);
+  const fpEdges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(fpGeo),
+    new THREE.LineBasicMaterial({ color: 0x33ff88, depthTest: false, transparent: true })
+  );
+  fpEdges.position.set(0, 7, 0);
+  fpEdges.renderOrder = 999;
+  fpEdges.visible = STATE.debugMode;
+  carPhysicsFootprint = fpEdges;
+  carGroup.add(fpEdges);
 }
 
 function buildCarModel() {
@@ -2146,7 +1973,7 @@ function renderPlaybackFrame(playhead, delta = 0.016) {
   const curZ = THREE.MathUtils.lerp(pos0.z, pos1.z, alpha);
 
   if (carGroup) {
-    carGroup.position.set(curX, 0.0, curZ);
+    carGroup.position.set(curX, ROAD_TOP_Y, curZ); // tyres sit on the asphalt (no float/sink)
   }
 
   // 2. Shortest-angle heading interpolation (slerp)
@@ -2166,11 +1993,15 @@ function renderPlaybackFrame(playhead, delta = 0.016) {
   const curSteerDeg = THREE.MathUtils.lerp(car0.steering_angle_deg, car1.steering_angle_deg, alpha);
   const curThrottle = THREE.MathUtils.lerp(car0.throttle, car1.throttle, alpha);
 
-  // 4. Smooth continuous wheel rotation
-  const wheelRadiusPx = 5.2;
-  const spinDelta = (curVelocity / wheelRadiusPx) * (delta / 0.030);
-  wheelSpinAngle -= spinDelta;
+  // 4. Wheel spin from interpolated ground distance / wheel radius (all four wheels)
+  if (prevCarWorldX !== null) {
+    const moved = Math.hypot(curX - prevCarWorldX, curZ - prevCarWorldZ);
+    const dir = curVelocity < 0 ? 1 : -1; // forward motion rolls the wheel forward
+    wheelSpinAngle += dir * (moved / CAR_WHEEL_RADIUS);
+  }
+  prevCarWorldX = curX; prevCarWorldZ = curZ;
 
+  // Front wheels yaw from steering_angle_deg telemetry (deg -> rad via world.js), not the action
   const steerRad = -envSteerToWorld(curSteerDeg);
   if (frontLeftSteerPivot) frontLeftSteerPivot.rotation.y = steerRad;
   if (frontRightSteerPivot) frontRightSteerPivot.rotation.y = steerRad;
@@ -3087,6 +2918,8 @@ function initEventHandlers() {
       toggleCinematicUIMode();
     } else if (e.key === "q" || e.key === "Q") {
       setGraphicsQuality(STATE.graphicsQuality === "high" ? "low" : "high");
+    } else if (e.key === "d" || e.key === "D") {
+      toggleDebugMode();
     } else if (e.key === "1") {
       setCameraMode("chase");
     } else if (e.key === "2") {
@@ -3110,6 +2943,18 @@ function buildDebugHelpers() {
   carAxesHelper.visible = false;
   carGroup.add(carAxesHelper);
 }
+
+// Debug overlay toggle (key D): axes + the 30x50 px physics-footprint wireframe.
+function toggleDebugMode() {
+  STATE.debugMode = !STATE.debugMode;
+  if (debugGroup) debugGroup.visible = STATE.debugMode;
+  if (trackAxesHelper) trackAxesHelper.visible = STATE.debugMode;
+  if (carAxesHelper) carAxesHelper.visible = STATE.debugMode;
+  if (carPhysicsFootprint) carPhysicsFootprint.visible = STATE.debugMode;
+  const btn = document.getElementById("btnDebugToggle");
+  if (btn) btn.style.display = STATE.debugMode ? "inline-flex" : "none";
+}
+window.toggleDebugMode = toggleDebugMode;
 
 // Render Stats Hook for Playwright E2E and Test Suites
 window.getRenderStats = function() {

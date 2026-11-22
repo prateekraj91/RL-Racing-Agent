@@ -94,10 +94,12 @@ def test_static_pbr_and_vendor_assets_delivery(client: TestClient):
     assert res_draco.status_code == 200
     assert "DRACOLoader" in res_draco.text
 
-    # Car 3D model asset
+    # The vehicle is a procedural, unbranded model (no external car.glb). The previous
+    # branded Ferrari car.glb was removed; it must NOT be served.
     res_car = client.get("/static/assets/models/car/car.glb")
-    assert res_car.status_code == 200
-    assert len(res_car.content) > 500000
+    assert res_car.status_code == 404
+    res_js = client.get("/static/app.js")
+    assert "buildProceduralVehicle" in res_js.text
 
 
 def test_checkpoint_c_features_and_dom_elements(client: TestClient):
@@ -135,4 +137,6 @@ def test_checkpoint_c_features_and_dom_elements(client: TestClient):
     assert res_lic.status_code == 200
     assert "Procedural Environment Props Architecture" in res_lic.text
     assert "THREE.InstancedMesh" in res_lic.text
-    assert "Tecpro" in res_lic.text
+    assert "Grandstand" in res_lic.text
+    # No branded vehicle model should be referenced any more.
+    assert "Ferrari 458" not in res_lic.text

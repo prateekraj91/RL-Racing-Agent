@@ -22,10 +22,12 @@ def shared_page(playwright: Playwright):
     browser = playwright.chromium.launch(headless=True)
     context = browser.new_context(viewport={"width": 1280, "height": 800})
     page = context.new_page()
-    page.goto(BASE_URL, wait_until="domcontentloaded", timeout=45000)
-    page.wait_for_selector("#threeCanvas", timeout=20000)
-    # Allow 1 second for initial startSimulation fetch to settle
-    time.sleep(1.0)
+    page.goto(BASE_URL, wait_until="domcontentloaded", timeout=60000)
+    # Generous timeout: headless WebGL init + the rollout fetch can be slow under the
+    # CPU contention of a full test run.
+    page.wait_for_selector("#threeCanvas", timeout=60000)
+    # Allow the initial startSimulation fetch to settle
+    time.sleep(1.5)
     yield page
     context.close()
     browser.close()
