@@ -477,6 +477,20 @@ let proceduralGrassTex = null;
 let proceduralGrassMacroTex = null;
 let proceduralBuildingTex = null;
 let proceduralAsphaltTex = null;
+let proceduralCrowdTex = null;
+
+// Speckled crowd texture for the grandstand (ported from concept main.js).
+function createProceduralCrowdTexture() {
+  return canvasTex(512, 64, (g, w, h) => {
+    g.fillStyle = "#2b2f36";
+    g.fillRect(0, 0, w, h);
+    const cols = ["#e64a3b", "#f2c14e", "#3b82f6", "#f5f5f5", "#22c55e", "#111", "#ff7a1a"];
+    for (let i = 0; i < 2600; i++) {
+      g.fillStyle = cols[(Math.random() * cols.length) | 0];
+      g.fillRect(Math.random() * w, Math.random() * h, 3, 4);
+    }
+  }, [6, 1]);
+}
 
 function loadPBRTextures() {
   const loader = new THREE.TextureLoader();
@@ -497,6 +511,7 @@ function loadPBRTextures() {
   proceduralGrassMacroTex = createGrassMacroTexture();
   proceduralAsphaltTex = createProceduralAsphaltTexture();
   proceduralBuildingTex = createProceduralBuildingTexture();
+  proceduralCrowdTex = createProceduralCrowdTexture();
   pbrTextures.groundDiff = proceduralGrassTex;
 }
 
@@ -600,6 +615,9 @@ function build3DTrack(trackData) {
 
   // 6. Start / finish checker line + gantry with glowing panel at the real start pose
   buildStartGantry(trackData);
+
+  // 6b. Grandstand + pit building along the start straight
+  buildGrandstand(trackData);
 
   // 7. Ground: huge grass plane receiving shadows (base), plus a low-frequency
   //    tonal overlay to break up texture tiling (concept "second scale").
@@ -1009,6 +1027,81 @@ function buildStartGantry(trackData) {
   panel.position.set(cx, postH - 0.5, cz);
   panel.rotation.y = -Math.atan2(tz, tx);
   trackGroup.add(panel);
+}
+
+// Grandstand + pit building along the start straight, built from the real start pose.
+function buildGrandstand(trackData) {
+  const inner = trackData.inner_boundary || [];
+  const outer = trackData.outer_boundary || [];
+  const bounds = trackData.bounds || { min_x: 100, max_x: 700, min_y: 100, max_y: 500 };
+  if (inner.length < 1 || outer.length < 1) return;
+  if (!isValidVector2(inner[0]) || !isValidVector2(outer[0])) return;
+
+  const center = envToWorld((bounds.min_x + bounds.max_x) / 2, (bounds.min_y + bounds.max_y) / 2);
+  const startOuter = envToWorld(outer[0][0], outer[0][1]);
+
+  // out = outward (away from track centre); fwd = along the track at the start.
+  let ox = startOuter.x - center.x, oz = startOuter.z - center.z;
+  const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+  const fx = -oz, fz = ox;
+  const ry = Math.atan2(-fz, fx); // aligns a box's local +X with fwd
+
+  const STAND_LEN = 260;
+
+  // --- Pit building: long white block + cyan light band, just outside the wall ---
+  const pit = new THREE.Mesh(
+    new THREE.BoxGeometry(STAND_LEN - 20, 18, 14),
+    new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.5, metalness: 0.05 })
+  );
+  const pitX = startOuter.x + ox * 52, pitZ = startOuter.z + oz * 52;
+  pit.position.set(pitX, 9, pitZ);
+  pit.rotation.y = ry;
+  pit.castShadow = true; pit.receiveShadow = true;
+  trackGroup.add(pit);
+
+  const band = new THREE.Mesh(
+    new THREE.BoxGeometry(STAND_LEN - 18, 3, 15),
+    new THREE.MeshStandardMaterial({ color: 0x0a0d12, emissive: 0x19c9ff, emissiveIntensity: 0.9 })
+  );
+  band.position.set(pitX, 19, pitZ);
+  band.rotation.y = ry;
+  trackGroup.add(band);
+
+  // --- Grandstand: tiered crowd rows + roof, further out ---
+  const standBase = { x: startOuter.x + ox * 110, z: startOuter.z + oz * 110 };
+  const crowdMat = new THREE.MeshStandardMaterial({ map: proceduralCrowdTex, roughness: 0.9 });
+  const concreteMat = new THREE.MeshStandardMaterial({ color: 0xd9dde2, roughness: 0.7 });
+  const ROWS = 6;
+  let topY = 0;
+  for (let r = 0; r < ROWS; r++) {
+    const h = 12 + r * 10;
+    topY = Math.max(topY, h);
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(STAND_LEN, h, 15), [concreteMat, concreteMat, concreteMat, concreteMat, crowdMat, concreteMat]);
+    seg.position.set(standBase.x + ox * (r * 13), h / 2, standBase.z + oz * (r * 13));
+    seg.rotation.y = ry;
+    seg.castShadow = true; seg.receiveShadow = true;
+    trackGroup.add(seg);
+  }
+  // Roof slab over the stand
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(STAND_LEN + 20, 4, 95),
+    new THREE.MeshStandardMaterial({ color: 0xeef1f4, roughness: 0.4, metalness: 0.3 })
+  );
+  const roofOut = (ROWS * 13) / 2;
+  roof.position.set(standBase.x + ox * roofOut, topY + 26, standBase.z + oz * roofOut);
+  roof.rotation.y = ry;
+  roof.castShadow = true;
+  trackGroup.add(roof);
+  // Roof support pillars at the front
+  const pillarMat = concreteMat;
+  for (let i = -1; i <= 1; i++) {
+    const px = standBase.x + fx * (i * STAND_LEN * 0.4);
+    const pz = standBase.z + fz * (i * STAND_LEN * 0.4);
+    const pil = new THREE.Mesh(new THREE.BoxGeometry(4, topY + 26, 4), pillarMat);
+    pil.position.set(px, (topY + 26) / 2, pz);
+    pil.castShadow = true;
+    trackGroup.add(pil);
+  }
 }
 
 // Coarse distance from an env-space point to the nearest centerline vertex (px).
