@@ -1829,6 +1829,131 @@ function updateCameraDirector(car, velocity, delta = 0.016) {
 }
 
 // ==============================================================================
+// Benchmark Mode (/demo?bench=1)
+// ==============================================================================
+
+const BENCH = { active: false, recording: false, samples: [], lastInfo: null };
+
+function percentile(sortedAsc, p) {
+  if (sortedAsc.length === 0) return 0;
+  const idx = Math.min(sortedAsc.length - 1, Math.floor((p / 100) * sortedAsc.length));
+  return sortedAsc[idx];
+}
+
+function summarizePhase(label, quality, samples, info) {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const n = sorted.length;
+  const sumMs = sorted.reduce((a, b) => a + b, 0);
+  const avgFps = n > 0 ? (1000 * n) / sumMs : 0;
+  const maxMs = n > 0 ? sorted[n - 1] : 0; // worst frame -> min fps
+  const minFps = maxMs > 0 ? 1000 / maxMs : 0;
+  return {
+    phase: label,
+    quality,
+    frames: n,
+    duration_s: +(sumMs / 1000).toFixed(2),
+    avg_fps: +avgFps.toFixed(1),
+    min_fps: +minFps.toFixed(1),
+    frame_time_ms: {
+      p50: +percentile(sorted, 50).toFixed(2),
+      p95: +percentile(sorted, 95).toFixed(2),
+      p99: +percentile(sorted, 99).toFixed(2),
+      max: +maxMs.toFixed(2),
+    },
+    renderer_info: info || null,
+  };
+}
+
+async function runBenchmark(durationMs = 20000) {
+  // Wait for the rollout to be ready.
+  const t0 = performance.now();
+  while ((!STATE.playback.rolloutData || !STATE.playback.rolloutData.steps) &&
+         performance.now() - t0 < 20000) {
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!STATE.playback.rolloutData) {
+    console.warn("[bench] rollout never loaded; aborting benchmark");
+    return;
+  }
+
+  BENCH.active = true;
+  setCameraMode("chase");
+
+  const phases = [
+    { label: "High quality", quality: "high" },
+    { label: "Low quality", quality: "low" },
+  ];
+  const results = [];
+
+  for (const ph of phases) {
+    setGraphicsQuality(ph.quality);
+    // Restart playback from the top for a comparable 20 s window.
+    STATE.playback.playhead = 0.0;
+    STATE.playback.lastStepIndex = -1;
+    STATE.playback.speed = 1.0;
+    STATE.playback.isPlaying = true;
+    STATE.simRunning = true;
+
+    showBenchOverlay(`Recording ${ph.label}… (${durationMs / 1000}s)`, results);
+    // Let the quality switch settle before recording.
+    await new Promise((r) => setTimeout(r, 600));
+    BENCH.samples = [];
+    BENCH.lastInfo = null;
+    if (renderer && renderer.info) renderer.info.autoReset = false;
+    BENCH.recording = true;
+    await new Promise((r) => setTimeout(r, durationMs));
+    BENCH.recording = false;
+    if (renderer && renderer.info) renderer.info.autoReset = true;
+
+    results.push(summarizePhase(ph.label, ph.quality, BENCH.samples, BENCH.lastInfo));
+    showBenchOverlay("Benchmark running…", results);
+  }
+
+  BENCH.active = false;
+  STATE.playback.isPlaying = false;
+
+  const payload = {
+    benchmark: "rl-racing-lab chase cam",
+    seed: STATE.trackSeed,
+    preset: STATE.presetId,
+    viewport: [window.innerWidth, window.innerHeight],
+    device_pixel_ratio: window.devicePixelRatio || 1,
+    results,
+  };
+  console.log("[bench] RESULTS JSON:\n" + JSON.stringify(payload, null, 2));
+  window.__benchResults = payload;
+  showBenchOverlay("Benchmark complete — results below (also logged to console)", results, true);
+}
+
+function showBenchOverlay(status, results, done) {
+  let el = document.getElementById("benchOverlay");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "benchOverlay";
+    el.style.cssText =
+      "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;" +
+      "background:rgba(9,13,20,0.92);border:1px solid rgba(140,200,255,0.25);border-radius:12px;" +
+      "padding:16px 20px;color:#e8eef6;font:13px/1.5 'DejaVu Sans Mono',monospace;min-width:460px;" +
+      "box-shadow:0 10px 40px rgba(0,0,0,0.5);backdrop-filter:blur(8px)";
+    document.body.appendChild(el);
+  }
+  const rows = results.map((r) => {
+    const i = r.renderer_info || {};
+    return (
+      `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.12)">` +
+      `<b style="color:#67e3ff">${r.phase} (${r.quality})</b><br>` +
+      `avg fps <b>${r.avg_fps}</b> &nbsp; min fps <b>${r.min_fps}</b> &nbsp; frames ${r.frames}<br>` +
+      `frame time ms — p50 ${r.frame_time_ms.p50} · p95 ${r.frame_time_ms.p95} · p99 ${r.frame_time_ms.p99} · max ${r.frame_time_ms.max}<br>` +
+      `draws ${i.draw_calls ?? "–"} · tris ${i.triangles ?? "–"} · tex ${i.textures ?? "–"} · geo ${i.geometries ?? "–"}` +
+      `</div>`
+    );
+  });
+  el.innerHTML =
+    `<div style="color:${done ? "#5ff2b5" : "#ffd27a"};font-weight:700;letter-spacing:.04em">${status}</div>` +
+    rows.join("");
+}
+
+// ==============================================================================
 // Animation Loop & Render Pipeline (Non-Blocking Startup)
 // ==============================================================================
 
@@ -1849,7 +1974,24 @@ function animate(currentTime) {
   requestAnimationFrame(animate);
 
   const delta = Math.min(Math.max((currentTime - lastFrameTime) * 0.001, 0.0001), 0.1);
+  const rawFrameMs = currentTime - lastFrameTime;
   lastFrameTime = currentTime;
+
+  // Benchmark sampler (see runBenchmark): record real frame time + renderer.info.
+  // info.autoReset is disabled during recording so totals accumulate across all
+  // composer passes for the frame; we read the previous frame's totals, then reset.
+  if (BENCH.recording && rawFrameMs > 0 && rawFrameMs < 2000) {
+    BENCH.samples.push(rawFrameMs);
+    if (renderer && renderer.info) {
+      BENCH.lastInfo = {
+        draw_calls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+        textures: renderer.info.memory.textures,
+        geometries: renderer.info.memory.geometries,
+      };
+      renderer.info.reset();
+    }
+  }
 
   frameCount++;
   if (currentTime - lastFpsUpdate >= 500) {
@@ -1866,13 +2008,19 @@ function animate(currentTime) {
     const stepDelta = (delta / STATE.playback.nominalDt) * STATE.playback.speed;
     STATE.playback.playhead += stepDelta;
     if (STATE.playback.playhead >= STATE.playback.maxStep) {
-      STATE.playback.playhead = STATE.playback.maxStep;
-      STATE.playback.isPlaying = false;
-      STATE.simRunning = false;
-      const startIcon = document.getElementById("startIcon");
-      if (startIcon) startIcon.innerText = "↺";
-      updateStatusPill("COMPLETED", "green");
-      showPostLapModal();
+      if (BENCH.active) {
+        // Loop the rollout continuously during benchmarking.
+        STATE.playback.playhead = 0.0;
+        STATE.playback.lastStepIndex = -1;
+      } else {
+        STATE.playback.playhead = STATE.playback.maxStep;
+        STATE.playback.isPlaying = false;
+        STATE.simRunning = false;
+        const startIcon = document.getElementById("startIcon");
+        if (startIcon) startIcon.innerText = "↺";
+        updateStatusPill("COMPLETED", "green");
+        showPostLapModal();
+      }
     }
   }
 
@@ -2914,4 +3062,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Initiate simulation rollout asynchronously in background without blocking render loop
   startSimulation(STATE.presetId, STATE.trackSeed);
+
+  // Benchmark mode: /demo?bench=1 records 20s at High then Low in chase cam.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("bench") === "1") {
+      runBenchmark(20000);
+    }
+  } catch (e) { /* no-op */ }
 });
