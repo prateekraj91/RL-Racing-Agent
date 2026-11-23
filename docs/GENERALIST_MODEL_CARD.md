@@ -73,7 +73,7 @@ An exhaustive audit of all 156 candidate checkpoints in `models/` and `runs/` wa
 1. `s[0]` — Forward Velocity: $v \in [-2.0, 4.0]\text{ px/step}$
 2. `s[1]` — Heading Error: $\theta_{\text{err}} \in [-180.0^\circ, 180.0^\circ]$ (relative to nearest track tangent)
 3. `s[2]` — Signed Centerline Distance: $d_{\text{center}} \in (-\infty, \infty)\text{ px}$
-4. `s[3]` — Tire Slip Indicator: $\beta_{\text{slip}} = 0.0$ (during standard kinematic rolling)
+4. `s[3]` — Slip channel: kinematic yaw-rate echo, computed each step (equals −Δheading), not tyre slip. *(Corrected after the independent audit, `docs/evaluation/BIC_INDEPENDENT_AUDIT.md` Q6; previously described as 0.0.)*
 5. `s[4]` — Left Lateral Ray: $-90.0^\circ$ (range $[0.0, 1.0]$, max distance $200.0\text{ px}$)
 6. `s[5]` — Left Diagonal Ray: $-45.0^\circ$ (range $[0.0, 1.0]$, max distance $200.0\text{ px}$)
 7. `s[6]` — Center Forward Ray: $0.0^\circ$ (range $[0.0, 1.0]$, max distance $200.0\text{ px}$)
