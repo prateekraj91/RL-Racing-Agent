@@ -45,6 +45,9 @@ Continuous SAC with automatic entropy temperature; actor MLP 9→128→128→(me
 ### 2.5 API and tests
 FastAPI service in `inference/` loads the frozen weights with strict integrity checking and the same `SACActor` class as training (parity is a stated contract; the audit re-confirmed `obs_dim = 9`, `tanh(mean)`, strict weight load, no normalisation). Endpoints: `/health`, `/predict`, `/predict/batch`, `/simulation/{tracks,start,step,rollout,reset,state}`, `/simulation/historical-saliency`, `/recorded/bic`; API changes are additive-only. `/simulation/rollout` is cached by request, rate-limited per IP and capped at 1000 steps. The public demo is a static Hugging Face Space serving recorded BIC/grip runs and precomputed seed 1001–1005 rollouts (no live API). The `tests/` suite covers the model contract, API, recorded BIC data, importer, grip-eval data and static build; targeted test results are in §9.
 
+![Live demo screenshot](figures/fig6_live_demo_screenshot.png)
+*Figure 6. The demo's recorded BIC playback (chase camera, step 472 of 7,521). All values are raw simulator output in px, px/step and degrees; the km/h line is labelled "assumes 60 steps/s".*
+
 ---
 
 ## 3. Training and generalisation results
