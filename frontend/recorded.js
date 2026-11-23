@@ -11,7 +11,7 @@
   const NA = "not recorded";
   let REC = null; // { meta, cols }
   // Optional experiment run (?source=bic&run=bic_g1p0 | std_g0p8 ...). Same honest-unit rules as BIC playback.
-  const RUN = (() => { try { return new URLSearchParams(window.location.search).get("run") || ""; } catch (e) { return ""; } })();
+  let RUN = (() => { try { return new URLSearchParams(window.location.search).get("run") || ""; } catch (e) { return ""; } })();
   const RUN_TAG = { off: "grip OFF (baseline)", g0p8: "grip limit 0.8 G", g1p0: "grip limit 1.0 G", g1p2: "grip limit 1.2 G" };
   const runLabel = () => { const [k, t] = RUN.split("_"); return `EXPERIMENT — ${RUN_TAG[t] || RUN}${k === "std" ? " (standard track)" : ""}`; };
   const isGrip = () => !!RUN;
@@ -66,6 +66,7 @@
   }
 
   function buildHud(m) {
+    const old = $("recordedHud"); if (old) old.remove();
     const hud = document.createElement("div");
     hud.id = "recordedHud"; hud.className = "recorded-hud";
     hud.innerHTML = `
@@ -210,7 +211,9 @@
     buildHud(m);
     setupSpeedPills();
     const mini = $("raceCanvas");
-    if (mini) {
+    const oldPanel = $("recordedMinimap");
+    if (oldPanel) { const t0 = oldPanel.querySelector(".rh-title"); if (t0) t0.textContent = m.track_kind === "std" ? "STANDARD TRACK · seed 1001" : "CIRCUIT · T1 / T6 / T8 = tightest"; }
+    else if (mini) {
       const panel = document.createElement("div");
       panel.id = "recordedMinimap"; panel.className = "recorded-minimap";
       panel.innerHTML = `<div class="rh-title">${m.track_kind === "std" ? "STANDARD TRACK · seed 1001" : "CIRCUIT · T1 / T6 / T8 = tightest"}</div>`;
@@ -237,6 +240,7 @@
     }
     hideLoadingOverlay();
     updateStatusPill("READY (RECORDED RUN LOADED)", "cyan");
+    window.dispatchEvent(new CustomEvent("recorded-loaded", { detail: { run: RUN } }));
     // Landing page (/demo with no query): start BIC playback automatically in the chase cam.
     if (!window.location.search) {
       STATE.playback.isPlaying = true; STATE.simRunning = true;
@@ -244,6 +248,14 @@
       updateStatusPill("RUNNING", "green");
     }
   }
+
+  // Re-load a recorded run in place (tour mode): window.recordedLoad("" | "bic_g1p0" | ...)
+  window.recordedLoad = async function (run) {
+    RUN = run || "";
+    STATE.source = "bic";
+    setBadge();
+    await loadRecordedBIC();
+  };
 
   window.addEventListener("DOMContentLoaded", () => {
     setBadge();

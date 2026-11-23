@@ -2115,7 +2115,7 @@ function animate(currentTime) {
         const startIcon = document.getElementById("startIcon");
         if (startIcon) startIcon.innerText = "↺";
         updateStatusPill("COMPLETED", "green");
-        showPostLapModal();
+        if (!window.__tourNoModal) showPostLapModal();
       }
     }
   }
