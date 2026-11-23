@@ -1059,3 +1059,31 @@ html, body {
   border-radius: 3px;
   flex: 0 0 auto;
 }
+
+/* ---- Data-source badge + recorded playback (BIC) ---- */
+.source-bar { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; gap: 12px; align-items: center; pointer-events: auto; }
+.source-badge { font: 700 12px/1 "DejaVu Sans Mono", monospace; letter-spacing: .08em; padding: 7px 14px; border-radius: 999px; border: 1px solid; }
+.source-badge.live { color: #5dffa0; background: rgba(10,40,24,.72); border-color: rgba(93,255,160,.55); }
+.source-badge.recorded { color: #ffd23f; background: rgba(60,38,0,.78); border-color: #ff9f1c; box-shadow: 0 0 14px rgba(255,159,28,.35); }
+.source-switch { font: 11px "DejaVu Sans Mono", monospace; color: #8fa3b8; text-decoration: none; }
+.source-switch:hover { color: #fff; }
+.recorded-hud { position: fixed; left: 16px; top: 100px; width: 270px; z-index: 40; padding: 10px 12px; background: rgba(8,12,18,.72); border: 1px solid rgba(255,159,28,.35); border-radius: 12px; backdrop-filter: blur(8px); font: 12px "DejaVu Sans Mono", monospace; color: #cfe0f0; }
+.rh-title { font-weight: 700; letter-spacing: .08em; color: #ffb02e; margin-bottom: 8px; font-size: 11px; }
+.rh-row { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.rh-row span { color: #8fa3b8; } .rh-row b { color: #e8f4ff; font-weight: 600; text-align: right; }
+.rh-row.na b { color: #7b8794; font-style: italic; font-weight: 400; }
+.rh-row.sec span, .rh-row.sec b { font-size: 10.5px; color: #9aa9b8; }
+.rh-note { font-size: 10px; color: #8a97a6; margin: 2px 0 4px; line-height: 1.35; }
+.rh-note.wide { flex: 1; text-align: left; margin-right: 12px; }
+.rh-sep { height: 1px; background: rgba(255,255,255,.08); margin: 6px 0; }
+.rh-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.1); margin: 6px 0 4px; overflow: hidden; }
+.rh-bar > div { height: 100%; width: 0; background: linear-gradient(90deg,#ff9f1c,#ffd23f); }
+.recorded-minimap { position: fixed; left: 16px; bottom: 84px; z-index: 40; padding: 8px 10px; background: rgba(8,12,18,.72); border: 1px solid rgba(255,159,28,.35); border-radius: 12px; }
+.recorded-minimap canvas { display: block; }
+body.recorded-source .concept-engineer-card { display: none; }
+body.recorded-source .post-lap-kpi-row { grid-template-columns: repeat(5, 1fr); }
+body.recorded-source .post-lap-footer { display: flex; align-items: center; }
+.rh-note.na { font-style: italic; margin-top: 6px; }
+
+.concept-step-display, .brand-title, .policy-badge, .concept-camera-switcher { white-space: nowrap; }
+.concept-top-bar { flex-wrap: nowrap; }

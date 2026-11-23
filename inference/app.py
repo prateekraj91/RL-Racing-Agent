@@ -361,6 +361,22 @@ def get_historical_saliency_endpoint() -> dict:
     }
 
 
+@app.get(
+    "/recorded/bic",
+    summary="Recorded BIC evaluation run (read-only)",
+    description="Serves the saved BIC evaluation CSV + exact track geometry for recorded playback. "
+    "Never runs the policy or the environment.",
+)
+def get_recorded_bic_endpoint() -> dict:
+    """Return the saved BIC run verbatim (additive endpoint)."""
+    from inference.recorded import load_bic_recorded
+
+    try:
+        return load_bic_recorded()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Recorded BIC data missing: {exc}")
+
+
 # ==============================================================================
 # Static Frontend Delivery
 # ==============================================================================

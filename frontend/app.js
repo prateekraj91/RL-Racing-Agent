@@ -7,7 +7,14 @@
 // State & Configuration
 // ==============================================================================
 
+// Data source: "live" (policy rollout via API) or "bic" (recorded BIC evaluation CSV; no API calls).
+const SOURCE = (() => {
+  try { return new URLSearchParams(window.location.search).get("source") === "bic" ? "bic" : "live"; }
+  catch (e) { return "live"; }
+})();
+
 const STATE = {
+  source: SOURCE,
   activeCameraMode: "chase", // chase | cockpit | orbit | overhead
   simRunning: false,
   simSpeed: 2,
@@ -643,9 +650,10 @@ function build3DTrack(trackData) {
 
   // 7. Ground: huge grass plane receiving shadows (base), plus a low-frequency
   //    tonal overlay to break up texture tiling (concept "second scale").
-  const groundGeo = new THREE.PlaneGeometry(16000, 16000);
+  const GROUND = Math.max(16000, (Math.hypot(bounds.max_x - bounds.min_x, bounds.max_y - bounds.min_y) || 0) * 2.2);
+  const groundGeo = new THREE.PlaneGeometry(GROUND, GROUND);
   groundGeo.rotateX(-Math.PI / 2);
-  if (proceduralGrassTex) proceduralGrassTex.repeat.set(120, 120);
+  if (proceduralGrassTex) proceduralGrassTex.repeat.set(120 * GROUND / 16000, 120 * GROUND / 16000);
   const groundMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: proceduralGrassTex || pbrTextures.groundDiff,
@@ -659,7 +667,7 @@ function build3DTrack(trackData) {
   trackGroup.add(groundPlaneMesh);
 
   if (proceduralGrassMacroTex) {
-    const macroGeo = new THREE.PlaneGeometry(16000, 16000);
+    const macroGeo = new THREE.PlaneGeometry(GROUND, GROUND);
     macroGeo.rotateX(-Math.PI / 2);
     const macroMat = new THREE.MeshBasicMaterial({
       map: proceduralGrassMacroTex,
@@ -1186,10 +1194,12 @@ function buildEnvironmentProps(trackData) {
   // Gather tree placements OUTSIDE the corridor (>=150 px from centerline),
   // scattered outward from the outer boundary so the infield stays open.
   const trees = []; // { x, z, scale, rotY, round }
-  const MAX_TREES = 620;
-  for (let i = 0; i < n && trees.length < MAX_TREES; i++) {
+  const LARGE = !!trackData.large_circuit; // BIC: ~5 km lap, 5,131 boundary points
+  const MAX_TREES = LARGE ? 1500 : 620;
+  const stride = LARGE ? Math.max(1, Math.floor(n / (MAX_TREES / 3))) : 1;
+  for (let i = 0; i < n && trees.length < MAX_TREES; i += stride) {
     const pt = outerPts[i];
-    const nextPt = outerPts[(i + 1) % n];
+    const nextPt = outerPts[(i + stride) % n];
     if (!isValidVector2(pt) || !isValidVector2(nextPt)) continue;
 
     const dx = nextPt[0] - pt[0];
@@ -1260,10 +1270,10 @@ function buildEnvironmentProps(trackData) {
   }
 
   // Distant City Skyline Skyscrapers on Horizon (depth / backdrop)
-  buildDistantCitySkyline();
+  buildDistantCitySkyline(trackData);
 }
 
-function buildDistantCitySkyline() {
+function buildDistantCitySkyline(trackData) {
   // Pale, self-lit blue-grey towers so they read as a soft hazy skyline even when
   // back-lit; pushed far out and fogged, they sit low behind the tree line.
   const buildingMat = new THREE.MeshStandardMaterial({
@@ -1277,7 +1287,8 @@ function buildDistantCitySkyline() {
     envMapIntensity: 0.6,
   });
 
-  const COUNT = 80;
+  const LARGE = !!(trackData && trackData.large_circuit);
+  const COUNT = LARGE ? 160 : 80;
   const dummy = new THREE.Object3D();
   const towerGeo = new THREE.BoxGeometry(1, 1, 1);
   const towerMesh = new THREE.InstancedMesh(towerGeo, buildingMat, COUNT);
@@ -1292,16 +1303,41 @@ function buildDistantCitySkyline() {
 
   for (let i = 0; i < COUNT; i++) {
     // Bias the cluster toward the far side, with some all around.
-    const angle = (i < 56)
-      ? (-2.4 + rnd() * 2.2)              // back arc
-      : (rnd() * Math.PI * 2);           // scattered
-    const dist = 3300 + rnd() * 2500;    // 3300–5800 world units (far, fogged, behind trees)
-    const x = Math.cos(angle) * dist;
-    const z = Math.sin(angle) * dist;
+    let x, z;
+    let sizeK = 1;
+    if (LARGE) {
+      // Large circuit: towers ring the lap, 1.2-2.4 km outside random centerline points
+      // (fixed-seed RNG), and are rejected if they would crowd any other part of the track.
+      const cl = trackData.centerline;
+      let ok = false;
+      for (let tries = 0; tries < 40 && !ok; tries++) {
+        const ci = Math.floor(rnd() * cl.length);
+        const a = cl[ci], b = cl[(ci + 7) % cl.length];
+        const dl = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        let nx = -(b[1] - a[1]) / dl, ny = (b[0] - a[0]) / dl;
+        const bnd = trackData.bounds;
+        const mx = (bnd.min_x + bnd.max_x) / 2, my = (bnd.min_y + bnd.max_y) / 2;
+        if ((a[0] - mx) * nx + (a[1] - my) * ny < 0) { nx = -nx; ny = -ny; }
+        const off = 1500 + rnd() * 1300;
+        const ex = a[0] + nx * off, ey = a[1] + ny * off;
+        if (trackDistEnv(cl, ex, ey) < 900) continue;
+        const w = envToWorld(ex, ey);
+        x = w.x; z = w.z; ok = true;
+      }
+      if (!ok) { x = 1e5; z = 1e5; } // parked far away; never near the track
+      sizeK = 1.0;
+    } else {
+      const angle = (i < 56)
+        ? (-2.4 + rnd() * 2.2)              // back arc
+        : (rnd() * Math.PI * 2);           // scattered
+      const dist = 3300 + rnd() * 2500;    // 3300–5800 world units (far, fogged, behind trees)
+      x = Math.cos(angle) * dist;
+      z = Math.sin(angle) * dist;
+    }
 
-    const bW = 110 + rnd() * 200;
-    const bD = 110 + rnd() * 200;
-    const bH = 120 + rnd() * 460;        // 120–580 (lower, so they sit near the tree line)
+    const bW = (110 + rnd() * 200) * sizeK;
+    const bD = (110 + rnd() * 200) * sizeK;
+    const bH = (120 + rnd() * 460) * sizeK; // 120–580 (lower, so they sit near the tree line)
 
     dummy.position.set(x, bH / 2 - 2, z);
     dummy.rotation.set(0, rnd() * 0.6, 0);
@@ -1764,7 +1800,10 @@ function desiredCameraPose(mode, carPos, delta) {
     return {
       pos: new THREE.Vector3(c.x, height, c.z),
       target: new THREE.Vector3(c.x, 0, c.z),
-      fov: fovV, up: new THREE.Vector3(0, 0, -1), near: 20, useControls: false,
+      // Very high camera (large circuit): raise near so the 24-bit depth buffer can still
+      // separate ground / runoff / asphalt (0.4-1.0 apart); standard tracks keep near = 20.
+      fov: fovV, up: new THREE.Vector3(0, 0, -1), near: height > 3000 ? height * 0.4 : 20,
+      far: Math.max(9000, height * 1.6), useControls: false,
     };
   }
   if (mode === "orbit") {
@@ -1790,8 +1829,10 @@ function updateCameraDirector(car, velocity, delta = 0.016) {
   const carPos = carGroup.position;
   const d = desiredCameraPose(STATE.activeCameraMode, carPos, delta);
 
-  if (camera.near !== d.near) {
+  const wantFar = d.far || 9000; // overhead on a large circuit needs a deeper far plane
+  if (camera.near !== d.near || camera.far !== wantFar) {
     camera.near = d.near;
+    camera.far = wantFar;
     camera.updateProjectionMatrix();
   }
 
@@ -2218,6 +2259,8 @@ function renderPlaybackFrame(playhead, delta = 0.016) {
       renderRadarMinimap(STATE.trackData, interpolatedVehicle);
     }
   }
+
+  if (STATE.source === "bic" && window.recordedHudUpdate) window.recordedHudUpdate(baseIdx, alpha);
 }
 
 // ==============================================================================
@@ -2428,6 +2471,17 @@ function renderRadarMinimap(trackData, car) {
     ctx.strokeStyle = "rgba(0, 240, 255, 0.4)";
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  // Corner markers (recorded circuit: T1/T6/T8 = tightest corners from the audit)
+  if (trackData.markers) {
+    ctx.font = "bold 11px DejaVu Sans Mono, monospace";
+    trackData.markers.forEach((m) => {
+      const p = toScreen(m.x, m.y);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffb02e"; ctx.fill();
+      ctx.fillStyle = "#ffd98a"; ctx.fillText(m.label, p.x + 7, p.y + 4);
+    });
   }
 
   // Draw Car Marker
@@ -2743,6 +2797,7 @@ function showPostLapModal() {
 
   const rollout = STATE.playback.rolloutData;
   if (!rollout || !rollout.steps) return;
+  if (STATE.source === "bic" && window.recordedPostLap) { window.recordedPostLap(); drawLapCircuitSpeedMap(); drawLapTraces(); return; }
   const st = computeLapStats(rollout.steps);
 
   const setKpi = (id, val, unit) => {
@@ -3138,7 +3193,8 @@ window.addEventListener("DOMContentLoaded", () => {
   startAnimationLoop();
 
   // Initiate simulation rollout asynchronously in background without blocking render loop
-  startSimulation(STATE.presetId, STATE.trackSeed);
+  // Recorded source (?source=bic) never starts a live rollout: recorded.js loads the saved run.
+  if (STATE.source !== "bic") startSimulation(STATE.presetId, STATE.trackSeed);
 
   // Benchmark mode: /demo?bench=1 records 20s at High then Low in chase cam.
   try {
