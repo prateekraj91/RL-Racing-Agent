@@ -2745,16 +2745,62 @@ function updateCinematicBottomHud(car) {
 // Post-Lap Analysis Modal (Matching reference_40s.png)
 // ==============================================================================
 
+// Compute post-lap KPIs from the REAL rollout step telemetry (not the live session's
+// 300-step window), matching the concept's "computed from logged telemetry".
+function computeLapStats(steps) {
+  const half = (STATE.trackData && STATE.trackData.half_width) || 35.0;
+  let vSum = 0, vMax = 0, brake = 0, depart = 0, devSum = 0, steerDeltaSum = 0;
+  let prevSteer = null;
+  for (let i = 0; i < steps.length; i++) {
+    const v = steps[i].vehicle || {};
+    const t = steps[i].telemetry || {};
+    const vel = v.velocity || 0;
+    vSum += vel; if (vel > vMax) vMax = vel;
+    const thr = (steps[i].action && steps[i].action[1] !== undefined) ? steps[i].action[1] : (v.throttle || 0);
+    if (thr < -0.05) brake++;
+    const dev = Math.abs(t.signed_distance || 0);
+    devSum += dev;
+    if (dev > half) depart++;
+    const st = v.steering_angle_deg || 0;
+    if (prevSteer !== null) steerDeltaSum += Math.abs(st - prevSteer);
+    prevSteer = st;
+  }
+  const n = steps.length || 1;
+  const crashed = !!(STATE.playback.rolloutData && STATE.playback.rolloutData.session &&
+    STATE.playback.rolloutData.session.is_crashed);
+  return {
+    lapSteps: STATE.playback.maxStep,
+    avgSpeed: vSum / n,
+    maxSpeed: vMax,
+    departures: depart,
+    collisions: crashed ? 1 : 0,
+    brakingPct: (brake / n) * 100,
+    avgLatDev: devSum / n,
+    steerDelta: steerDeltaSum / Math.max(1, n - 1),
+  };
+}
+
 function showPostLapModal() {
   const overlay = document.getElementById("canvasOverlay");
   if (!overlay) return;
   overlay.style.display = "flex";
 
   const rollout = STATE.playback.rolloutData;
-  if (!rollout) return;
+  if (!rollout || !rollout.steps) return;
+  const st = computeLapStats(rollout.steps);
 
-  const lapTimeEl = document.getElementById("kpiLapTime");
-  if (lapTimeEl) lapTimeEl.innerHTML = `${STATE.playback.maxStep} <span class="kpi-unit">steps</span>`;
+  const setKpi = (id, val, unit) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = unit ? `${val} <span class="kpi-unit">${unit}</span>` : `${val}`;
+  };
+  setKpi("kpiLapTime", st.lapSteps, "steps");
+  setKpi("kpiAvgSpeed", st.avgSpeed.toFixed(2), "px/st");
+  setKpi("kpiMaxSpeed", st.maxSpeed.toFixed(2), "px/st");
+  setKpi("kpiDepartures", st.departures);
+  setKpi("kpiCollisions", st.collisions);
+  setKpi("kpiBraking", st.brakingPct.toFixed(1), "%");
+  setKpi("kpiLatDev", st.avgLatDev.toFixed(1), "px");
+  setKpi("kpiSteerDelta", st.steerDelta.toFixed(2) + "°");
 
   drawLapCircuitSpeedMap();
   drawLapTraces();
@@ -2765,40 +2811,41 @@ function hidePostLapModal() {
   if (overlay) overlay.style.display = "none";
 }
 
+// Speed-along-the-lap map: the REAL driven path coloured by REAL speed (red slow -> cyan fast).
 function drawLapCircuitSpeedMap() {
   const canvas = document.getElementById("lapCircuitCanvas");
-  if (!canvas || !STATE.trackData) return;
+  const rollout = STATE.playback.rolloutData;
+  if (!canvas || !STATE.trackData || !rollout || !rollout.steps) return;
   const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  const centerPts = STATE.trackData.centerline || [];
-  if (centerPts.length < 4) return;
-
   const bounds = STATE.trackData.bounds || { min_x: 100, max_x: 700, min_y: 100, max_y: 500 };
-  const scale = Math.min((w - 40) / (bounds.max_x - bounds.min_x), (h - 40) / (bounds.max_y - bounds.min_y));
+  const pad = 22;
+  const scale = Math.min((w - 2 * pad) / (bounds.max_x - bounds.min_x), (h - 2 * pad) / (bounds.max_y - bounds.min_y));
+  const ox = (w - scale * (bounds.max_x - bounds.min_x)) / 2;
+  const oz = (h - scale * (bounds.max_y - bounds.min_y)) / 2;
+  const toScreen = (x, y) => ({ x: ox + (x - bounds.min_x) * scale, y: oz + (y - bounds.min_y) * scale });
 
-  function toScreen(x, y) {
-    return {
-      x: 20 + (x - bounds.min_x) * scale,
-      y: 20 + (y - bounds.min_y) * scale,
-    };
+  // Faint full centreline underlay
+  const cl = STATE.trackData.centerline || [];
+  if (cl.length > 2) {
+    ctx.beginPath();
+    cl.forEach((p, i) => { const s = toScreen(p[0], p[1]); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); });
+    ctx.closePath();
+    ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 10; ctx.lineCap = "round"; ctx.stroke();
   }
 
-  // Draw colorful circuit with speed gradient
-  for (let i = 0; i < centerPts.length - 1; i++) {
-    const p1 = toScreen(centerPts[i][0], centerPts[i][1]);
-    const p2 = toScreen(centerPts[i + 1][0], centerPts[i + 1][1]);
-
-    const frac = i / centerPts.length;
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = frac > 0.4 && frac < 0.6 ? "#ff2a5f" : "#00f0ff";
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.stroke();
+  const steps = rollout.steps;
+  const VLO = 2.2, VHI = 4.0;
+  ctx.lineWidth = 6; ctx.lineCap = "round";
+  for (let i = 1; i < steps.length; i++) {
+    const a = steps[i - 1].vehicle, b = steps[i].vehicle;
+    if (!a || !b) continue;
+    const p0 = toScreen(a.x, a.y), p1 = toScreen(b.x, b.y);
+    const u = Math.min(1, Math.max(0, (b.velocity - VLO) / (VHI - VLO)));
+    ctx.strokeStyle = `hsl(${(u * 190).toFixed(0)},90%,${(55 - u * 5).toFixed(0)}%)`;
+    ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
   }
 }
 
@@ -2806,46 +2853,56 @@ function drawLapTraces() {
   const rollout = STATE.playback.rolloutData;
   if (!rollout || !rollout.steps) return;
   const steps = rollout.steps;
+  const nS = steps.length;
+  const thrOf = (s) => (s.action && s.action[1] !== undefined) ? s.action[1] : ((s.vehicle && s.vehicle.throttle) || 0);
 
-  // Speed Trace
+  // Speed trace with braking zones shaded (where longitudinal action < 0).
   const speedCanvas = document.getElementById("lapSpeedTraceCanvas");
   if (speedCanvas) {
     const ctx = speedCanvas.getContext("2d");
-    const w = speedCanvas.width;
-    const h = speedCanvas.height;
+    const w = speedCanvas.width, h = speedCanvas.height;
     ctx.clearRect(0, 0, w, h);
-
+    ctx.fillStyle = "rgba(255,255,255,0.03)"; ctx.fillRect(0, 0, w, h);
+    // braking-zone shading
+    ctx.fillStyle = "rgba(255,77,77,0.16)";
+    for (let i = 0; i < nS; i++) {
+      if (thrOf(steps[i]) < -0.05) ctx.fillRect((i / nS) * w, 0, w / nS + 1, h);
+    }
+    // gridlines
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
+    for (let g = 1; g < 4; g++) { ctx.beginPath(); ctx.moveTo(0, (h * g) / 4); ctx.lineTo(w, (h * g) / 4); ctx.stroke(); }
+    // speed line (2..4.2)
+    const lo = 2, hi = 4.2;
     ctx.beginPath();
     steps.forEach((s, i) => {
-      const x = (i / steps.length) * w;
-      const y = h - (s.vehicle.velocity / 4.0) * (h - 10) - 5;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      const x = (i / nS) * w;
+      const y = h - ((s.vehicle.velocity - lo) / (hi - lo)) * (h - 8) - 4;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     });
-    ctx.strokeStyle = "#00f0ff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.strokeStyle = "#67e3ff"; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.font = "11px DejaVu Sans Mono, monospace"; ctx.fillStyle = "#8fa3b8";
+    ctx.fillText(hi.toString(), 5, 13); ctx.fillText(lo.toString(), 5, h - 5);
   }
 
-  // Steering Trace
+  // Steering-angle trace.
   const steerCanvas = document.getElementById("lapSteerTraceCanvas");
   if (steerCanvas) {
     const ctx = steerCanvas.getContext("2d");
-    const w = steerCanvas.width;
-    const h = steerCanvas.height;
+    const w = steerCanvas.width, h = steerCanvas.height;
     ctx.clearRect(0, 0, w, h);
-
+    ctx.fillStyle = "rgba(255,255,255,0.03)"; ctx.fillRect(0, 0, w, h);
     const centerY = h / 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, centerY); ctx.lineTo(w, centerY); ctx.stroke();
     ctx.beginPath();
     steps.forEach((s, i) => {
-      const x = (i / steps.length) * w;
-      const y = centerY - (s.vehicle.steering_angle_deg / 30.0) * (centerY - 6);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      const x = (i / nS) * w;
+      const y = centerY - (s.vehicle.steering_angle_deg / 32.0) * (centerY - 6);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     });
-    ctx.strokeStyle = "#ffb700";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.strokeStyle = "#ffb02e"; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.font = "11px DejaVu Sans Mono, monospace"; ctx.fillStyle = "#8fa3b8";
+    ctx.fillText("32", 5, 13); ctx.fillText("-32", 5, h - 5);
   }
 }
 
