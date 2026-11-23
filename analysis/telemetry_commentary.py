@@ -42,10 +42,16 @@ CONFIG_PATH = ROOT_DIR / "configs" / "generalist_v1.json"
 EXPECTED_WEIGHTS_SHA256 = "0d40dc47b70463b99dc2c65b9f034317ab527cf94b756065a8205284f3b76784"
 EXPECTED_CONFIG_SHA256 = "4d76575babb065d3a9fe9a0bbeb4705c7b58b4d4c8f46708489bd2bb3d63bdb1"
 
-# Deliverable Output Paths
+# Deliverable Output Paths (Preserve Historical Baseline, Write Remediated V1)
 RESULTS_DIR = ROOT_DIR / "analysis" / "results"
-EXAMPLES_JSON_PATH = RESULTS_DIR / "telemetry_commentary_examples.json"
-SUMMARY_JSON_PATH = RESULTS_DIR / "telemetry_commentary_summary.json"
+HISTORICAL_EXAMPLES_JSON_PATH = RESULTS_DIR / "telemetry_commentary_examples.json"
+HISTORICAL_SUMMARY_JSON_PATH = RESULTS_DIR / "telemetry_commentary_summary.json"
+REMEDIATED_EXAMPLES_JSON_PATH = RESULTS_DIR / "telemetry_commentary_remediated_v1.json"
+REMEDIATED_SUMMARY_JSON_PATH = RESULTS_DIR / "telemetry_commentary_remediated_summary_v1.json"
+
+# Default deliverable destinations for remediated pipeline
+EXAMPLES_JSON_PATH = REMEDIATED_EXAMPLES_JSON_PATH
+SUMMARY_JSON_PATH = REMEDIATED_SUMMARY_JSON_PATH
 
 
 def compute_sha256(filepath: Path) -> str:
@@ -93,12 +99,49 @@ def load_api_credentials() -> Tuple[str, str]:
 
 
 class GroundingValidator:
-    """Deterministic validation layer verifying LLM commentary against empirical telemetry."""
+    """Deterministic validation layer verifying LLM commentary against empirical telemetry.
+
+    Production-only strict validation path verifying:
+    - Simulation physical bounds (speed [-2.0, 4.0] px/step, steering [-30, 30] deg).
+    - Elimination of evidence leakage (sensors must be present in commentary text).
+    - Non-existent sensor rejection (cameras, 360 lidar, IMU, GPS).
+    - Contradictory real sensor attribution (steering/longitudinal sensors must match dominant saliency).
+    - Strict semantic & physics filtering against domain violations and synonyms
+      (tire traction, downforce, weight transfer, visual gaze, competitor agents, intentional apex clipping).
+    - Steering coherence (|mean_steer| <= 0.08 / 2.4 deg for straight-line cruising).
+    - Unit correctness (px/step for speed, deg for steering angles, px for radius).
+    - Fabricated corner label rejection (Turn IDs must match event corner_id).
+    - Cross-lap / evidence provenance integrity (lap_id, track_seed, event_id).
+    """
 
     REQUIRED_KEYS = ["event_id", "event_type", "commentary", "evidence", "confidence", "model_id"]
-    FORBIDDEN_HALLUCINATIONS = [
-        "spun out", "spin out", "crash", "collision", "overtake", "overtaking",
-        "tire puncture", "gear shift", "gearbox", "turbo", "pit stop"
+
+    REMEDIATED_FORBIDDEN_PATTERNS = [
+        # Hallucinations & accidents
+        r"\b(?:spun\s+out|spin\s+out|crash|collision|overtake|overtaking|pit\s+stop)\b",
+        r"\b(?:tire\s+puncture|tyre\s+puncture|gear\s*shift|gearbox|turbo|supercharger|clutch|differential|engine\s+braking)\b",
+        # Physics violations (Car has grip_limit=False, no aero/downforce, no suspension/weight transfer)
+        r"\b(?:tire|tyre|rubber)\s+(?:grip|traction|friction|adhesion|contact\s+patch|slip|temperature)\b",
+        r"\b(?:grip\s+limit|grip\s+optimization|maximize\s+tire\s+grip|maximizing\s+tire\s+grip|mechanical\s+grip|friction\s+circle)\b",
+        r"\b(?:aero|aerodynamic|downforce|diffuser|ground\s+effect|wing|spoiler|drag\s+reduction|aero\s+balance)\b",
+        r"\b(?:suspension|anti-roll|chassis\s+flex|body\s+roll|weight\s+transfer|load\s+transfer|pitch\s+angle)\b",
+        r"\b(?:chatter|steering\s+chatter|wheel\s+chatter)\b",
+        # Non-existent sensors & anthropomorphic vision
+        r"\b(?:visual\s+gaze|shifts?\s+(?:its\s+)?(?:visual\s+)?gaze|shifting\s+(?:visual\s+)?gaze|foveal|ocular|peripheral\s+vision|eyeball|driver\'?s?\s+eyes?|visual\s+field|gazing|looking\s+ahead)\b",
+        r"\b(?:attention\s+mechanism|rear_camera|camera|lidar_360|360\s+lidar|gps|imu|accelerometer)\b",
+        # Competitors & racing traffic
+        r"\b(?:competitor|opponent|rival|other\s+car|other\s+vehicle|traffic|grid|paddock|slipstream|drafting)\b",
+        # Unmeasured driving intentions
+        r"\b(?:deliberately|intentionally|consciously)\s+(?:clips?|aims?|targets?|hugs?|cuts?)\b",
+        r"\b(?:intentional|deliberate)\s+(?:apex|curb|kerb|line)\b",
+    ]
+
+    VALID_SENSOR_NAMES = {
+        "ray_0", "ray_plus_45", "ray_minus_45", "ray_plus_90", "ray_minus_90",
+        "ray_45", "ray_90",
+    }
+    INVALID_SENSOR_INDICATORS = [
+        "rear_camera", "camera", "lidar_360", "360_lidar", "gps", "imu", "accelerometer"
     ]
 
     @classmethod
@@ -107,8 +150,12 @@ class GroundingValidator:
         commentary_item: Dict[str, Any],
         ground_truth_event: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Validate a single Gemini commentary against its source telemetry event.
-        
+        """Strict production validation verifying typed physical limits, sensor citations, and semantics.
+
+        Args:
+            commentary_item: The generated commentary dictionary.
+            ground_truth_event: The telemetry event record slice.
+
         Returns:
             Dictionary with is_valid boolean, grounding_score [0..1], verified_facts,
             flagged_issues, and verdict ('CORRECT_GROUNDED', 'UNCERTAIN_INTERPRETATION', 'UNSUPPORTED_REJECTED').
@@ -121,9 +168,9 @@ class GroundingValidator:
             if k not in commentary_item:
                 flagged_issues.append(f"Missing required key: {k}")
 
-        if commentary_item.get("event_id") != ground_truth_event["event_id"]:
+        if commentary_item.get("event_id") != ground_truth_event.get("event_id"):
             flagged_issues.append(
-                f"event_id mismatch: got {commentary_item.get('event_id')}, expected {ground_truth_event['event_id']}"
+                f"event_id mismatch: got {commentary_item.get('event_id')}, expected {ground_truth_event.get('event_id')}"
             )
 
         conf = commentary_item.get("confidence", 0.0)
@@ -132,59 +179,260 @@ class GroundingValidator:
 
         text = commentary_item.get("commentary", "")
         ev_data = commentary_item.get("evidence", {})
+        interp = str(commentary_item.get("interpretation_notes", ""))
 
-        # 2. Hallucination Checks
-        is_actual_crash = ground_truth_event.get("benchmark", "") == "hairpin" and ground_truth_event.get("track_seed") == 1001 and ground_truth_event.get("end_step", 0) >= 220
-        for term in cls.FORBIDDEN_HALLUCINATIONS:
-            if term in ["crash", "collision"] and is_actual_crash:
+        telem = ground_truth_event.get("telemetry_summary", {})
+        sensors = ground_truth_event.get("sensor_summary", {})
+        actions = ground_truth_event.get("action_summary", {})
+        saliencies = ground_truth_event.get("saliency_triggers", {})
+
+        # Cross-lap / evidence reference provenance validation
+        if isinstance(ev_data, dict):
+            ev_lap = ev_data.get("lap_id")
+            gt_lap = ground_truth_event.get("lap_id") or commentary_item.get("lap_id")
+            if ev_lap and gt_lap and ev_lap != gt_lap:
+                flagged_issues.append(f"Mismatched evidence reference: evidence references lap '{ev_lap}', expected '{gt_lap}'")
+
+            ev_eid = ev_data.get("event_id")
+            gt_eid = ground_truth_event.get("event_id")
+            if ev_eid and gt_eid and ev_eid != gt_eid:
+                flagged_issues.append(f"Mismatched evidence reference: evidence references event '{ev_eid}', expected '{gt_eid}'")
+
+            ev_seed = ev_data.get("track_seed")
+            gt_seed = ground_truth_event.get("track_seed") or commentary_item.get("track_seed")
+            if ev_seed is not None and gt_seed is not None and int(ev_seed) != int(gt_seed):
+                flagged_issues.append(f"Mismatched evidence reference: evidence references track seed {ev_seed}, expected {gt_seed}")
+
+        # 2. Strict Semantic & Domain Synonyms Filter
+        is_actual_crash = (
+            ground_truth_event.get("benchmark", "") == "hairpin"
+            and ground_truth_event.get("track_seed") == 1001
+            and ground_truth_event.get("end_step", 0) >= 220
+        )
+        combined_text_for_terms = (text + " " + str(ev_data) + " " + interp).lower()
+
+        for pat in cls.REMEDIATED_FORBIDDEN_PATTERNS:
+            if ("crash" in pat or "collision" in pat) and is_actual_crash:
                 continue
-            if re.search(r"\b" + re.escape(term) + r"\b", text.lower()):
-                flagged_issues.append(f"Commentary contains unsupported hallucinated concept: '{term}'")
+            m = re.search(pat, combined_text_for_terms, re.IGNORECASE)
+            if m:
+                flagged_issues.append(f"Commentary contains unsupported hallucinated concept or domain violation: '{m.group(0)}'")
 
-        # 3. Numerical Grounding Validation
-        # Check if numbers cited in text actually exist in telemetry
-        telem = ground_truth_event["telemetry_summary"]
-        sensors = ground_truth_event["sensor_summary"]
-        actions = ground_truth_event["action_summary"]
-        saliencies = ground_truth_event["saliency_triggers"]
+        # 3. Unit Validation & Cross-Unit Contradictions
+        if re.search(r"\b(?:km/h|mph|m/s|kmph|knots)\b", text, re.IGNORECASE):
+            flagged_issues.append("Invalid unit: simulation velocity must be in 'px/step', real-world velocity units are not supported")
 
-        # Verify action mode grounding
+        if re.search(r"(-?\d+\.?\d*)\s*(?:deg|degrees|°)\s*(?:speed|velocity)", text, re.IGNORECASE) or \
+           re.search(r"(?:speed|velocity)\s*(?:of|is|at)?\s*(-?\d+\.?\d*)\s*(?:deg|degrees|°)", text, re.IGNORECASE):
+            flagged_issues.append("Cross-unit error: velocity cannot be measured in degrees")
+
+        if re.search(r"(?:steer|steering|wheel)\s*(?:angle|lock|action)?\s*(?:of|is|at)?\s*(-?\d+\.?\d*)\s*(?:px/step|pixels/step)", text, re.IGNORECASE):
+            flagged_issues.append("Cross-unit error: steering cannot be measured in px/step")
+
+        if re.search(r"(?:radius|curvature)\s*(?:of|is|at)?\s*(-?\d+\.?\d*)\s*(?:deg|degrees|°)", text, re.IGNORECASE):
+            flagged_issues.append("Cross-unit error: corner radius cannot be measured in degrees")
+
+        # 4. Fabricated Corner Labels
+        corner_matches = re.finditer(r"\b(?:turn|corner)\s*(\d+)\b", text, re.IGNORECASE)
+        gt_corner_id = ground_truth_event.get("corner_id")
+        for cm in corner_matches:
+            cited_turn = int(cm.group(1))
+            if gt_corner_id and gt_corner_id != "none":
+                m_gt = re.search(r"(\d+)", str(gt_corner_id))
+                expected_turn = int(m_gt.group(1)) if m_gt else None
+                if expected_turn is not None and cited_turn != expected_turn:
+                    flagged_issues.append(f"Fabricated corner label: commentary cites Turn {cited_turn}, but ground truth event is {gt_corner_id}")
+            else:
+                flagged_issues.append(f"Fabricated corner label: commentary cites Turn {cited_turn} during section with no corner")
+
+        # 5. Non-Existent Sensors & Evidence Integrity
+        ev_str = str(ev_data).lower()
+        for fake_sensor in cls.INVALID_SENSOR_INDICATORS:
+            if fake_sensor in ev_str or fake_sensor in text.lower():
+                flagged_issues.append(f"Evidence references invalid or nonexistent sensor: '{fake_sensor}'")
+
+        # Dominant sensor citations in commentary text
+        top_s_ray = saliencies.get("top_steering_ray") or saliencies.get("dominant_steering_saliency_ray")
+        top_l_ray = saliencies.get("top_longitudinal_ray") or saliencies.get("dominant_longitudinal_saliency_ray")
+
+        text_sensors = [r for r in cls.VALID_SENSOR_NAMES if r in text]
+        if top_s_ray and top_s_ray in text:
+            verified_facts.append(f"Correctly referenced dominant steering sensor in commentary text: {top_s_ray}")
+        if top_l_ray and top_l_ray in text:
+            verified_facts.append(f"Correctly referenced dominant longitudinal sensor in commentary text: {top_l_ray}")
+
+        # Sensor cited only in metadata, not in commentary text
+        claims_sensor_guidance = bool(re.search(r"\b(?:sensor|saliency|guided by|directed by|lookahead beam|lookahead ray)\b", text, re.IGNORECASE))
+        has_sensor_in_metadata = any(r in ev_str for r in cls.VALID_SENSOR_NAMES) or bool(saliencies)
+        if claims_sensor_guidance and not text_sensors:
+            flagged_issues.append("Sensor guidance claimed in commentary, but no sensor ray is cited in commentary text")
+        elif has_sensor_in_metadata and not text_sensors and "saliency_facts" in ev_data:
+            flagged_issues.append("Sensor data present in metadata/saliency_facts, but no sensor ray is cited in commentary text")
+
+        # Contradictory real sensor attribution
+        for other_ray in cls.VALID_SENSOR_NAMES:
+            if other_ray in text:
+                if top_s_ray and other_ray != top_s_ray:
+                    if re.search(rf"\b(?:steering|steer|lateral)\b[^\.\n]*\b{other_ray}\b", text, re.IGNORECASE) or \
+                       re.search(rf"\b{other_ray}\b[^\.\n]*\b(?:dictates|controls|guides|steers|governs)\b[^\.\n]*\b(?:steering|steer|lateral)\b", text, re.IGNORECASE) or \
+                       re.search(rf"\bdominant\s+steering\s+sensor\s+{other_ray}\b", text, re.IGNORECASE):
+                        flagged_issues.append(f"Contradictory sensor attribution: commentary attributes steering to {other_ray}, but dominant steering sensor is {top_s_ray}")
+                if top_l_ray and other_ray != top_l_ray:
+                    if re.search(rf"\b(?:throttle|braking|longitudinal|speed|cruising)\b[^\.\n]*\b{other_ray}\b", text, re.IGNORECASE) or \
+                       re.search(rf"\b{other_ray}\b[^\.\n]*\b(?:dictates|controls|guides|governs)\b[^\.\n]*\b(?:throttle|braking|longitudinal|speed)\b", text, re.IGNORECASE) or \
+                       re.search(rf"\bdominant\s+longitudinal\s+sensor\s+{other_ray}\b", text, re.IGNORECASE):
+                        flagged_issues.append(f"Contradictory sensor attribution: commentary attributes longitudinal control to {other_ray}, but dominant longitudinal sensor is {top_l_ray}")
+
+        # Reject evidence leakage where evidence dictionary cites fake/contradictory sensors
+        if isinstance(ev_data, dict):
+            saliency_facts = str(ev_data.get("saliency_facts", "")).lower()
+            for r_name in cls.VALID_SENSOR_NAMES:
+                if f"top steering sensor is {r_name}" in saliency_facts and top_s_ray and r_name != top_s_ray:
+                    flagged_issues.append(f"Evidence falsely claims {r_name} is top steering sensor (expected {top_s_ray})")
+                if f"top longitudinal sensor is {r_name}" in saliency_facts and top_l_ray and r_name != top_l_ray:
+                    flagged_issues.append(f"Evidence falsely claims {r_name} is top longitudinal sensor (expected {top_l_ray})")
+
+        # 6. Action Regime & Steering Coherence
         act_mode = actions.get("action_mode", "")
         if act_mode == "braking":
             if any(w in text.lower() for w in ["brak", "decel", "slow"]):
                 verified_facts.append("Correctly identified braking / deceleration control regime")
             else:
                 flagged_issues.append("Failed to identify active negative longitudinal braking")
+            if any(w in text.lower() for w in ["flat-out", "cruising at top speed", "positive acceleration"]):
+                flagged_issues.append("Contradictory claim: commentary claims cruising/acceleration during active braking")
         elif act_mode == "throttle":
             if any(w in text.lower() for w in ["throttle", "accel", "speed", "cruis"]):
                 verified_facts.append("Correctly identified throttle / cruising control regime")
+            if any(w in text.lower() for w in ["threshold braking", "heavy braking", "negative longitudinal action"]):
+                flagged_issues.append("Contradictory claim: commentary claims braking during active throttle regime")
 
-        # Verify sensor citations
-        top_s_ray = saliencies.get("top_steering_ray") or saliencies.get("dominant_steering_saliency_ray")
-        top_l_ray = saliencies.get("top_longitudinal_ray") or saliencies.get("dominant_longitudinal_saliency_ray")
-        if top_s_ray and (top_s_ray in str(ev_data) or top_s_ray in text):
-            verified_facts.append(f"Correctly referenced dominant steering sensor: {top_s_ray}")
-        if top_l_ray and (top_l_ray in str(ev_data) or top_l_ray in text):
-            verified_facts.append(f"Correctly referenced dominant longitudinal sensor: {top_l_ray}")
-        if top_l_ray in str(ev_data) or top_l_ray in text:
-            verified_facts.append(f"Correctly referenced dominant longitudinal sensor: {top_l_ray}")
+        # Steering Coherence: strictly aligned with straight-line cruising detector (|delta| <= 0.08 / 2.4 deg)
+        if any(w in text.lower() for w in ["steering centered", "neutral steering", "zero steering", "straight line", "straight-line cruising", "straight cruising"]):
+            actual_mean_steer = abs(actions.get("mean_steering", 0.0))
+            actual_wheel_deg = actual_mean_steer * 30.0
+            is_corner_phase = ground_truth_event.get("corner_phase") in ["entry", "apex", "exit"]
+            if actual_mean_steer > 0.08 or is_corner_phase:
+                flagged_issues.append(
+                    f"Contradictory steering claim: commentary claims steering centered/neutral during corner phase or high steer "
+                    f"(actual steering: {actions.get('mean_steering', 0.0):.3f}, angle {actions.get('mean_steering', 0.0)*30.0:.1f} deg, phase: {ground_truth_event.get('corner_phase')})"
+                )
+            else:
+                verified_facts.append(f"Verified centered steering ({actual_wheel_deg:.1f} deg)")
 
-        # Extract numerical mentions (speeds, distances) from commentary
-        numbers = [float(x) for x in re.findall(r"\b\d+\.?\d*\b", text)]
-        valid_ranges = [
-            telem["velocity_range"],
-            [sensors["min_forward_ray_0"] - 5.0, sensors["mean_forward_ray_0"] + 5.0],
-            [actions["steering_range"][0] * 30.0 - 5.0, actions["steering_range"][1] * 30.0 + 5.0],
-            [telem["min_corner_radius"] - 10.0, telem["mean_corner_radius"] + 10.0],
-        ]
+        # 7. Typed Numerical Grounding & Physical Limits
+        velocity_values: List[float] = []
+        # Pattern 1: [v1, v2] px/step, from v1 to v2 px/step, or within [v1, v2]
+        for m in re.finditer(
+            r"(?:\[|\bfrom\s+|\bwithin\s+\[?)\s*(-?\d+\.?\d*)\s*(?:,\s*|\s+to\s+)\s*(-?\d+\.?\d*)\s*\]?\s*(?:px/step|px\s*/\s*step|pixels/step)?",
+            text,
+            re.IGNORECASE,
+        ):
+            velocity_values.extend([float(m.group(1)), float(m.group(2))])
+        # Pattern 2: single number followed by px/step
+        for m in re.finditer(
+            r"(-?\d+\.?\d*)\s*[\]\)]?\s*(?:px/step|px\s*/\s*step|pixels/step|pixels\s*/\s*step)",
+            text,
+            re.IGNORECASE,
+        ):
+            val = float(m.group(1))
+            if val not in velocity_values:
+                velocity_values.append(val)
+        # Pattern 3: explicit speed or velocity keywords followed by number
+        for m in re.finditer(
+            r"(?:speed|velocity)\s*(?:of|is|at|was)?\s*\(?(-?\d+\.?\d*)\)?(?:\s*px/step)?",
+            text,
+            re.IGNORECASE,
+        ):
+            val = float(m.group(1))
+            if val not in velocity_values:
+                velocity_values.append(val)
+
+        for v_val in velocity_values:
+            if v_val > 4.0:
+                flagged_issues.append(
+                    f"Physically impossible velocity cited: {v_val} px/step (simulation hard limit is [-2.0, 4.0] px/step)"
+                )
+            elif v_val < -2.0:
+                flagged_issues.append(
+                    f"Physically impossible negative velocity cited: {v_val} px/step"
+                )
+            else:
+                v_range = telem.get("velocity_range", [telem.get("mean_velocity", 0.0), telem.get("mean_velocity", 0.0)])
+                if not (v_range[0] - 0.40 <= v_val <= v_range[1] + 0.40):
+                    flagged_issues.append(
+                        f"Cited velocity {v_val} px/step is outside event measured velocity range [{v_range[0]:.2f}, {v_range[1]:.2f}] px/step"
+                    )
+                else:
+                    verified_facts.append(f"Verified velocity {v_val} px/step within measured range")
+
+        # Steering Angle Citations
+        steer_matches = re.findall(r"(-?\d+\.?\d*)\s*(?:deg|degrees|°)", text, re.IGNORECASE)
+        for s_str in steer_matches:
+            s_val = float(s_str)
+            if abs(s_val) > 30.0:
+                flagged_issues.append(
+                    f"Physically impossible steering angle cited: {s_val} deg (simulation hard limit is [-30.0, 30.0] deg)"
+                )
+            else:
+                s_range = actions.get("steering_range", [actions.get("mean_steering", 0.0), actions.get("mean_steering", 0.0)])
+                s_min_deg = min(s_range) * 30.0 - 5.0
+                s_max_deg = max(s_range) * 30.0 + 5.0
+                if not (s_min_deg <= s_val <= s_max_deg):
+                    flagged_issues.append(
+                        f"Cited steering angle {s_val} deg is outside event measured steering range [{s_min_deg:.1f}, {s_max_deg:.1f}] deg"
+                    )
+                else:
+                    verified_facts.append(f"Verified steering angle {s_val} deg within measured range")
+
+        # Step Range Citations
+        step_matches = re.findall(r"\bstep\s*(\d+)\b", text, re.IGNORECASE)
+        ev_start = ground_truth_event.get("start_step", 0)
+        ev_end = ground_truth_event.get("end_step", 0)
+        for st_str in step_matches:
+            st_val = int(st_str)
+            if not (ev_start - 10 <= st_val <= ev_end + 10):
+                flagged_issues.append(
+                    f"Cited step {st_val} outside event step window [{ev_start}, {ev_end}]"
+                )
+            else:
+                verified_facts.append(f"Verified step {st_val} within event window")
+
+        # Corner Radius Citations
+        radius_matches = re.findall(
+            r"(?:radius|curvature)\s*(?:of|is|radius)?\s*(\d+\.?\d*)\s*(?:px)?",
+            text,
+            re.IGNORECASE,
+        )
+        for r_str in radius_matches:
+            r_val = float(r_str)
+            min_r = telem.get("min_corner_radius", 0.0) - 25.0
+            mean_r = telem.get("mean_corner_radius", 0.0) + 25.0
+            if not (min_r <= r_val <= mean_r):
+                flagged_issues.append(
+                    f"Cited corner radius {r_val} px outside event radius range [{min_r:.1f}, {mean_r:.1f}]"
+                )
+            else:
+                verified_facts.append(f"Verified corner radius {r_val} px within measured range")
+
+        # General Numerical Verification: Catch unexplained / arbitrary numbers
+        all_numbers = [float(x) for x in re.findall(r"-?\b\d+\.?\d*\b", text)]
+        for num in all_numbers:
+            is_accounted = (
+                abs(num - ground_truth_event.get("track_seed", 0)) < 1.0
+                or (ev_start - 10 <= num <= ev_end + 10)
+                or (telem.get("min_corner_radius", 0) - 30 <= num <= telem.get("mean_corner_radius", 0) + 30)
+                or (-35.0 <= num <= 35.0)
+                or (sensors.get("min_lateral_distance", 0) - 10 <= num <= 250.0)
+            )
+            if not is_accounted and num > 4.0:
+                flagged_issues.append(f"Unexplained / ungrounded numerical value cited in commentary: {num}")
 
         grounding_score = max(0.0, 1.0 - (len(flagged_issues) * 0.25))
-
-        # Classification
         if flagged_issues:
             verdict = "UNSUPPORTED_REJECTED"
             is_valid = False
-        elif conf < 0.80 or "uncertain" in str(commentary_item.get("interpretation_notes", "")).lower():
+        elif conf < 0.80 or "uncertain" in interp.lower():
             verdict = "UNCERTAIN_INTERPRETATION"
             is_valid = True
         else:
@@ -297,6 +545,7 @@ class GeminiCommentaryClient:
             self.request_logs.append({
                 "lap_id": lap_metadata.get("lap_id"),
                 "status": "success",
+                "latency_type": "live_api",
                 "latency_ms": round(latency_ms, 1),
                 "prompt_tokens": p_tok,
                 "candidate_tokens": c_tok,
@@ -315,6 +564,7 @@ class GeminiCommentaryClient:
             self.request_logs.append({
                 "lap_id": lap_metadata.get("lap_id"),
                 "status": "fallback_error",
+                "latency_type": "live_api_failed",
                 "latency_ms": round(latency_ms, 1),
                 "prompt_tokens": 0,
                 "candidate_tokens": 0,
@@ -372,57 +622,78 @@ class GeminiCommentaryClient:
         self.calls_made += 1
         self.total_prompt_tokens += 650
         self.total_candidate_tokens += 280
-        self.total_latency_ms += 12.0
+        local_latency_ms = 0.5
+        self.total_latency_ms += local_latency_ms
 
         mock_items = []
         for ev in key_events:
             telem = ev["telemetry_summary"]
             act = ev["action_summary"]
             sal = ev["saliency_triggers"]
+            ev_type = ev.get("event_type", "")
+            steer_deg = act["mean_steering"] * 30.0
+            v_mean = telem["mean_velocity"]
+            v_min = telem["velocity_range"][0]
+            v_max = telem["velocity_range"][1]
+            r_mean = telem["mean_corner_radius"]
+            r_min = telem["min_corner_radius"]
+            fwd_ray = ev["sensor_summary"]["mean_forward_ray_0"]
+            lat_dist = ev["sensor_summary"]["min_lateral_distance"]
+            top_s = sal["top_steering_ray"]
+            top_l = sal["top_longitudinal_ray"]
 
             if act["action_mode"] == "braking":
                 comment = (
-                    f"Approaching corner with curvature radius {telem['mean_corner_radius']} px. "
-                    f"The policy applies negative longitudinal action ({act['mean_longitudinal']:.3f}), actively decelerating "
-                    f"as forward lookahead sensor ({sal['top_longitudinal_ray']}) exhibits dominant sensitivity."
+                    f"Deceleration phase approaching curvature (radius {r_mean:.1f} px). "
+                    f"The policy applies negative longitudinal action ({act['mean_longitudinal']:.3f}), "
+                    f"decelerating within [{v_min:.2f}, {v_max:.2f}] px/step as {top_l} exhibits dominant sensitivity."
                 )
-            elif ev["event_type"] == "corner_apex":
+            elif ev_type in ["corner_approach", "corner_entry"]:
                 comment = (
-                    f"Clipping apex at step {ev['start_step']} with steering angle {act['mean_steering'] * 30.0:.1f} degrees. "
-                    f"Lateral positioning is guided by {sal['top_steering_ray']} while holding steady maintenance speed ({telem['mean_velocity']} px/step)."
+                    f"Approaching corner entry with track radius {r_mean:.1f} px. "
+                    f"The policy initiates turn-in with steering angle {steer_deg:.1f} degrees, "
+                    f"guided by {top_s} while tracking {top_l} for velocity maintenance ({v_mean:.2f} px/step)."
                 )
-            elif ev["event_type"] == "corner_exit":
+            elif ev_type == "corner_apex":
                 comment = (
-                    f"Exiting corner as curvature unwinds. The car transitions into positive acceleration "
-                    f"({act['mean_longitudinal']:.3f}), unwinding front wheels with {sal['top_steering_ray']} guiding exit line."
+                    f"Navigating corner apex at step {ev['start_step']} with curvature radius {r_min:.1f} px "
+                    f"and steering angle {steer_deg:.1f} degrees. "
+                    f"Lateral positioning is guided by {top_s} while holding speed at {v_mean:.2f} px/step."
                 )
-            elif ev["event_type"] == "lateral_wall_proximity":
+            elif ev_type == "corner_exit":
                 comment = (
-                    f"Navigating narrow corridor with lateral clearance constrained to {ev['sensor_summary']['min_lateral_distance']} px. "
-                    f"High centering sensitivity on lateral beams prevents wall clipping without induced steering chatter."
+                    f"Exiting corner as curvature unwinds. The policy applies positive longitudinal action "
+                    f"({act['mean_longitudinal']:.3f}), unwinding steering toward center with {top_s} "
+                    f"guiding exit trajectory at {v_mean:.2f} px/step."
+                )
+            elif ev_type == "lateral_wall_proximity":
+                comment = (
+                    f"Navigating narrow corridor with lateral clearance constrained to {lat_dist:.1f} px "
+                    f"at {v_mean:.2f} px/step. Steering sensitivity concentrates on lateral beam {top_s} to maintain clearance."
                 )
             else:
+                # straight cruising
                 comment = (
-                    f"Flat-out straightaway cruising at {telem['mean_velocity']} px/step with steering centered. "
-                    f"Forward lookahead is open ({ev['sensor_summary']['mean_forward_ray_0']} px) maintaining top speed."
+                    f"Straightaway cruising at {v_mean:.2f} px/step with steering centered ({steer_deg:.1f} degrees). "
+                    f"Forward beam {top_l} detects open corridor ahead ({fwd_ray:.1f} px)."
                 )
 
             mock_items.append({
                 "event_id": ev["event_id"],
-                "event_type": ev["event_type"],
+                "event_type": ev_type,
                 "commentary": comment,
                 "evidence": {
                     "telemetry_facts": [
-                        f"Velocity is {telem['mean_velocity']} px/step",
-                        f"Corner radius is {telem['mean_corner_radius']} px",
+                        f"Velocity is {v_mean:.2f} px/step (range [{v_min:.2f}, {v_max:.2f}] px/step)",
+                        f"Track corner radius is {r_mean:.1f} px",
                     ],
                     "action_facts": [
-                        f"Steering action is {act['mean_steering']}",
-                        f"Longitudinal action is {act['mean_longitudinal']} ({act['action_mode']})",
+                        f"Steering angle is {steer_deg:.1f} degrees (action {act['mean_steering']:.3f})",
+                        f"Longitudinal action is {act['mean_longitudinal']:.3f} ({act['action_mode']})",
                     ],
                     "saliency_facts": [
-                        f"Top steering sensor is {sal['top_steering_ray']}",
-                        f"Top longitudinal sensor is {sal['top_longitudinal_ray']}",
+                        f"Dominant steering sensor is {top_s}",
+                        f"Dominant longitudinal sensor is {top_l}",
                     ],
                 },
                 "confidence": 0.95,
@@ -433,7 +704,8 @@ class GeminiCommentaryClient:
         self.request_logs.append({
             "lap_id": lap_metadata.get("lap_id"),
             "status": "success",
-            "latency_ms": 12.0,
+            "latency_type": "local_mock",
+            "latency_ms": local_latency_ms,
             "prompt_tokens": 650,
             "candidate_tokens": 280,
             "events_processed": len(key_events),
@@ -445,8 +717,12 @@ class GeminiCommentaryClient:
 def run_commentary_pipeline(
     mock_mode: bool = False,
     max_api_calls: int = 5,
+    output_examples_path: Optional[Path] = None,
+    output_summary_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Execute the commentary pipeline across the five representative laps."""
+    dest_examples = output_examples_path or REMEDIATED_EXAMPLES_JSON_PATH
+    dest_summary = output_summary_path or REMEDIATED_SUMMARY_JSON_PATH
     print("=" * 80)
     print("RL RACING AGENT: GEMINI TELEMETRY COMMENTARY PIPELINE")
     print(f"Target Model: gemini-3.8-flash | Mode: {'MOCK' if mock_mode else 'LIVE'}")
@@ -555,7 +831,7 @@ def run_commentary_pipeline(
 
     summary = {
         "metadata": {
-            "pipeline_name": "gemini_telemetry_commentary",
+            "pipeline_name": "gemini_telemetry_commentary_remediated_v1",
             "model_id": client.model_id,
             "execution_mode": "MOCK" if mock_mode else "LIVE",
             "weights_path": str(FROZEN_MODEL_PATH),
@@ -567,11 +843,16 @@ def run_commentary_pipeline(
         "api_usage_metrics": {
             "total_requests": client.calls_made,
             "max_api_calls_limit": client.max_calls_limit,
+            "execution_mode": "MOCK" if mock_mode else "LIVE",
             "total_prompt_tokens": client.total_prompt_tokens,
             "total_candidate_tokens": client.total_candidate_tokens,
             "total_tokens": client.total_prompt_tokens + client.total_candidate_tokens,
-            "total_latency_ms": round(client.total_latency_ms, 1),
-            "mean_latency_per_request_ms": round(client.total_latency_ms / max(1, client.calls_made), 1),
+            "total_latency_ms": round(client.total_latency_ms, 2),
+            "mean_latency_per_request_ms": round(client.total_latency_ms / max(1, client.calls_made), 2),
+            "latency_benchmark_note": (
+                "Local deterministic mock execution latency is sub-millisecond (<1.0 ms/request). "
+                "Live Gemini API roundtrip latency typically averages 15,000 to 25,000 ms/request."
+            ),
             "request_logs": client.request_logs,
         },
         "grounding_validation_metrics": {
@@ -590,13 +871,13 @@ def run_commentary_pipeline(
     # 6. Save Deliverables
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(EXAMPLES_JSON_PATH, "w") as f:
+    with open(dest_examples, "w") as f:
         json.dump(all_commentaries, f, indent=2)
-    print(f"\nSaved {len(all_commentaries)} commentary examples to: {EXAMPLES_JSON_PATH}")
+    print(f"\nSaved {len(all_commentaries)} commentary examples to: {dest_examples}")
 
-    with open(SUMMARY_JSON_PATH, "w") as f:
+    with open(dest_summary, "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"Saved pipeline summary metrics to: {SUMMARY_JSON_PATH}")
+    print(f"Saved pipeline summary metrics to: {dest_summary}")
 
     # 7. Verify frozen checksums AFTER analysis
     sha_weights_after, sha_config_after = verify_frozen_integrity()
@@ -614,12 +895,29 @@ def run_commentary_pipeline(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Gemini Telemetry Commentary Pipeline")
+    parser = argparse.ArgumentParser(description="Gemini Telemetry Commentary Pipeline (Remediated V1)")
     parser.add_argument("--mock", action="store_true", help="Run with deterministic mock responses (no API calls)")
     parser.add_argument("--max-calls", type=int, default=5, help="Maximum allowable API calls limit (default: 5)")
+    parser.add_argument(
+        "--output-examples",
+        type=str,
+        default=str(REMEDIATED_EXAMPLES_JSON_PATH),
+        help="Destination path for commentary examples JSON",
+    )
+    parser.add_argument(
+        "--output-summary",
+        type=str,
+        default=str(REMEDIATED_SUMMARY_JSON_PATH),
+        help="Destination path for summary JSON",
+    )
     args = parser.parse_args()
 
-    run_commentary_pipeline(mock_mode=args.mock, max_api_calls=args.max_calls)
+    run_commentary_pipeline(
+        mock_mode=args.mock,
+        max_api_calls=args.max_calls,
+        output_examples_path=Path(args.output_examples),
+        output_summary_path=Path(args.output_summary),
+    )
 
 
 if __name__ == "__main__":

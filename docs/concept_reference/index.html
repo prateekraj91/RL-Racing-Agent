@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#000;font-family:Inter,sans-serif;color:#e8eef6}
+#c{position:absolute;inset:0;width:1920px;height:1080px}
+.layer{position:absolute;inset:0;display:none;pointer-events:none}
+.mono{font-family:'DejaVu Sans Mono',monospace}
+.glass{background:rgba(9,13,20,.78);border:1px solid rgba(140,200,255,.16);border-radius:16px;backdrop-filter:blur(14px)}
+.lbl{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8fa3b8;font-weight:600}
+.chip{display:inline-block;padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600;letter-spacing:.06em;border:1px solid rgba(255,255,255,.18);background:rgba(10,14,20,.55)}
+.chip.frozen{color:#ffd27a;border-color:rgba(255,210,122,.45)}
+.chip.live{color:#5ff2b5;border-color:rgba(95,242,181,.45)}
+.chip.cyan{color:#67e3ff;border-color:rgba(103,227,255,.45)}
+#wm{position:absolute;left:28px;bottom:22px;font-size:13px;letter-spacing:.12em;color:rgba(255,255,255,.55);font-weight:600;display:none}
+#vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.45) 100%);pointer-events:none}
+/* title */
+#L-title .t1{position:absolute;left:120px;top:330px;font-family:'Inter Display',Inter;font-weight:800;font-size:118px;letter-spacing:-.02em;line-height:1}
+#L-title .t2{position:absolute;left:124px;top:470px;font-size:34px;color:#c9d6e3;font-weight:400}
+#L-title .t3{position:absolute;left:124px;top:545px}
+#L-title .bar{position:absolute;left:124px;top:310px;height:5px;width:120px;background:linear-gradient(90deg,#ff3b2f,#ffb02e)}
+/* HUD */
+#hud{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;gap:28px;align-items:center;padding:18px 30px}
+.big{font-family:'Inter Display',Inter;font-weight:700;font-size:54px;line-height:1}
+.unit{font-size:15px;color:#8fa3b8;margin-left:6px}
+.barw{width:220px;height:8px;border-radius:4px;background:rgba(255,255,255,.1);position:relative;overflow:hidden;margin-top:8px}
+.barw i{position:absolute;top:0;bottom:0;border-radius:4px}
+.vsep{width:1px;height:58px;background:rgba(255,255,255,.12)}
+#mm{position:absolute;right:34px;bottom:34px;width:300px;height:210px;padding:12px}
+#topl{position:absolute;left:34px;top:30px;display:flex;gap:10px;align-items:center}
+.tag{font-size:16px;font-weight:700;letter-spacing:.16em}
+/* lab */
+#labTop{position:absolute;left:0;right:0;top:0;height:64px;display:flex;align-items:center;gap:16px;padding:0 26px;background:linear-gradient(180deg,rgba(6,9,14,.92),rgba(6,9,14,.7));border-bottom:1px solid rgba(140,200,255,.12)}
+.logo{font-family:'Inter Display';font-weight:800;font-size:20px;letter-spacing:.08em}
+.tabs span{font-size:14px;padding:7px 14px;border-radius:9px;color:#8fa3b8;font-weight:600}
+.tabs span.on{background:rgba(103,227,255,.15);color:#67e3ff}
+#side{position:absolute;right:16px;top:80px;width:448px;bottom:16px;padding:18px 18px;display:flex;flex-direction:column;gap:12px}
+.chart{position:relative}
+.chart .h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.chart .v{font-family:'DejaVu Sans Mono';font-size:17px;font-weight:700}
+#feed{position:absolute;left:16px;right:480px;bottom:16px;height:236px;padding:16px 22px;overflow:hidden}
+.fl{font-size:18px;line-height:1.4;margin-top:9px;display:flex;gap:14px}
+.fl .s{font-family:'DejaVu Sans Mono';font-size:14px;color:#67e3ff;white-space:nowrap;padding-top:3px}
+.fl.old{opacity:.55}
+.raysbox{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.rb{border-radius:9px;background:rgba(255,255,255,.05);padding:7px 6px;text-align:center}
+.rb .a{font-size:11px;color:#8fa3b8;font-family:'DejaVu Sans Mono'}
+.rb .d{font-size:17px;font-weight:700;font-family:'DejaVu Sans Mono'}
+/* sensors */
+.rl{position:absolute;transform:translate(-50%,-130%);font-family:'DejaVu Sans Mono';font-size:17px;font-weight:700;padding:4px 9px;border-radius:7px;background:rgba(6,9,14,.75);border:1px solid rgba(255,255,255,.2);white-space:nowrap}
+#legend{position:absolute;right:34px;top:30px;padding:16px 20px;width:410px}
+.lg{display:flex;align-items:center;gap:12px;font-size:16px;margin-top:10px}
+.sw{width:34px;height:6px;border-radius:3px}
+#sensT{position:absolute;left:34px;top:30px}
+.h2{font-family:'Inter Display';font-weight:800;font-size:44px;letter-spacing:-.01em}
+.sub{font-size:20px;color:#b9c7d6;margin-top:6px}
+/* realworld */
+#map{position:absolute;inset:0}
+#rwInfo{position:absolute;left:34px;bottom:34px;width:560px;padding:20px 24px}
+.kv{display:flex;justify-content:space-between;font-size:17px;margin-top:9px}
+.kv b{font-family:'DejaVu Sans Mono';font-weight:700}
+#pipe{position:absolute;left:34px;top:30px}
+.steps{display:flex;gap:10px;margin-top:14px}
+.steps span{font-size:15px;font-weight:600;padding:8px 14px;border-radius:10px;background:rgba(10,14,20,.7);border:1px solid rgba(255,255,255,.14);color:#8fa3b8}
+.steps span.on{color:#0b0f14;background:#67e3ff;border-color:#67e3ff}
+/* analysis */
+#anaWrap{position:absolute;inset:0;background:rgba(4,7,11,.55);backdrop-filter:blur(10px)}
+#ana{position:absolute;left:60px;right:60px;top:56px;bottom:56px;padding:30px 34px}
+.tiles{display:grid;grid-template-columns:repeat(8,1fr);gap:12px;margin-top:20px}
+.tile{background:rgba(255,255,255,.045);border-radius:12px;padding:14px 14px}
+.tile .n{font-family:'Inter Display';font-weight:700;font-size:32px;margin-top:6px}
+.tile .n small{font-size:14px;color:#8fa3b8;font-weight:500;margin-left:4px}
+#end{position:absolute;inset:0;background:#05070b;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+</style></head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div id="vig"></div>
+
+<div class="layer" id="L-title">
+  <div class="bar"></div>
+  <div class="t1">RL RACING LAB</div>
+  <div class="t2">Watch a frozen SAC policy drive — and explain itself.</div>
+  <div class="t3"><span class="chip frozen mono">generalist-v1.0 · FROZEN · sha256 0d40dc47…76784</span></div>
+</div>
+
+<div class="layer" id="L-chase">
+  <div id="topl"><span class="chip live">● LIVE</span><span class="tag">CHASE CAM</span><span class="chip frozen mono" style="font-size:13px">generalist-v1.0 (SAC)</span></div>
+  <div id="hud" class="glass">
+    <div><div class="lbl">Speed</div><div><span class="big" id="hSpd">0.00</span><span class="unit">px/step</span></div></div>
+    <div class="vsep"></div>
+    <div><div class="lbl">Steering <span class="mono" id="hStr" style="color:#e8eef6;margin-left:8px;letter-spacing:0">0.0°</span></div><div class="barw"><i id="hStrB" style="background:#ffb02e"></i><i style="left:50%;width:2px;background:rgba(255,255,255,.5)"></i></div></div>
+    <div class="vsep"></div>
+    <div><div class="lbl">Throttle / Brake <span class="mono" id="hLong" style="color:#e8eef6;margin-left:8px;letter-spacing:0">+0.00</span></div><div class="barw"><i id="hLongB"></i><i style="left:50%;width:2px;background:rgba(255,255,255,.5)"></i></div></div>
+    <div class="vsep"></div>
+    <div><div class="lbl">Lap</div><div><span class="big" style="font-size:40px" id="hLap">0%</span></div></div>
+  </div>
+  <div id="mm" class="glass"><div class="lbl" style="font-size:11px">Circuit radar</div><canvas id="mmc" width="276" height="170"></canvas></div>
+</div>
+
+<div class="layer" id="L-lab">
+  <div id="labTop"><div class="logo">RL RACING LAB</div><span class="chip frozen mono" style="font-size:13px">generalist-v1.0 · frozen</span>
+    <div class="tabs" style="margin-left:30px"><span class="on">Chase</span><span>Cockpit</span><span>Orbit</span><span>Overhead</span></div>
+    <div style="flex:1"></div><span class="mono" style="font-size:16px;color:#8fa3b8">STEP <b id="lStep" style="color:#67e3ff">0</b></span><span class="chip live" style="margin-left:14px">● RUNNING</span></div>
+  <div id="side" class="glass">
+    <div class="chart"><div class="h"><span class="lbl">Speed</span><span class="v" id="cv0"></span></div><canvas id="ch0" width="412" height="118"></canvas></div>
+    <div class="chart"><div class="h"><span class="lbl">Steering angle</span><span class="v" id="cv1"></span></div><canvas id="ch1" width="412" height="118"></canvas></div>
+    <div class="chart"><div class="h"><span class="lbl">Throttle / brake</span><span class="v" id="cv2"></span></div><canvas id="ch2" width="412" height="118"></canvas></div>
+    <div class="chart"><div class="h"><span class="lbl">Lateral dev · slip</span><span class="v" id="cv3"></span></div><canvas id="ch3" width="412" height="118"></canvas></div>
+    <div><div class="lbl" style="margin-bottom:8px">Rangefinders (raw px)</div><div class="raysbox" id="raysbox"></div></div>
+  </div>
+  <div id="feed" class="glass"><div style="display:flex;align-items:center;gap:12px"><span class="lbl" style="color:#e8eef6">AI Race Engineer</span><span class="chip cyan mono" style="font-size:12px;padding:4px 10px">GROUNDED · TELEMETRY ONLY</span></div><div id="feedL"></div></div>
+</div>
+
+<div class="layer" id="L-sens">
+  <div id="sensT"><div class="h2">Sensor view</div><div class="sub">Five rangefinders · raw pixel distances · hit points on the track boundary</div></div>
+  <div id="legend" class="glass">
+    <div class="lbl">Legend</div>
+    <div class="lg"><span class="sw" style="background:#67e3ff"></span>Measured ray (far)</div>
+    <div class="lg"><span class="sw" style="background:#ffb02e"></span>Measured ray (&lt; 90 px)</div>
+    <div class="lg"><span class="sw" style="background:#ff4d4d"></span>Measured ray (&lt; 45 px) · collision zone</div>
+    <div class="lg"><span class="sw" style="background:rgba(214,120,255,.7)"></span>Scan sweep — <i>illustrative only</i></div>
+  </div>
+  <div id="rlabels"></div>
+</div>
+
+<div class="layer" id="L-rw">
+  <canvas id="map" width="1920" height="1080"></canvas>
+  <div id="pipe"><div class="h2">Real-world circuit import</div><div class="steps" id="psteps"><span>OpenStreetMap</span><span>lat/lon → local metres</span><span>metres → env px</span><span>Frozen policy, unseen track</span></div></div>
+  <div id="rwInfo" class="glass">
+    <div class="lbl">Imported track · <span style="color:#ffd27a">illustrative layout</span></div>
+    <div class="kv"><span>METRES_PER_PX</span><b>0.18</b></div>
+    <div class="kv"><span>Length</span><b id="rwLen"></b></div>
+    <div class="kv"><span>Min corner radius</span><b id="rwRad"></b></div>
+    <div class="kv"><span>Corridor width</span><b>70 px · 12.6 m</b></div>
+  </div>
+</div>
+
+<div class="layer" id="L-ana"><div id="anaWrap"></div>
+  <div id="ana" class="glass">
+    <div style="display:flex;align-items:baseline;gap:18px"><div class="h2">Post-lap analysis</div><span class="chip live">LAP 1 COMPLETE</span><span class="mono" style="color:#8fa3b8;font-size:15px">computed from logged telemetry</span></div>
+    <div class="tiles" id="tiles"></div>
+    <div style="display:grid;grid-template-columns:600px 1fr;gap:22px;margin-top:22px">
+      <div><div class="lbl" style="margin-bottom:8px">Speed along the lap</div><canvas id="aMap" width="600" height="640"></canvas></div>
+      <div><div class="lbl" style="margin-bottom:8px">Speed trace · braking zones shaded</div><canvas id="aSpd" width="1110" height="300"></canvas>
+           <div class="lbl" style="margin:14px 0 8px">Steering angle</div><canvas id="aStr" width="1110" height="270"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="layer" id="L-end"><div id="end">
+  <div style="height:5px;width:120px;background:linear-gradient(90deg,#ff3b2f,#ffb02e);margin-bottom:34px"></div>
+  <div style="font-family:'Inter Display';font-weight:800;font-size:84px;letter-spacing:-.02em">RL RACING LAB</div>
+  <div style="font-size:28px;color:#b9c7d6;margin-top:16px">SAC · FastAPI · Three.js · frozen weights · grounded AI race engineer</div>
+  <div class="mono" style="font-size:20px;color:#67e3ff;margin-top:40px">github.com/prateekraj91</div>
+  <div style="font-size:15px;color:rgba(255,255,255,.45);margin-top:60px;letter-spacing:.1em">CONCEPT RENDER · SCRIPTED LAP, NOT POLICY OUTPUT · TRACK LAYOUT ILLUSTRATIVE</div>
+</div></div>
+
+<div id="wm">CONCEPT RENDER · SCRIPTED LAP, NOT POLICY OUTPUT</div>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="./main.js"></script>
+</body></html>

@@ -1,0 +1,88 @@
+{
+  "suite_name": "Buddh Circuit Robustness Evaluation Suite",
+  "model": "models/generalist_v1.pth",
+  "max_steps": 15000,
+  "trials": [
+    {
+      "trial_id": "trial_01_nominal_rep1",
+      "description": "Nominal baseline start pose (repetition 1)",
+      "options": {}
+    },
+    {
+      "trial_id": "trial_02_nominal_rep2",
+      "description": "Nominal baseline start pose (repetition 2, bitwise check)",
+      "options": {}
+    },
+    {
+      "trial_id": "trial_03_lateral_left_15px",
+      "description": "Lateral offset -15.0 px (-2.57m towards left boundary)",
+      "options": {
+        "lateral_offset_px": -15.0
+      }
+    },
+    {
+      "trial_id": "trial_04_lateral_right_15px",
+      "description": "Lateral offset +15.0 px (+2.57m towards right boundary)",
+      "options": {
+        "lateral_offset_px": 15.0
+      }
+    },
+    {
+      "trial_id": "trial_05_lateral_left_8px",
+      "description": "Lateral offset -8.0 px (-1.37m left offset)",
+      "options": {
+        "lateral_offset_px": -8.0
+      }
+    },
+    {
+      "trial_id": "trial_06_lateral_right_8px",
+      "description": "Lateral offset +8.0 px (+1.37m right offset)",
+      "options": {
+        "lateral_offset_px": 8.0
+      }
+    },
+    {
+      "trial_id": "trial_07_heading_left_10deg",
+      "description": "Initial heading perturbation -10.0 deg (angled left)",
+      "options": {
+        "heading_offset_deg": -10.0
+      }
+    },
+    {
+      "trial_id": "trial_08_heading_right_10deg",
+      "description": "Initial heading perturbation +10.0 deg (angled right)",
+      "options": {
+        "heading_offset_deg": 10.0
+      }
+    },
+    {
+      "trial_id": "trial_09_heading_left_5deg",
+      "description": "Initial heading perturbation -5.0 deg (angled left)",
+      "options": {
+        "heading_offset_deg": -5.0
+      }
+    },
+    {
+      "trial_id": "trial_10_heading_right_5deg",
+      "description": "Initial heading perturbation +5.0 deg (angled right)",
+      "options": {
+        "heading_offset_deg": 5.0
+      }
+    },
+    {
+      "trial_id": "trial_11_combined_offset",
+      "description": "Combined perturbation: Lateral +10.0 px, Heading -5.0 deg",
+      "options": {
+        "lateral_offset_px": 10.0,
+        "heading_offset_deg": -5.0
+      }
+    },
+    {
+      "trial_id": "trial_12_longitudinal_10m",
+      "description": "Longitudinal start line offset +10.0m (+58.33 px forward)",
+      "options": {
+        "longitudinal_offset_px": 58.33
+      }
+    }
+  ]
+}

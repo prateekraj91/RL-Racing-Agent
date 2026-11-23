@@ -1,0 +1,13 @@
+trial_id,description,completed,steps,lap_time_s,avg_speed_kmh,max_speed_kmh,min_steady_speed_kmh,rms_dist_m,max_dist_m,rms_dist_px,max_dist_px,off_track_steps,collisions,mean_steer,max_steer,steer_diff_mean,rms_heading_err_deg,max_heading_err_deg,termination_reason,wall_clock_s
+trial_01_nominal_rep1,Nominal baseline start pose (repetition 1),True,7521,125.35,147.32,148.11,56.16,0.142,1.002,0.828,5.845,0,0,0.0951,0.9998,0.0546,1.053,12.515,lap_completed,37.01
+trial_02_nominal_rep2,"Nominal baseline start pose (repetition 2, bitwise check)",True,7521,125.35,147.32,148.11,56.16,0.142,1.002,0.828,5.845,0,0,0.0951,0.9998,0.0546,1.053,12.515,lap_completed,36.53
+trial_03_lateral_left_15px,Lateral offset -15.0 px (-2.57m towards left boundary),True,7521,125.35,147.3,148.11,54.63,0.227,2.571,1.323,15.0,0,0,0.0978,0.9998,0.055,1.328,14.757,lap_completed,37.39
+trial_04_lateral_right_15px,Lateral offset +15.0 px (+2.57m towards right boundary),True,7522,125.37,147.31,148.11,55.88,0.221,2.571,1.289,15.0,0,0,0.0992,0.9998,0.055,1.37,18.564,lap_completed,44.91
+trial_05_lateral_left_8px,Lateral offset -8.0 px (-1.37m left offset),True,7522,125.37,147.3,148.11,54.85,0.166,1.371,0.968,8.0,0,0,0.0969,0.9998,0.0552,1.159,12.462,lap_completed,39.69
+trial_06_lateral_right_8px,Lateral offset +8.0 px (+1.37m right offset),True,7521,125.35,147.32,148.11,56.27,0.166,1.371,0.966,8.0,0,0,0.0978,0.9998,0.055,1.212,13.023,lap_completed,39.71
+trial_07_heading_left_10deg,Initial heading perturbation -10.0 deg (angled left),True,7520,125.33,147.32,148.11,56.08,0.145,0.996,0.845,5.811,0,0,0.0968,0.9997,0.0541,1.149,12.447,lap_completed,42.84
+trial_08_heading_right_10deg,Initial heading perturbation +10.0 deg (angled right),True,7520,125.33,147.32,148.11,56.55,0.144,1.003,0.842,5.85,0,0,0.0966,0.9886,0.0549,1.142,12.749,lap_completed,41.58
+trial_09_heading_left_5deg,Initial heading perturbation -5.0 deg (angled left),True,7521,125.35,147.32,148.11,56.07,0.144,0.982,0.841,5.726,0,0,0.0971,0.9996,0.0541,1.065,12.431,lap_completed,43.35
+trial_10_heading_right_5deg,Initial heading perturbation +5.0 deg (angled right),True,7521,125.35,147.32,148.11,56.32,0.143,1.005,0.833,5.861,0,0,0.0942,0.9996,0.054,1.066,12.411,lap_completed,36.54
+trial_11_combined_offset,"Combined perturbation: Lateral +10.0 px, Heading -5.0 deg",True,7522,125.37,147.32,148.11,56.31,0.181,1.786,1.055,10.417,0,0,0.0984,0.9998,0.0551,1.225,15.593,lap_completed,35.45
+trial_12_longitudinal_10m,Longitudinal start line offset +10.0m (+58.33 px forward),True,7521,125.35,147.32,148.11,56.17,0.142,0.964,0.83,5.623,0,0,0.0958,0.9998,0.0557,1.046,12.706,lap_completed,35.78

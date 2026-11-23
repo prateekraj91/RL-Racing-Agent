@@ -1,0 +1,36 @@
+# Git & Version Control
+.git/
+.gitignore
+
+# Virtual Environments
+venv/
+.venv/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Training Logs & Runs
+runs/
+evaluation_runs/
+ablation_results/
+wandb/
+
+# Development Documentation & Tests
+docs/
+tests/
+analysis/
+notebooks/
+*.png
+*.csv
+*.md
+
+# Local Environment & Secrets
+.env
+.env.*
+.DS_Store

@@ -21,3 +21,8 @@ analysis/results/hairpin_candidate_*.csv
 .env
 .env.*
 !.env.example
+
+# Media recordings and concept renders
+*.mp4
+scratch/
+

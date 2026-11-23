@@ -1,0 +1,60 @@
+{
+ "benchmark": "rl-racing-lab chase cam",
+ "seed": 1001,
+ "preset": "standard_medium",
+ "viewport": [
+  1280,
+  800
+ ],
+ "device_pixel_ratio": 1,
+ "results": [
+  {
+   "phase": "High quality",
+   "quality": "high",
+   "frames": 1149,
+   "duration_s": 19.23,
+   "avg_fps": 59.7,
+   "min_fps": 29.9,
+   "frame_time_ms": {
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8,
+    "max": 33.4
+   },
+   "startup": {
+    "frames": 31,
+    "max_ms": 433.3
+   },
+   "renderer_info": {
+    "draw_calls": 158,
+    "triangles": 260346,
+    "textures": 20,
+    "geometries": 104
+   }
+  },
+  {
+   "phase": "Low quality",
+   "quality": "low",
+   "frames": 1133,
+   "duration_s": 19,
+   "avg_fps": 59.6,
+   "min_fps": 15,
+   "frame_time_ms": {
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8,
+    "max": 66.7
+   },
+   "startup": {
+    "frames": 60,
+    "max_ms": 16.8
+   },
+   "renderer_info": {
+    "draw_calls": 131,
+    "triangles": 155573,
+    "textures": 20,
+    "geometries": 104
+   }
+  }
+ ]
+}
