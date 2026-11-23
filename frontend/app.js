@@ -489,6 +489,11 @@ function createProceduralBuildingTexture() {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 6);
+  // Mipmaps + anisotropy so the window grid doesn't alias/pixelate on near faces.
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = renderer ? Math.min(renderer.capabilities.getMaxAnisotropy(), 8) : 4;
   return tex;
 }
 
@@ -1290,13 +1295,13 @@ function buildDistantCitySkyline() {
     const angle = (i < 56)
       ? (-2.4 + rnd() * 2.2)              // back arc
       : (rnd() * Math.PI * 2);           // scattered
-    const dist = 2000 + rnd() * 1500;    // 2000–3500 world units (far)
+    const dist = 3300 + rnd() * 2500;    // 3300–5800 world units (far, fogged, behind trees)
     const x = Math.cos(angle) * dist;
     const z = Math.sin(angle) * dist;
 
-    const bW = 90 + rnd() * 170;
-    const bD = 90 + rnd() * 170;
-    const bH = 120 + rnd() * 520;        // 120–640
+    const bW = 110 + rnd() * 200;
+    const bD = 110 + rnd() * 200;
+    const bH = 120 + rnd() * 460;        // 120–580 (lower, so they sit near the tree line)
 
     dummy.position.set(x, bH / 2 - 2, z);
     dummy.rotation.set(0, rnd() * 0.6, 0);
@@ -1369,27 +1374,31 @@ function buildProceduralVehicle() {
   body.castShadow = true; body.receiveShadow = true;
   carBodyGroup.add(body);
 
-  // ---- Glass canopy ----
+  // ---- Glass canopy (lower + narrower so it doesn't read as a tall box) ----
   const cs = new THREE.Shape();
-  [[-22, 16], [-9, 25.5], [6, 25.5], [19, 15.5]].forEach((p, i) => (i ? cs.lineTo(p[0], p[1]) : cs.moveTo(p[0], p[1])));
+  [[-21, 15.5], [-10, 21], [5, 21], [18, 15]].forEach((p, i) => (i ? cs.lineTo(p[0], p[1]) : cs.moveTo(p[0], p[1])));
   cs.closePath();
-  const cabGeo = new THREE.ExtrudeGeometry(cs, { depth: 22, bevelEnabled: true, bevelThickness: 2, bevelSize: 1.5, bevelSegments: 4 });
-  cabGeo.translate(0, 0, -11);
+  const cabGeo = new THREE.ExtrudeGeometry(cs, { depth: 17, bevelEnabled: true, bevelThickness: 2, bevelSize: 1.5, bevelSegments: 4 });
+  cabGeo.translate(0, 0, -8.5);
   const cab = new THREE.Mesh(cabGeo, glass);
   cab.castShadow = true;
   carBodyGroup.add(cab);
 
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 20), paint);
-  roof.position.set(-1.5, 27.2, 0);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(11, 1.0, 15), paint);
+  roof.position.set(-2, 22.0, 0);
   carBodyGroup.add(roof);
 
-  // ---- Rear wing + struts, diffuser, splitter, skirts ----
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(7, 1.2, 32), black);
-  wing.position.set(-38, 21.5, 0); wing.rotation.z = 0.08; wing.castShadow = true;
+  // ---- Rear wing (blended into the deck) + struts, diffuser, splitter, skirts ----
+  // A sloped rear deck fairing bridges the cabin down to the wing.
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(16, 1.4, 26), paint);
+  deck.position.set(-31, 16.5, 0); deck.rotation.z = 0.18; deck.castShadow = true;
+  carBodyGroup.add(deck);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(7, 1.1, 30), black);
+  wing.position.set(-39, 18.5, 0); wing.rotation.z = 0.06; wing.castShadow = true;
   carBodyGroup.add(wing);
   for (const s of [-1, 1]) {
-    const strut = new THREE.Mesh(new THREE.BoxGeometry(2.4, 5, 1.2), black);
-    strut.position.set(-37, 18.5, 8 * s);
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(2.4, 4.0, 1.2), black);
+    strut.position.set(-38, 16.5, 8 * s);
     carBodyGroup.add(strut);
   }
   const diff = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 26), black);
@@ -1835,12 +1844,22 @@ function percentile(sortedAsc, p) {
 }
 
 function summarizePhase(label, quality, samples, info) {
-  const sorted = [...samples].sort((a, b) => a - b);
+  // Split the first 1 s (startup / any residual compile) from the steady-state window.
+  const startup = [];
+  const steady = [];
+  let cum = 0;
+  for (const ms of samples) {
+    if (cum < 1000) startup.push(ms); else steady.push(ms);
+    cum += ms;
+  }
+  const body = steady.length > 2 ? steady : samples;
+  const sorted = [...body].sort((a, b) => a - b);
   const n = sorted.length;
   const sumMs = sorted.reduce((a, b) => a + b, 0);
   const avgFps = n > 0 ? (1000 * n) / sumMs : 0;
-  const maxMs = n > 0 ? sorted[n - 1] : 0; // worst frame -> min fps
+  const maxMs = n > 0 ? sorted[n - 1] : 0;
   const minFps = maxMs > 0 ? 1000 / maxMs : 0;
+  const startupMax = startup.length ? Math.max(...startup) : 0;
   return {
     phase: label,
     quality,
@@ -1854,8 +1873,32 @@ function summarizePhase(label, quality, samples, info) {
       p99: +percentile(sorted, 99).toFixed(2),
       max: +maxMs.toFixed(2),
     },
+    startup: { frames: startup.length, max_ms: +startupMax.toFixed(2) },
     renderer_info: info || null,
   };
+}
+
+// Pre-compile all materials/post-processing for every camera mode and quality so the
+// first rendered frame of playback doesn't hitch on shader compilation.
+function warmupShaders() {
+  if (!renderer || !scene || !camera) return;
+  try {
+    const prevMode = STATE.activeCameraMode;
+    const prevQuality = STATE.graphicsQuality;
+    for (const q of ["high", "low"]) {
+      setGraphicsQuality(q);
+      for (const m of ["chase", "cockpit", "orbit", "overhead"]) {
+        setCameraMode(m);
+        renderer.compile(scene, camera);
+        if (q === "high" && composer) composer.render();
+        else renderer.render(scene, camera);
+      }
+    }
+    setGraphicsQuality(prevQuality);
+    setCameraMode(prevMode);
+  } catch (e) {
+    console.warn("[warmup] shader pre-compile skipped:", e);
+  }
 }
 
 async function runBenchmark(durationMs = 20000) {
@@ -1889,6 +1932,11 @@ async function runBenchmark(durationMs = 20000) {
     STATE.simRunning = true;
 
     showBenchOverlay(`Recording ${ph.label}… (${durationMs / 1000}s)`, results);
+    // Warm up this quality's pipeline (compile any passes) before recording.
+    if (renderer && scene && camera) {
+      renderer.compile(scene, camera);
+      if (ph.quality === "high" && composer) composer.render(); else renderer.render(scene, camera);
+    }
     // Let the quality switch settle before recording.
     await new Promise((r) => setTimeout(r, 600));
     BENCH.samples = [];
@@ -1938,6 +1986,7 @@ function showBenchOverlay(status, results, done) {
       `<b style="color:#67e3ff">${r.phase} (${r.quality})</b><br>` +
       `avg fps <b>${r.avg_fps}</b> &nbsp; min fps <b>${r.min_fps}</b> &nbsp; frames ${r.frames}<br>` +
       `frame time ms — p50 ${r.frame_time_ms.p50} · p95 ${r.frame_time_ms.p95} · p99 ${r.frame_time_ms.p99} · max ${r.frame_time_ms.max}<br>` +
+      `startup (first 1s, excluded): ${r.startup ? r.startup.frames : 0} frames, max ${r.startup ? r.startup.max_ms : 0} ms<br>` +
       `draws ${i.draw_calls ?? "–"} · tris ${i.triangles ?? "–"} · tex ${i.textures ?? "–"} · geo ${i.geometries ?? "–"}` +
       `</div>`
     );
@@ -2196,10 +2245,10 @@ function updateTelemetryCharts(car, telemetry, stepIdx) {
     TELEM_HISTORY.slip.shift();
   }
 
-  drawSpeedChart();
-  drawSteerChart();
-  drawThrottleChart();
-  drawLateralSlipChart();
+  drawSpeedChart(stepIdx);
+  drawSteerChart(stepIdx);
+  drawThrottleChart(stepIdx);
+  drawLateralSlipChart(stepIdx);
 
   // Readouts - Concept IDs & Legacy IDs
   const velEl = document.getElementById("valVelocity");
@@ -2259,160 +2308,64 @@ function updateTelemetryCharts(car, telemetry, stepIdx) {
   updateCinematicBottomHud(car);
 }
 
-function drawSpeedChart() {
-  const canvas = document.getElementById("chartSpeed");
-  if (!canvas) return;
+// Lab sparklines: plot the rolling window of the REAL step values around the current
+// index (not per-render-frame samples, which flatline when paused and oversample when
+// fast). Matches the concept's chart() approach.
+const CHART_WIN = 80;
+const thrOfStep = (s) => (s.action && s.action[1] !== undefined) ? s.action[1] : ((s.vehicle && s.vehicle.throttle) || 0);
+
+function chartFromSteps(canvasId, stepIdx, series, opts) {
+  const canvas = document.getElementById(canvasId);
+  const rollout = STATE.playback.rolloutData;
+  if (!canvas || !rollout || !rollout.steps) return;
+  const steps = rollout.steps;
   const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
+  const lo = opts.lo, hi = opts.hi;
+  const base = Math.max(0, Math.min(steps.length - 1, Math.floor(stepIdx)));
+  const yOf = (v) => h - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * (h - 8) - 4;
 
-  const data = TELEM_HISTORY.speed;
-  if (data.length < 2) return;
-
-  const maxVal = 4.0;
-  const stepX = w / (TELEM_HISTORY.maxPoints - 1);
-  const startX = (TELEM_HISTORY.maxPoints - data.length) * stepX;
-
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, "rgba(0, 240, 255, 0.28)");
-  grad.addColorStop(1, "rgba(0, 240, 255, 0.0)");
-
-  ctx.beginPath();
-  data.forEach((val, i) => {
-    const x = startX + i * stepX;
-    const y = h - (Math.min(maxVal, Math.max(0, val)) / maxVal) * (h - 8) - 4;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-
-  ctx.strokeStyle = "#00f0ff";
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
-
-  ctx.lineTo(startX + (data.length - 1) * stepX, h);
-  ctx.lineTo(startX, h);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-}
-
-function drawSteerChart() {
-  const canvas = document.getElementById("chartSteer");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-
-  const data = TELEM_HISTORY.steer;
-  if (data.length < 2) return;
-
-  const centerY = h / 2;
-  const stepX = w / (TELEM_HISTORY.maxPoints - 1);
-  const startX = (TELEM_HISTORY.maxPoints - data.length) * stepX;
-
-  // Zero baseline
-  ctx.beginPath();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-  ctx.lineWidth = 1;
-  ctx.moveTo(0, centerY);
-  ctx.lineTo(w, centerY);
-  ctx.stroke();
-
-  ctx.beginPath();
-  data.forEach((val, i) => {
-    const x = startX + i * stepX;
-    const y = centerY - (val / 30.0) * (centerY - 6);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-
-  ctx.strokeStyle = "#ffb700";
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
-}
-
-function drawThrottleChart() {
-  const canvas = document.getElementById("chartThrottle");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-
-  const data = TELEM_HISTORY.throttle;
-  if (data.length < 2) return;
-
-  const centerY = h / 2;
-  const stepX = w / (TELEM_HISTORY.maxPoints - 1);
-  const startX = (TELEM_HISTORY.maxPoints - data.length) * stepX;
-
-  // Red zero center line
-  ctx.beginPath();
-  ctx.strokeStyle = "rgba(255, 42, 95, 0.4)";
-  ctx.lineWidth = 1;
-  ctx.moveTo(0, centerY);
-  ctx.lineTo(w, centerY);
-  ctx.stroke();
-
-  // Stepped line
-  ctx.beginPath();
-  data.forEach((val, i) => {
-    const x = startX + i * stepX;
-    const y = centerY - val * (centerY - 6);
-    if (i === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, centerY - data[i - 1] * (centerY - 6));
-      ctx.lineTo(x, y);
+  if (opts.zero && lo < 0 && hi > 0) {
+    const zy = yOf(0);
+    ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, zy); ctx.lineTo(w, zy); ctx.stroke();
+  }
+  for (const srs of series) {
+    ctx.beginPath();
+    for (let i = 0; i < CHART_WIN; i++) {
+      const s = steps[Math.max(0, base - CHART_WIN + 1 + i)];
+      const x = (i / (CHART_WIN - 1)) * w;
+      const y = yOf(srs.fn(s));
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
-  });
-
-  ctx.strokeStyle = "#00e676";
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
+    ctx.strokeStyle = srs.color; ctx.lineWidth = srs.width || 2.0; ctx.stroke();
+    if (srs.fill) {
+      ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, srs.fill); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.fill();
+    }
+  }
 }
 
-function drawLateralSlipChart() {
-  const canvas = document.getElementById("chartLateralSlip");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width;
-  const h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-
-  const dataLat = TELEM_HISTORY.lateral;
-  const dataSlip = TELEM_HISTORY.slip;
-  if (dataLat.length < 2) return;
-
-  const centerY = h / 2;
-  const stepX = w / (TELEM_HISTORY.maxPoints - 1);
-  const startX = (TELEM_HISTORY.maxPoints - dataLat.length) * stepX;
-
-  // White line: Lateral deviation
-  ctx.beginPath();
-  dataLat.forEach((val, i) => {
-    const x = startX + i * stepX;
-    const y = centerY - (val / 35.0) * (centerY - 6);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // Magenta line: Slip angle
-  ctx.beginPath();
-  dataSlip.forEach((val, i) => {
-    const x = startX + i * stepX;
-    const y = centerY - (val / 15.0) * (centerY - 6);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.strokeStyle = "#b388ff";
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
+function drawSpeedChart(stepIdx) {
+  chartFromSteps("chartSpeed", stepIdx, [{ fn: (s) => s.vehicle.velocity, color: "#67e3ff", fill: "rgba(103,227,255,0.28)" }], { lo: 0, hi: 4.4 });
+}
+function drawSteerChart(stepIdx) {
+  chartFromSteps("chartSteer", stepIdx, [{ fn: (s) => s.vehicle.steering_angle_deg, color: "#ffb02e" }], { lo: -32, hi: 32, zero: true });
+}
+function drawThrottleChart(stepIdx) {
+  chartFromSteps("chartThrottle", stepIdx, [
+    { fn: (s) => Math.max(0, thrOfStep(s)), color: "#3ee08f" },
+    { fn: (s) => Math.min(0, thrOfStep(s)), color: "#ff4d4d" },
+  ], { lo: -1.05, hi: 1.05, zero: true });
+}
+function drawLateralSlipChart(stepIdx) {
+  chartFromSteps("chartLateralSlip", stepIdx, [
+    { fn: (s) => (s.telemetry && s.telemetry.signed_distance) || 0, color: "#ffffff", width: 1.8 },
+    { fn: (s) => ((s.telemetry && s.telemetry.slip_angle) || 0) * 2, color: "#b388ff", width: 1.8 },
+  ], { lo: -30, hi: 30, zero: true });
 }
 
 function syncPlaybackCommentary(allCommentary, currentStep) {
@@ -2609,6 +2562,9 @@ async function startSimulation(presetId = STATE.presetId, trackSeed = STATE.trac
 
     // Initial frame
     renderPlaybackFrame(0.0, 0.016);
+
+    // Pre-compile shaders for every mode/quality so the first playback frames don't hitch.
+    warmupShaders();
 
     // Snap chase camera to starting position
     if (STATE.activeCameraMode === "chase" && carGroup) {
