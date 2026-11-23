@@ -153,7 +153,7 @@ function initThreeJS() {
     powerPreference: "high-performance",
   });
   renderer.setSize(width, height, false);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(highPixelRatio());
 
   // PBR Tone Mapping & Color Management (concept: ACES @ exposure 0.62)
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -235,6 +235,17 @@ function initThreeJS() {
   });
 }
 
+// High-quality pixel ratio. BIC (large circuit) is capped at 1.0 CSS-px (Low-quality fill cost);
+// override for native A/B benchmarking with ?pr=<0.5..2>.
+function highPixelRatio() {
+  try {
+    const q = parseFloat(new URLSearchParams(window.location.search).get("pr"));
+    if (Number.isFinite(q) && q >= 0.5 && q <= 2) return q;
+  } catch (e) {}
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  return STATE.source === "bic" ? Math.min(dpr, 1.0) : dpr;
+}
+
 function onCanvasResize(width, height) {
   if (!width || !height) {
     width = window.innerWidth;
@@ -243,7 +254,7 @@ function onCanvasResize(width, height) {
   if (!renderer || !camera || width <= 0 || height <= 0) return;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  const pr = Math.min(window.devicePixelRatio || 1, 2);
+  const pr = highPixelRatio();
   renderer.setPixelRatio(pr);
   renderer.setSize(width, height, false);
 
@@ -549,7 +560,7 @@ function loadPBRTextures() {
 function initEffectComposer(width, height) {
   if (!THREE.EffectComposer || !THREE.RenderPass) return;
 
-  const pr = Math.min(window.devicePixelRatio || 1, 2);
+  const pr = highPixelRatio();
   const renderTarget = new THREE.WebGLRenderTarget(width * pr, height * pr, {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
@@ -1288,7 +1299,7 @@ function buildDistantCitySkyline(trackData) {
   });
 
   const LARGE = !!(trackData && trackData.large_circuit);
-  const COUNT = LARGE ? 160 : 80;
+  const COUNT = LARGE ? 52 : 80; // BIC: 160 -> 52 (-67%) to cut High-quality cost
   const dummy = new THREE.Object3D();
   const towerGeo = new THREE.BoxGeometry(1, 1, 1);
   const towerMesh = new THREE.InstancedMesh(towerGeo, buildingMat, COUNT);
@@ -2715,7 +2726,7 @@ function setGraphicsQuality(quality) {
   }
 
   if (renderer) {
-    renderer.setPixelRatio(quality === "high" ? Math.min(window.devicePixelRatio || 1, 2) : 1);
+    renderer.setPixelRatio(quality === "high" ? highPixelRatio() : 1);
     renderer.shadowMap.enabled = quality === "high";
   }
 }
