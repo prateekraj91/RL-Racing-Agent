@@ -35,7 +35,7 @@
       if (sw) { sw.textContent = "◂ switch to LIVE rollout"; sw.href = "?source=live"; }
     } else {
       b.className = "source-badge live";
-      b.textContent = "LIVE — policy rollout";
+      b.textContent = window.STATIC_BUILD ? "PRECOMPUTED — deterministic rollout (frozen policy)" : "LIVE — policy rollout";
       if (sw) { sw.textContent = "Recorded: BIC ▸"; sw.href = "?source=bic"; }
     }
   }

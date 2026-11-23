@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# Deploy the Docker Space. Usage: scripts/deploy_hf.sh <hf_user> [space_name]
-# Requires `hf auth login --add-to-git-credential` (token never stored in this repo). Pushes a clean snapshot
-# of the whitelisted build context (see .dockerignore) with Space front-matter prepended to README.
+# Deploy the STATIC build (dist/) to a Hugging Face Static Space.
+# Usage: scripts/deploy_hf.sh [hf_user/space]   (default prateekraj91/rl-racing-lab)
+# Requires `hf auth login --add-to-git-credential` (token never stored in this repo).
 set -euo pipefail
-USER_NAME="${1:?hf username}"; SPACE="${2:-rl-racing-lab}"
-ROOT="$(git rev-parse --show-toplevel)"; TMP="$(mktemp -d)"
-cd "$ROOT"
-git ls-files -z sac/__init__.py sac/actor.py env inference frontend models/generalist_v1.pth configs/generalist_v1.json \
-  buddh/buddh_track_data.npz buddh/buddh_manifest.json analysis/buddh/buddh_full_rollout.csv runs/grip_eval \
-  docs/evaluation Dockerfile .dockerignore requirements-inference.txt \
-  | xargs -0 -I{} rsync -aR "{}" "$TMP/"
-{ printf -- '---\ntitle: RL Racing Lab\nemoji: 🏎️\ncolorFrom: red\ncolorTo: gray\nsdk: docker\napp_port: 7860\npinned: false\n---\n\n'; cat README.md; } > "$TMP/README.md"
-cd "$TMP"; git init -q; git add -A; git commit -q -m "Deploy RL Racing Lab"
-hf repos create "$USER_NAME/$SPACE" --type space --sdk docker --public 2>/dev/null || true
-git push -f "https://huggingface.co/spaces/$USER_NAME/$SPACE" HEAD:main
-echo "https://huggingface.co/spaces/$USER_NAME/$SPACE  (app: https://${USER_NAME//_/-}-${SPACE//_/-}.hf.space/demo)"
+SPACE="${1:-prateekraj91/rl-racing-lab}"
+ROOT="$(git rev-parse --show-toplevel)"; cd "$ROOT"
+PYTHONPATH=. "${PYTHON:-python}" scripts/build_static.py --out dist
+TMP="$(mktemp -d)"
+git clone -q "https://huggingface.co/spaces/$SPACE" "$TMP/space"
+find "$TMP/space" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+cp -R dist/. "$TMP/space/"
+cd "$TMP/space"; git add -A
+git -c user.name="deploy" -c user.email="deploy@localhost" commit -q -m "Deploy static build" || { echo "nothing to deploy"; exit 0; }
+git push -q origin HEAD:main
+echo "https://huggingface.co/spaces/$SPACE"
