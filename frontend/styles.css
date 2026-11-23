@@ -1090,3 +1090,36 @@ body.recorded-source .post-lap-footer { display: flex; align-items: center; }
 
 .source-select { font: 11px "DejaVu Sans Mono", monospace; color: #cfe0f2; background: rgba(12,18,26,0.85); border: 1px solid #35506b; border-radius: 6px; padding: 3px 6px; cursor: pointer; }
 .source-select:hover { border-color: #7fb4ea; }
+
+/* ==============================================================================
+   Tour mode (/demo?tour=1): automated screen-recording sequence. UI controls + cursor hidden.
+   ============================================================================== */
+body.tour-mode, body.tour-mode * { cursor: none !important; }
+body.tour-mode .concept-top-bar, body.tour-mode #sourceBar, body.tour-mode #playbackBar,
+body.tour-mode #settingsDrawer, body.tour-mode .recorded-hud, body.tour-mode .recorded-minimap,
+body.tour-mode .simulation-loading-overlay, body.tour-mode .btn-close-modal, body.tour-mode #btnOverlayRestart,
+body.tour-mode #btnOverlayClose { display: none !important; }
+body.tour-nohud #cinematicBottomHud { display: none !important; }
+body.tour-nolabels #rayLabels, body.tour-nolabels #sensorLegend { display: none !important; }
+body.tour-ended #canvasOverlay { display: none !important; }
+
+.tour-fade { position: fixed; inset: 0; background: #04070e; opacity: 0; pointer-events: none; z-index: 9000; transition: opacity 380ms ease; }
+.tour-fade.on { opacity: 1; }
+.tour-caption {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(8px);
+  max-width: min(760px, 86vw); padding: 14px 26px; text-align: center; z-index: 8000; pointer-events: none;
+  font: 600 17px/1.4 "Inter", "Helvetica Neue", Arial, sans-serif; letter-spacing: 0.2px; color: #eaf3ff;
+  background: rgba(10, 16, 24, 0.82); border: 1px solid rgba(120, 200, 255, 0.22); border-radius: 14px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  opacity: 0; transition: opacity 500ms ease, transform 500ms ease;
+}
+.tour-caption.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.tour-caption.high { bottom: 190px; }
+.tour-caption.top { bottom: auto; top: 28px; }
+.tour-caption.title { bottom: auto; top: 40%; font-size: 30px; padding: 26px 40px; max-width: min(900px, 90vw); letter-spacing: 0.4px; }
+.tour-end { position: fixed; inset: 0; z-index: 9500; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; color: #eaf3ff; font-family: "Inter", "Helvetica Neue", Arial, sans-serif; opacity: 0; pointer-events: none; transition: opacity 700ms ease; text-align: center; }
+.tour-end.show { opacity: 1; }
+.tour-end .te-title { font-size: 34px; font-weight: 700; }
+.tour-end .te-sub { font-size: 16px; color: #8fb4d8; margin-bottom: 14px; letter-spacing: 1.5px; text-transform: uppercase; }
+.tour-end .te-url { font: 17px "DejaVu Sans Mono", monospace; color: #67e3ff; }

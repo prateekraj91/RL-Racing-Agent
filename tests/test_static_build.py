@@ -85,3 +85,20 @@ require({json.dumps(str(dist / 'static/static_shim.js'))});
     assert out["calls"] == ["http://x/data/recorded/bic.json", "http://x/data/recorded/bic_g1p0.json",
                             "http://x/data/rollouts/standard_medium_1004.json", "static/assets/x.jpg"]
     assert out["blocked"] == 7 and out["attempts"] == 7
+
+
+def test_tour_mode_shipped_and_static_safe(dist):
+    html = (dist / "index.html").read_text()
+    assert html.index("recorded.js") < html.index("tour.js")
+    tour = (dist / "static/tour.js").read_text()
+    assert 'get("tour") === "1"' in tour and "Escape" in tour
+    # only recorded/precomputed runs: the three sources the tour touches exist in the static data set
+    assert (dist / "data/recorded/bic.json").is_file() and (dist / "data/recorded/bic_g1p0.json").is_file()
+    assert (dist / "data/rollouts/standard_medium_1001.json").is_file()
+    # tour fetches only through the (shimmed) endpoints the app already uses
+    import re
+    paths = set(re.findall(r'fetch\("(/[^"?]*)', tour))
+    assert paths <= {"/recorded/bic", "/simulation/rollout"}
+    # timeline is strictly increasing and spans ~90 s
+    ts = [int(x) for x in re.findall(r"\{ t: (\d+),", tour)]
+    assert ts == sorted(ts) and ts[0] == 0 and 80 <= ts[-1] <= 90
