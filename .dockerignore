@@ -1,36 +1,19 @@
-# Git & Version Control
-.git/
-.gitignore
-
-# Virtual Environments
-venv/
-.venv/
-
-# Python Cache & Bytecode
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Training Logs & Runs
-runs/
-evaluation_runs/
-ablation_results/
-wandb/
-
-# Development Documentation & Tests
-docs/
-tests/
-analysis/
-notebooks/
-*.png
-*.csv
-*.md
-
-# Local Environment & Secrets
-.env
-.env.*
-.DS_Store
+# Whitelist build context: only what the API + frontend + recorded playback need.
+*
+!requirements-inference.txt
+!sac/__init__.py
+!sac/actor.py
+!env/
+!inference/
+!frontend/
+!models/generalist_v1.pth
+!configs/generalist_v1.json
+!buddh/buddh_track_data.npz
+!buddh/buddh_manifest.json
+!analysis/buddh/buddh_full_rollout.csv
+!runs/grip_eval/*.csv
+**/__pycache__
+**/*.pyc
+frontend/static
+frontend/node_modules
+frontend/package-lock.json

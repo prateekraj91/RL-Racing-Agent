@@ -26,3 +26,4 @@ analysis/results/hairpin_candidate_*.csv
 *.mp4
 scratch/
 
+dist/

@@ -64,7 +64,15 @@
   <!-- Data source badge: LIVE (policy rollout) vs RECORDED (saved BIC eval) -->
   <div class="source-bar" id="sourceBar">
     <span class="source-badge live" id="sourceBadge">LIVE — policy rollout</span>
-    <a class="source-switch" id="sourceSwitch" href="?source=bic">Recorded: BIC ▸</a>
+    <select class="source-select" id="sourceSelect" aria-label="Playback source">
+      <option value="source=bic">BIC — recorded eval (grip OFF)</option>
+      <option value="source=bic&run=bic_g0p8">EXPERIMENT — BIC grip 0.8 G</option>
+      <option value="source=bic&run=bic_g1p0">EXPERIMENT — BIC grip 1.0 G</option>
+      <option value="source=bic&run=bic_g1p2">EXPERIMENT — BIC grip 1.2 G</option>
+      <option value="source=bic&run=std_off">Standard track — recorded, grip OFF</option>
+      <option value="source=bic&run=std_g1p0">EXPERIMENT — standard track grip 1.0 G</option>
+      <option value="source=live">LIVE — standard-track rollout</option>
+    </select>
   </div>
 
   <!-- Top Floating Header Bar (Concept Layout) -->
@@ -374,7 +382,7 @@
   <div id="tabLong" style="display:none;"></div>
   <div id="tabHist" style="display:none;"></div>
 
-  <script src="/static/app.js?v=bic6"></script>
-  <script src="/static/recorded.js?v=bic6"></script>
+  <script src="/static/app.js?v=bic7"></script>
+  <script src="/static/recorded.js?v=bic7"></script>
 </body>
 </html>

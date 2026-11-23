@@ -286,6 +286,82 @@ def step_simulation_endpoint(
     )
 
 
+# ==============================================================================
+# Public-deployment hardening (additive): rollout cache + per-IP rate limit
+# ==============================================================================
+import hashlib as _hashlib
+import json as _json
+import threading as _threading
+import time as _time
+from collections import OrderedDict as _OrderedDict, deque as _deque
+
+ROLLOUT_CACHE_DIR = Path(os.getenv("ROLLOUT_CACHE_DIR", "/tmp/rollout_cache"))
+ROLLOUT_CACHE_MAX = int(os.getenv("ROLLOUT_CACHE_MAX", "64"))
+RATE_LIMIT_PER_MIN = int(os.getenv("ROLLOUT_RATE_LIMIT_PER_MIN", "20"))  # uncached rollouts / IP / minute
+_rollout_mem: "_OrderedDict[str, dict]" = _OrderedDict()
+_rollout_lock = _threading.Lock()
+_rate_hits: dict = {}
+
+
+def _rollout_key(payload) -> str:
+    raw = _json.dumps(payload.model_dump(), sort_keys=True, default=str)
+    return _hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _rollout_cache_get(key: str):
+    with _rollout_lock:
+        if key in _rollout_mem:
+            _rollout_mem.move_to_end(key)
+            return _rollout_mem[key]
+    f = ROLLOUT_CACHE_DIR / f"{key}.json"
+    try:
+        if f.is_file():
+            data = _json.loads(f.read_text())
+            _rollout_cache_put(key, data, write_disk=False)
+            return data
+    except Exception:
+        pass
+    return None
+
+
+def _rollout_cache_put(key: str, data: dict, write_disk: bool = True) -> None:
+    with _rollout_lock:
+        _rollout_mem[key] = data
+        _rollout_mem.move_to_end(key)
+        while len(_rollout_mem) > ROLLOUT_CACHE_MAX:
+            _rollout_mem.popitem(last=False)
+    if write_disk:
+        try:
+            ROLLOUT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = ROLLOUT_CACHE_DIR / f"{key}.tmp"
+            tmp.write_text(_json.dumps(data))
+            tmp.replace(ROLLOUT_CACHE_DIR / f"{key}.json")
+        except Exception:
+            pass  # disk cache is best-effort
+
+
+def _client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _rate_limit_or_429(request: Request) -> None:
+    if RATE_LIMIT_PER_MIN <= 0:
+        return
+    ip, now = _client_ip(request), _time.monotonic()
+    with _rollout_lock:
+        q = _rate_hits.setdefault(ip, _deque())
+        while q and now - q[0] > 60.0:
+            q.popleft()
+        if len(q) >= RATE_LIMIT_PER_MIN:
+            retry = max(1, int(60 - (now - q[0])))
+            raise HTTPException(status_code=429, detail="Rate limit exceeded for /simulation/rollout",
+                                headers={"Retry-After": str(retry)})
+        q.append(now)
+
+
 @app.post(
     "/simulation/rollout",
     summary="Execute full deterministic simulation rollout",
@@ -295,13 +371,26 @@ def step_simulation_endpoint(
     ),
 )
 def rollout_simulation_endpoint(
+    request: Request,
     payload: SimulationRolloutRequest,
     actor_bundle: Tuple[SACActor, dict] = Depends(get_actor_and_metadata),
 ) -> dict:
-    """Execute complete episode rollout for client-side playback."""
+    """Execute complete episode rollout for client-side playback.
+
+    Rollouts are deterministic (frozen weights, mean action), so offline-commentary results are cached
+    by their full request key (memory + disk). Only cache MISSES (real compute) count against the
+    per-IP rate limit. max_steps is capped at 1000 by the request schema.
+    """
     actor, _ = actor_bundle
+    use_cache = payload.commentary_mode == "offline"
+    key = _rollout_key(payload)
+    if use_cache:
+        hit = _rollout_cache_get(key)
+        if hit is not None:
+            return hit
+    _rate_limit_or_429(request)
     gemini_key = os.getenv("GEMINI_API_KEY")
-    return simulation_manager.rollout(
+    result = simulation_manager.rollout(
         actor=actor,
         preset_id=payload.preset_id,
         track_seed=payload.track_seed,
@@ -311,7 +400,9 @@ def rollout_simulation_endpoint(
         commentary_mode=payload.commentary_mode,
         gemini_api_key=gemini_key,
     )
-
+    if use_cache:
+        _rollout_cache_put(key, result)
+    return result
 
 
 @app.post(
