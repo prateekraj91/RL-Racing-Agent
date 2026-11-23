@@ -367,12 +367,15 @@ def get_historical_saliency_endpoint() -> dict:
     description="Serves the saved BIC evaluation CSV + exact track geometry for recorded playback. "
     "Never runs the policy or the environment.",
 )
-def get_recorded_bic_endpoint() -> dict:
-    """Return the saved BIC run verbatim (additive endpoint)."""
+def get_recorded_bic_endpoint(run: str = "") -> dict:
+    """Return the saved BIC run verbatim (additive endpoint). Optional ?run=<id> selects a saved
+    grip-limit experiment run from runs/grip_eval/ (e.g. bic_g1p0, std_off); default is unchanged."""
     from inference.recorded import load_bic_recorded
 
     try:
-        return load_bic_recorded()
+        return load_bic_recorded(run)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown recorded run: {run}")
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Recorded BIC data missing: {exc}")
 

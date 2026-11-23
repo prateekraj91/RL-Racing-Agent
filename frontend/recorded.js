@@ -10,6 +10,11 @@
 (function () {
   const NA = "not recorded";
   let REC = null; // { meta, cols }
+  // Optional experiment run (?source=bic&run=bic_g1p0 | std_g0p8 ...). Same honest-unit rules as BIC playback.
+  const RUN = (() => { try { return new URLSearchParams(window.location.search).get("run") || ""; } catch (e) { return ""; } })();
+  const RUN_TAG = { off: "grip OFF (baseline)", g0p8: "grip limit 0.8 G", g1p0: "grip limit 1.0 G", g1p2: "grip limit 1.2 G" };
+  const runLabel = () => { const [k, t] = RUN.split("_"); return `EXPERIMENT — ${RUN_TAG[t] || RUN}${k === "std" ? " (standard track)" : ""}`; };
+  const isGrip = () => !!RUN;
 
   const $ = (id) => document.getElementById(id);
   const fmt = (v, d) => (Number.isFinite(v) ? v.toFixed(d) : NA);
@@ -20,7 +25,7 @@
     if (!b) return;
     if (STATE.source === "bic") {
       b.className = "source-badge recorded";
-      b.textContent = "RECORDED PLAYBACK — BIC eval";
+      b.textContent = RUN ? runLabel() : "RECORDED PLAYBACK — BIC eval";
       if (sw) { sw.textContent = "◂ switch to LIVE rollout"; sw.href = window.location.pathname; }
     } else {
       b.className = "source-badge live";
@@ -58,7 +63,7 @@
     const hud = document.createElement("div");
     hud.id = "recordedHud"; hud.className = "recorded-hud";
     hud.innerHTML = `
-      <div class="rh-title">RECORDED RUN · BIC eval</div>
+      <div class="rh-title">${RUN ? runLabel() : "RECORDED RUN · BIC eval"}</div>
       <div class="rh-row"><span>STEP</span><b id="rhStep">1 / ${m.steps}</b></div>
       <div class="rh-row"><span>ELAPSED*</span><b id="rhElapsed">0.00 s</b></div>
       <div class="rh-bar"><div id="rhBarFill"></div></div>
@@ -72,7 +77,10 @@
       <div class="rh-row"><span>YAW-RATE</span><b id="rhSlip">0.00°</b></div>
       <div class="rh-note">kinematic yaw-rate (not tyre slip)</div>
       <div class="rh-row"><span>STEER ACTION</span><b id="rhSteer">0.00</b></div>
-      <div class="rh-note na">Not recorded: lateral accel, tyre slip/grip, commentary. * assumes 60 steps/s (physics has no time base); kinematic model, no grip limit.</div>`;
+      ${RUN ? `<div class="rh-row"><span>LAT ACCEL (derived)</span><b id="rhAlat">0.00 G</b></div>
+      <div class="rh-row"><span>GRIP LIMIT</span><b>${m.grip && m.grip.limit_g ? m.grip.limit_g.toFixed(1) + " G" : "OFF"}</b></div>
+      <div class="rh-note na">Derived: lat accel = speed × |Δheading| per step, in G assuming 12 m = 70 px and 60 steps/s. Grip = existing Car.grip_limit understeer clamp (no speed loss). Not recorded: tyre slip, commentary. * assumes 60 steps/s.</div>`
+      : `<div class="rh-note na">Not recorded: lateral accel, tyre slip/grip, commentary. * assumes 60 steps/s (physics has no time base); kinematic model, no grip limit.</div>`}`;
     document.body.appendChild(hud);
   }
 
@@ -91,6 +99,10 @@
     s("rhLat", `${c.signed_dist_px[i] >= 0 ? "+" : ""}${fmt(c.signed_dist_px[i], 2)} px · ${fmt(c.signed_dist_m[i], 3)} m`);
     s("rhHdg", `${fmt(c.heading_err_deg[i], 2)}°`);
     s("rhSlip", `${fmt(c.slip_deg[i], 2)}°`);
+    if (RUN && i > 0) {
+      let d = c.car_angle[i] - c.car_angle[i - 1]; d = ((d + 540) % 360) - 180;
+      s("rhAlat", `${((c.speed_px_step[i] * Math.abs(d) * Math.PI / 180) / (9.80665 / ((1 / m.px_per_m) * 3600))).toFixed(2)} G`);
+    }
     s("rhSteer", `${c.steering_action[i] >= 0 ? "+" : ""}${fmt(c.steering_action[i], 3)} (×${m.max_steer_deg}°)`);
     // Overrides of the live-sim readouts that assume a different time base / labels
     s("stepClock", `STEP: ${c.step[i]} / ${m.steps}`);
@@ -131,12 +143,13 @@
     set("kpiRms", u(rms.toFixed(3), "m"));
     set("kpiMaxLat", u(maxLat.toFixed(3), "m"));
     const badge = document.querySelector(".lap-complete-badge"); if (badge) badge.textContent = "RECORDED LAP COMPLETE";
-    const tag = document.querySelector(".computed-tag"); if (tag) tag.textContent = "computed from recorded CSV (7,521 rows)";
+    const tag = document.querySelector(".computed-tag"); if (tag) tag.textContent = `computed from recorded CSV (${n.toLocaleString("en-US")} rows)`;
     const foot = document.querySelector(".post-lap-footer");
     if (foot && !$("recordedNote")) {
       const d = document.createElement("div"); d.id = "recordedNote"; d.className = "rh-note wide";
       d.textContent = "* assumes 60 steps/s (no time base in the physics). Speeds are native px/step. Yaw-rate is kinematic, not tyre slip. " +
-        "Kinematic model, no grip limit. Braking = throttle < 0 (never occurs).";
+        (isGrip() ? "Kinematic model with the existing grip-limit understeer clamp (experiment). Braking = throttle < 0." :
+        "Kinematic model, no grip limit. Braking = throttle < 0 (never occurs).");
       foot.prepend(d);
     }
     window.__recordedPostLapStats = { avgLat_m: avgLat, rms_m: rms, maxLat_m: maxLat, brakingPct: (braking / n) * 100,
@@ -157,15 +170,15 @@
   async function loadRecordedBIC() {
     updateStatusPill("LOADING RECORDED RUN...", "amber");
     showLoadingOverlay("LOADING RECORDED BIC RUN", "Reading saved evaluation CSV (no policy calls)...");
-    const res = await fetch("/recorded/bic");
+    const res = await fetch(RUN ? `/recorded/bic?run=${encodeURIComponent(RUN)}` : "/recorded/bic");
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     REC = data;
     const m = data.meta;
 
     const track = Object.assign({}, data.track, {
-      large_circuit: true,
-      markers: [1, 6, 8].map((k) => {
+      large_circuit: m.track_kind !== "std",
+      markers: (m.track_kind === "std" ? [] : [1, 6, 8]).map((k) => {
         const t = m.turns.find((q) => q.n === k);
         return { label: `T${k}`, x: t.x, y: t.y, radius_m: t.radius_m };
       }),
@@ -194,7 +207,7 @@
     if (mini) {
       const panel = document.createElement("div");
       panel.id = "recordedMinimap"; panel.className = "recorded-minimap";
-      panel.innerHTML = `<div class="rh-title">CIRCUIT · T1 / T6 / T8 = tightest</div>`;
+      panel.innerHTML = `<div class="rh-title">${m.track_kind === "std" ? "STANDARD TRACK · seed 1001" : "CIRCUIT · T1 / T6 / T8 = tightest"}</div>`;
       mini.width = 150; mini.height = 240;
       panel.appendChild(mini);
       document.body.appendChild(panel);
@@ -202,7 +215,7 @@
     const t = document.querySelector("#telemetrySidebar .telemetry-chart-block:nth-child(4) .chart-title");
     if (t) { t.textContent = "LAT DEV • KINEMATIC YAW-RATE (NOT TYRE SLIP)"; t.style.fontSize = "9px"; }
     const disc = document.querySelector(".concept-disclaimer");
-    if (disc) disc.textContent = "RECORDED BIC EVAL • FROZEN GENERALIST-V1 • NO LIVE INFERENCE";
+    if (disc) disc.textContent = (RUN ? `${runLabel().toUpperCase()} • FROZEN GENERALIST-V1 • NO LIVE INFERENCE` : "RECORDED BIC EVAL • FROZEN GENERALIST-V1 • NO LIVE INFERENCE");
     const total = $("pbTotalTime"); if (total) total.textContent = mmss(m.steps / m.assumed_steps_per_s);
     const sc = $("pbScrubber"); if (sc) { sc.max = STATE.playback.maxStep; sc.value = 0; }
     const startIcon = $("startIcon"); if (startIcon) startIcon.innerText = "▶";
