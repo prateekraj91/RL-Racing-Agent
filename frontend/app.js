@@ -235,7 +235,7 @@ function initThreeJS() {
   });
 }
 
-// High-quality pixel ratio. BIC (large circuit) is capped at 1.0 CSS-px (Low-quality fill cost);
+// High-quality pixel ratio. BIC (large circuit) is set to 0.8 (native bench: High avg 59.9 fps);
 // override for native A/B benchmarking with ?pr=<0.5..2>.
 function highPixelRatio() {
   try {
@@ -243,7 +243,7 @@ function highPixelRatio() {
     if (Number.isFinite(q) && q >= 0.5 && q <= 2) return q;
   } catch (e) {}
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  return STATE.source === "bic" ? Math.min(dpr, 1.0) : dpr;
+  return STATE.source === "bic" ? Math.min(dpr, 0.8) : dpr;
 }
 
 function onCanvasResize(width, height) {
