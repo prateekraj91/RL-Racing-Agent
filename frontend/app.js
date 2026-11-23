@@ -38,9 +38,16 @@ const STATE = {
   trackData: null,
   trackCenter: { x: 400.0, y: 300.0 },
 
-  // Camera lerp targets
+  // Camera lerp targets (smoothed actual camera state)
   cameraPos: new THREE.Vector3(0, 45, 140),
   cameraTarget: new THREE.Vector3(0, 6, 0),
+  cameraUp: new THREE.Vector3(0, 1, 0),
+  cameraFov: 52,
+  // Snapshot of the camera at the last mode switch (for the ease-in/out blend)
+  camFromPos: new THREE.Vector3(0, 45, 140),
+  camFromTarget: new THREE.Vector3(0, 6, 0),
+  camFromUp: new THREE.Vector3(0, 1, 0),
+  camFromFov: 52,
 
   // Trajectory buffer
   trajectoryPoints: [],
@@ -100,6 +107,13 @@ let rearBrakeLights = [];
 let carEmitterNodes = [];
 let wheelSpinAngle = 0.0;
 let prevCarWorldX = null, prevCarWorldZ = null; // for distance-based wheel spin
+// Camera smoothing + orbit state
+let orbitAngle = 0.0;
+let orbitUserTookOver = false;
+let chaseForwardX = 1.0, chaseForwardZ = 0.0; // car heading averaged over ~25 steps
+let cameraTransT = 1.0; // transition timer since last mode switch (seconds); 1 = settled
+const CAMERA_TRANSITION_S = 0.6;
+const smoothstep01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
 let rayBeamObjects = [];
 let roadMesh, curbInnerMesh, curbOuterMesh, barrierMesh, groundPlaneMesh;
 let innerEdgeMesh, outerEdgeMesh, centerLineMesh;
@@ -156,6 +170,10 @@ function initThreeJS() {
     controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI / 2 - 0.02;
     controls.enabled = false;
+    // First drag in orbit hands control to the mouse (stops auto-rotation).
+    controls.addEventListener("start", () => {
+      if (STATE.activeCameraMode === "orbit") orbitUserTookOver = true;
+    });
   }
 
   // 5. Scene Hierarchy Groups
@@ -1474,6 +1492,15 @@ function buildCarModel() {
 // 5 Dynamic Rangefinder Sensor Beams (PX_TO_WORLD = 1.0)
 // ==============================================================================
 
+const RAY_MAX = 200; // env obs_ray_max_dist
+let sweepMesh = null;
+const BEAM_Y = 7.0;
+
+// Real-distance colour tiers (concept): red <45, amber <90, cyan beyond.
+function rayCol(d) {
+  return d < 45 ? 0xff4d4d : d < 90 ? 0xffb02e : 0x67e3ff;
+}
+
 function buildLidarBeams() {
   while (lidarGroup.children.length > 0) {
     const obj = lidarGroup.children[0];
@@ -1482,96 +1509,108 @@ function buildLidarBeams() {
   }
   rayBeamObjects = [];
 
-  // Concept ray tiers: red (<45px), amber (<90px), cyan (far). Low-blue reds avoid magenta.
-  const colors = [0xff4d4d, 0xffb02e, 0x67e3ff, 0xffb02e, 0xff4d4d];
-
   for (let i = 0; i < 5; i++) {
-    const beamColor = colors[i];
-
-    // 3D Solid Laser Beam Cylinder (Immune to WebGL 1px line limitations)
-    const beamGeo = new THREE.CylinderGeometry(0.55, 0.55, 1.0, 10);
-    const beamMat = new THREE.MeshBasicMaterial({
-      color: beamColor,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const beamMesh = new THREE.Mesh(beamGeo, beamMat);
-    lidarGroup.add(beamMesh);
-
-    // Ground Contact Ring at Hit Point
-    const ringGeo = new THREE.RingGeometry(1.4, 2.5, 20);
+    // Thin bright core
+    const core = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.5, 1, 8),
+      new THREE.MeshBasicMaterial({ color: 0x67e3ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    // Soft wider additive glow
+    const glow = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.6, 2.6, 1, 8),
+      new THREE.MeshBasicMaterial({ color: 0x67e3ff, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    // White hit sphere
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(2.3, 14, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    // Flat ground ring in the beam colour
+    const ringGeo = new THREE.RingGeometry(3.6, 5.6, 28);
     ringGeo.rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: beamColor,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    lidarGroup.add(ring);
-
-    // Spark Particle at Hit Point
-    const sparkGeo = new THREE.SphereGeometry(1.1, 10, 10);
-    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const spark = new THREE.Mesh(sparkGeo, sparkMat);
-    lidarGroup.add(spark);
-
-    rayBeamObjects.push({ beam: beamMesh, ring, spark, color: beamColor });
+    const ring = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshBasicMaterial({ color: 0x67e3ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    lidarGroup.add(core, glow, hit, ring);
+    rayBeamObjects.push({ core, glow, hit, ring });
   }
+
+  // Optional illustrative scan sweep (rotating translucent purple fan) — clearly distinct
+  // from the measured beams (wide flat wedge, not a thin line).
+  sweepMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(RAY_MAX, 36, 0, 0.32),
+    new THREE.MeshBasicMaterial({ color: 0xd678ff, transparent: true, opacity: 0.16, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  sweepMesh.rotation.x = -Math.PI / 2;
+  sweepMesh.visible = false;
+  lidarGroup.add(sweepMesh);
 }
 
-function updateLidarVisuals(rays, car) {
-  if (!rays || rays.length < 5 || !carGroup) return;
-
-  const origin = new THREE.Vector3(carGroup.position.x, 5.5, carGroup.position.z);
+const _tmpV3 = new THREE.Vector3();
+function updateLidarVisuals(rays) {
+  if (!rays || rays.length < 5 || !carGroup || rayBeamObjects.length < 5) return;
+  const mode = STATE.activeCameraMode;
+  const upY = new THREE.Vector3(0, 1, 0);
+  const labelParts = [];
+  const container = document.getElementById("canvasContainer");
+  const W = container ? container.clientWidth : window.innerWidth;
+  const H = container ? container.clientHeight : window.innerHeight;
+  camera.updateMatrixWorld();
 
   for (let i = 0; i < 5; i++) {
     const ray = rays[i];
-    const beamObj = rayBeamObjects[i];
-    if (!beamObj || !ray) continue;
+    const o = rayBeamObjects[i];
+    if (!ray || !isValidVector2(ray.start) || !isValidVector2(ray.end) || !isValidNumber(ray.distance)) continue;
 
-    if (!isValidVector2(ray.start) || !isValidVector2(ray.end) || !isValidNumber(ray.distance)) {
-      continue;
-    }
+    const sW = envToWorld(ray.start[0], ray.start[1]);
+    const hW = envToWorld(ray.end[0], ray.end[1]);
+    const origin = _tmpV3.set(sW.x, BEAM_Y, sW.z);
+    const hit = new THREE.Vector3(hW.x, BEAM_Y, hW.z);
+    const col = rayCol(ray.distance);
 
-    // Emitter origin on car
-    let rayOrigin = origin;
-    if (carEmitterNodes[i]) {
-      const worldNodePos = new THREE.Vector3();
-      carEmitterNodes[i].getWorldPosition(worldNodePos);
-      rayOrigin = worldNodePos;
-    }
-
-    const hitWorld = envToWorld(ray.end[0], ray.end[1]);
-    const hit = new THREE.Vector3(hitWorld.x, 1.2, hitWorld.z);
-
-    // Color coding matching concept: Red (<45 px), Amber (<90 px), Cyan (>=90 px)
-    let beamColor = 0x67e3ff;
-    if (ray.distance < 45.0) {
-      beamColor = 0xff4d4d;
-    } else if (ray.distance < 90.0) {
-      beamColor = 0xffb02e;
-    }
-
-    // Orient and scale 3D laser cylinder between rayOrigin and hit
-    const deltaVec = new THREE.Vector3().subVectors(hit, rayOrigin);
-    const beamLen = deltaVec.length();
-
-    if (beamLen > 0.1) {
-      beamObj.beam.visible = true;
-      beamObj.beam.position.copy(rayOrigin).addScaledVector(deltaVec, 0.5);
-      beamObj.beam.scale.set(1.0, beamLen, 1.0);
-      beamObj.beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), deltaVec.clone().normalize());
-      beamObj.beam.material.color.setHex(beamColor);
+    const dv = new THREE.Vector3().subVectors(hit, origin);
+    const len = dv.length();
+    if (len > 0.1) {
+      const q = new THREE.Quaternion().setFromUnitVectors(upY, dv.clone().normalize());
+      const mid = origin.clone().addScaledVector(dv, 0.5);
+      for (const m of [o.core, o.glow]) {
+        m.visible = true;
+        m.position.copy(mid);
+        m.scale.set(1, len, 1);
+        m.quaternion.copy(q);
+        m.material.color.setHex(col);
+      }
     } else {
-      beamObj.beam.visible = false;
+      o.core.visible = o.glow.visible = false;
     }
+    o.hit.position.set(hit.x, BEAM_Y, hit.z);
+    o.ring.position.set(hit.x, 0.72, hit.z);
+    o.ring.material.color.setHex(col);
 
-    beamObj.ring.position.set(hit.x, 0.65, hit.z);
-    beamObj.ring.material.color.setHex(beamColor);
-
-    beamObj.spark.position.set(hit.x, 1.2, hit.z);
+    if (mode === "orbit") {
+      const p = new THREE.Vector3(hit.x, BEAM_Y, hit.z).project(camera);
+      if (p.z < 1) {
+        const sx = (p.x + 1) / 2 * W;
+        const sy = (1 - p.y) / 2 * H;
+        const c = "#" + col.toString(16).padStart(6, "0");
+        labelParts.push(
+          `<div class="ray-label" style="left:${sx.toFixed(0)}px;top:${sy.toFixed(0)}px;color:${c};border-color:${c}66">${ray.distance.toFixed(0)} px</div>`
+        );
+      }
+    }
   }
+
+  // Illustrative sweep + labels only in the orbit "sensor" view.
+  if (sweepMesh) {
+    sweepMesh.visible = mode === "orbit";
+    if (sweepMesh.visible) {
+      sweepMesh.position.set(carGroup.position.x, 2.0, carGroup.position.z);
+      sweepMesh.rotation.z -= 0.05;
+    }
+  }
+  const labels = document.getElementById("rayLabels");
+  if (labels) labels.innerHTML = mode === "orbit" ? labelParts.join("") : "";
 }
 
 // ==============================================================================
@@ -1587,33 +1626,67 @@ function clearTrajectoryTrail() {
   }
 }
 
-function updatePlaybackTrajectory(steps, baseIdx, curX, curZ) {
-  const windowStart = Math.max(0, baseIdx - 400);
+const TRAIL_LEN = 260;
+// Fading cyan ribbon of the last ~260 poses, slightly above the road, brighter near the car.
+// Rebuilt each frame from the contiguous window [baseIdx-259 .. baseIdx] + the interpolated
+// head, so it never draws a diagonal across the track on wrap/scrub.
+function updatePlaybackTrajectory(steps, baseIdx, alpha, curX, curZ) {
+  const start = Math.max(0, baseIdx - TRAIL_LEN + 1);
   const pts = [];
-  for (let i = windowStart; i <= baseIdx; i++) {
-    const s = steps[i];
-    if (s && s.vehicle && isValidNumber(s.vehicle.x) && isValidNumber(s.vehicle.y)) {
-      const w = envToWorld(s.vehicle.x, s.vehicle.y);
-      pts.push(new THREE.Vector3(w.x, 0.64, w.z));
+  for (let i = start; i <= baseIdx; i++) {
+    const v = steps[i] && steps[i].vehicle;
+    if (v && isValidNumber(v.x) && isValidNumber(v.y)) {
+      const w = envToWorld(v.x, v.y);
+      pts.push([w.x, w.z]);
     }
   }
-  pts.push(new THREE.Vector3(curX, 0.64, curZ));
+  pts.push([curX, curZ]); // interpolated head pose
 
-  if (pts.length < 2) return;
+  if (pts.length < 2) {
+    if (trajectoryMesh) trajectoryMesh.visible = false;
+    return;
+  }
+
+  const half = 1.7, y = 0.66;
+  const n = pts.length;
+  const pos = new Float32Array(n * 2 * 3);
+  const col = new Float32Array(n * 2 * 3);
+  const idx = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const prev = pts[Math.max(0, i - 1)];
+    const next = pts[Math.min(n - 1, i + 1)];
+    let dx = next[0] - prev[0], dz = next[1] - prev[1];
+    const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    const nx = -dz, nz = dx; // perpendicular
+    const o = i * 6;
+    pos[o] = p[0] + nx * half; pos[o + 1] = y; pos[o + 2] = p[1] + nz * half;
+    pos[o + 3] = p[0] - nx * half; pos[o + 4] = y; pos[o + 5] = p[1] - nz * half;
+    const a = i / (n - 1); // tail (0) -> head (1): brighter near the car
+    const r = 0.25 * a, g = 0.85 * a, b = 1.0 * a;
+    col[o] = r; col[o + 1] = g; col[o + 2] = b;
+    col[o + 3] = r; col[o + 4] = g; col[o + 5] = b;
+    if (i > 0) { const base = (i - 1) * 2; idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3); }
+  }
 
   if (!trajectoryMesh) {
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({
-      color: 0x00f0ff,
-      transparent: true,
-      opacity: 0.65,
-      linewidth: 2,
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
-    trajectoryMesh = new THREE.Line(geo, mat);
+    trajectoryMesh = new THREE.Mesh(geo, mat);
     scene.add(trajectoryMesh);
   } else {
-    trajectoryMesh.geometry.setFromPoints(pts);
+    const g = trajectoryMesh.geometry;
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    g.setIndex(idx);
   }
+  trajectoryMesh.visible = true;
 }
 
 // ==============================================================================
@@ -1631,101 +1704,121 @@ function setCameraMode(mode) {
   }[mode];
   if (activeBtn) activeBtn.classList.add("active");
 
-  if (mode === "cockpit") {
-    camera.near = 0.4;
-  } else if (mode === "overhead") {
-    camera.near = 20.0;
-  } else {
-    camera.near = 2.0;
-  }
+  // Near plane: 0.4 only in cockpit, >=15 overhead, 2.0 elsewhere (set here too so
+  // tests reading camera.near right after a switch see the right value).
+  camera.near = mode === "cockpit" ? 0.4 : mode === "overhead" ? 20.0 : 2.0;
   camera.updateProjectionMatrix();
+
+  // Snapshot the current camera pose and start a smooth ease-in/out transition.
+  STATE.camFromPos.copy(STATE.cameraPos);
+  STATE.camFromTarget.copy(STATE.cameraTarget);
+  STATE.camFromUp.copy(STATE.cameraUp);
+  STATE.camFromFov = STATE.cameraFov;
+  cameraTransT = 0.0;
+
+  if (mode === "orbit") {
+    orbitUserTookOver = false;
+    orbitAngle = Math.atan2(chaseForwardZ, chaseForwardX) + Math.PI + 0.6; // start behind/side
+  }
+  // Toggle the sensor legend (orbit only)
+  const legend = document.getElementById("sensorLegend");
+  if (legend) legend.style.display = mode === "orbit" ? "block" : "none";
+  const labels = document.getElementById("rayLabels");
+  if (labels && mode !== "orbit") labels.innerHTML = "";
 }
 window.setCameraMode = setCameraMode;
+
+// Desired camera pose per mode (position, look target, fov, up, near).
+function desiredCameraPose(mode, carPos, delta) {
+  const h = carGroup.rotation.y;
+  const fwd = new THREE.Vector3(Math.cos(h), 0, -Math.sin(h));
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const lagFwd = new THREE.Vector3(chaseForwardX, 0, chaseForwardZ);
+  if (lagFwd.lengthSq() < 1e-6) lagFwd.copy(fwd);
+
+  if (mode === "cockpit") {
+    return {
+      pos: new THREE.Vector3(carPos.x + fwd.x * 6, carPos.y + 16, carPos.z + fwd.z * 6),
+      target: new THREE.Vector3(carPos.x + fwd.x * 140, carPos.y + 9, carPos.z + fwd.z * 140),
+      fov: 72, up: new THREE.Vector3(0, 1, 0), near: 0.4, useControls: false,
+    };
+  }
+  if (mode === "overhead") {
+    const b = (STATE.trackData && STATE.trackData.bounds) || { min_x: 0, max_x: 800, min_y: 0, max_y: 600 };
+    const c = envToWorld((b.min_x + b.max_x) / 2, (b.min_y + b.max_y) / 2);
+    const spanX = b.max_x - b.min_x, spanZ = b.max_y - b.min_y;
+    const fovV = 46;
+    const aspect = (camera && camera.aspect) || 1.6;
+    const needV = (spanZ / 2) / Math.tan((fovV * Math.PI) / 360);
+    const needH = (spanX / 2) / (Math.tan((fovV * Math.PI) / 360) * aspect);
+    const height = Math.max(needV, needH) * 1.12 + 120;
+    return {
+      pos: new THREE.Vector3(c.x, height, c.z),
+      target: new THREE.Vector3(c.x, 0, c.z),
+      fov: fovV, up: new THREE.Vector3(0, 0, -1), near: 20, useControls: false,
+    };
+  }
+  if (mode === "orbit") {
+    orbitAngle += (delta || 0.016) * 0.28; // slow auto-rotation
+    return {
+      pos: new THREE.Vector3(carPos.x + Math.cos(orbitAngle) * 175, carPos.y + 120, carPos.z + Math.sin(orbitAngle) * 175),
+      target: new THREE.Vector3(carPos.x, carPos.y + 8, carPos.z),
+      fov: 48, up: new THREE.Vector3(0, 1, 0), near: 2, useControls: orbitUserTookOver,
+    };
+  }
+  // chase — lagged cinematic heading
+  return {
+    pos: new THREE.Vector3(carPos.x - lagFwd.x * 185, carPos.y + 52, carPos.z - lagFwd.z * 185),
+    target: new THREE.Vector3(carPos.x + lagFwd.x * 70, carPos.y + 14, carPos.z + lagFwd.z * 70),
+    fov: 52, up: new THREE.Vector3(0, 1, 0), near: 2, useControls: false,
+  };
+}
 
 function updateCameraDirector(car, velocity, delta = 0.016) {
   if (!carGroup || !camera) return;
 
-  // Near plane: tight only in cockpit (0.4), safely back (>=2) elsewhere to avoid z-fighting.
-  const desiredNear = STATE.activeCameraMode === "cockpit" ? 0.4 : 2.0;
-  if (camera.near !== desiredNear) {
-    camera.near = desiredNear;
+  const safeDelta = Math.min(Math.max(delta || 0.016, 0.001), 0.1);
+  const carPos = carGroup.position;
+  const d = desiredCameraPose(STATE.activeCameraMode, carPos, delta);
+
+  if (camera.near !== d.near) {
+    camera.near = d.near;
     camera.updateProjectionMatrix();
   }
 
-  const carPos = carGroup.position;
-  const heading = carGroup.rotation.y;
-  const forward = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
-  const backward = forward.clone().negate();
+  cameraTransT = Math.min(CAMERA_TRANSITION_S, cameraTransT + safeDelta);
 
-  if (STATE.activeCameraMode === "closeup") {
-    if (controls) controls.enabled = false;
-    const right = new THREE.Vector3(-forward.z, 0, forward.x);
-    camera.position.set(
-      carPos.x - forward.x * 52.0 + right.x * 24.0,
-      22.0,
-      carPos.z - forward.z * 52.0 + right.z * 24.0
-    );
-    camera.lookAt(carPos.x, 8.0, carPos.z);
+  if (d.useControls && controls) {
+    // Orbit after the user grabbed the view: OrbitControls drives the camera.
+    controls.enabled = true;
+    controls.target.set(carPos.x, carPos.y + 8, carPos.z);
+    controls.update();
+    STATE.cameraPos.copy(camera.position);
+    STATE.cameraTarget.copy(controls.target);
+    STATE.cameraFov = camera.fov;
+    STATE.cameraUp.copy(camera.up);
     return;
   }
 
-  if (STATE.activeCameraMode === "cockpit") {
-    if (controls) controls.enabled = false;
-    const right = new THREE.Vector3(-forward.z, 0, forward.x);
-    const eyePos = new THREE.Vector3(
-      carPos.x + forward.x * 2.5 - right.x * 6.5,
-      14.5,
-      carPos.z + forward.z * 2.5 - right.z * 6.5
-    );
-    const lookTarget = new THREE.Vector3(
-      carPos.x + forward.x * 120.0,
-      10.0,
-      carPos.z + forward.z * 120.0
-    );
-    camera.position.copy(eyePos);
-    camera.lookAt(lookTarget);
-    camera.up.set(0, 1, 0);
+  // Keep controls enabled in orbit to capture the first drag, but don't let it move
+  // the camera until the user takes over.
+  if (controls) controls.enabled = STATE.activeCameraMode === "orbit";
 
-  } else if (STATE.activeCameraMode === "overhead") {
-    if (controls) controls.enabled = false;
-    camera.position.set(0, 750.0, 0);
-    camera.up.set(0, 0, -1);
-    camera.lookAt(0, 0, 0);
+  // Ease-in/out blend from the pose at the last switch toward the (live) desired pose.
+  // smoothstep gives zero velocity at both ends → no jump on switch, no snap on arrival.
+  const u = smoothstep01(cameraTransT / CAMERA_TRANSITION_S);
+  STATE.cameraPos.copy(STATE.camFromPos).lerp(d.pos, u);
+  STATE.cameraTarget.copy(STATE.camFromTarget).lerp(d.target, u);
+  STATE.cameraUp.copy(STATE.camFromUp).lerp(d.up, u);
+  if (STATE.cameraUp.lengthSq() > 1e-6) STATE.cameraUp.normalize();
+  STATE.cameraFov = STATE.camFromFov + (d.fov - STATE.camFromFov) * u;
 
-  } else if (STATE.activeCameraMode === "orbit") {
-    camera.up.set(0, 1, 0);
-    if (controls) {
-      controls.enabled = true;
-      controls.target.set(carPos.x, 6.0, carPos.z);
-      controls.update();
-    }
-
-  } else {
-    // Chase Camera (Framing matched to concept video: car centered in lower-third, track ahead visible)
-    if (controls) controls.enabled = false;
-    const followDist = 120.0;
-    const followHeight = 40.0 + Math.min(Math.abs(velocity) * 1.2, 6.0);
-    const targetCamPos = new THREE.Vector3(
-      carPos.x + backward.x * followDist,
-      followHeight,
-      carPos.z + backward.z * followDist
-    );
-    const lookTarget = new THREE.Vector3(
-      carPos.x + forward.x * 48.0,
-      7.0,
-      carPos.z + forward.z * 48.0
-    );
-
-    const safeDelta = Math.min(Math.max(delta || 0.016, 0.001), 0.1);
-    const camLerp = 1.0 - Math.exp(-8.0 * safeDelta);
-    const targetLerp = 1.0 - Math.exp(-9.5 * safeDelta);
-
-    STATE.cameraPos.lerp(targetCamPos, camLerp);
-    STATE.cameraTarget.lerp(lookTarget, targetLerp);
-
-    camera.position.copy(STATE.cameraPos);
-    camera.lookAt(STATE.cameraTarget);
-    camera.up.set(0, 1, 0);
+  camera.position.copy(STATE.cameraPos);
+  camera.up.copy(STATE.cameraUp);
+  camera.lookAt(STATE.cameraTarget);
+  if (Math.abs(camera.fov - STATE.cameraFov) > 0.01) {
+    camera.fov = STATE.cameraFov;
+    camera.updateProjectionMatrix();
   }
 }
 
@@ -1988,6 +2081,19 @@ function renderPlaybackFrame(playhead, delta = 0.016) {
     carGroup.rotation.y = curHeadingRad;
   }
 
+  // Lagged forward vector: car heading averaged over the last ~25 steps (cinematic chase).
+  let lfx = 0, lfz = 0;
+  for (let k = 0; k < 25; k++) {
+    const sv = steps[Math.max(0, baseIdx - k)];
+    if (!sv || !sv.vehicle) continue;
+    const a = envHeadingToWorld(sv.vehicle.angle);
+    lfx += Math.cos(a);
+    lfz += -Math.sin(a);
+  }
+  const lfl = Math.hypot(lfx, lfz) || 1;
+  chaseForwardX = lfx / lfl;
+  chaseForwardZ = lfz / lfl;
+
   // 3. Speed & steering interpolation
   const curVelocity = THREE.MathUtils.lerp(car0.velocity, car1.velocity, alpha);
   const curSteerDeg = THREE.MathUtils.lerp(car0.steering_angle_deg, car1.steering_angle_deg, alpha);
@@ -2019,11 +2125,11 @@ function renderPlaybackFrame(playhead, delta = 0.016) {
 
   // 6. Rangefinder sensor beams
   if (s0.rays) {
-    updateLidarVisuals(s0.rays, { x: curX, y: curZ });
+    updateLidarVisuals(s0.rays);
   }
 
   // 7. Trajectory ribbon
-  updatePlaybackTrajectory(steps, baseIdx, curX, curZ);
+  updatePlaybackTrajectory(steps, baseIdx, alpha, curX, curZ);
 
   // 8. Camera smoothing
   if (carGroup) {

@@ -1004,3 +1004,58 @@ html, body {
   padding: 6px 16px;
   font-size: 11px;
 }
+
+/* ===== Sensor legend + screen-projected ray labels (orbit / sensor view) ===== */
+#rayLabels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+.ray-label {
+  position: absolute;
+  transform: translate(-50%, -140%);
+  font-family: "DejaVu Sans Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: rgba(6, 9, 14, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  white-space: nowrap;
+}
+#sensorLegend {
+  position: absolute;
+  left: 20px;
+  top: 92px;
+  z-index: 60;
+  padding: 14px 18px;
+  width: 300px;
+  pointer-events: none;
+  background: rgba(9, 13, 20, 0.82);
+  border: 1px solid rgba(140, 200, 255, 0.18);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  color: #e8eef6;
+  font-size: 13px;
+}
+#sensorLegend .legend-title {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #8fa3b8;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+#sensorLegend .legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  line-height: 1.3;
+}
+#sensorLegend .legend-swatch {
+  width: 28px;
+  height: 6px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}

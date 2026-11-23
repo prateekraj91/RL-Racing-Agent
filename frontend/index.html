@@ -21,7 +21,7 @@
   <script src="/static/vendor/UnrealBloomPass.js"></script>
   <script src="/static/vendor/SSAOPass.js"></script>
   <script src="/static/vendor/SMAAShader.js"></script>
-  <script src="/static/world.js?v=p4b"></script>
+  <script src="/static/world.js?v=p5c"></script>
   <script>
     if (typeof THREE === 'undefined') {
       document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
@@ -46,6 +46,18 @@
           <button class="btn btn-primary btn-retry" id="btnRetryRollout">Retry Rollout</button>
         </div>
       </div>
+    </div>
+
+    <!-- Screen-projected rangefinder distance labels (orbit / sensor view) -->
+    <div id="rayLabels"></div>
+
+    <!-- Sensor legend (orbit / sensor view) -->
+    <div id="sensorLegend" class="glass-panel" style="display:none;">
+      <div class="legend-title">SENSOR LEGEND</div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#67e3ff"></span>Measured ray (far)</div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#ffb02e"></span>Measured ray (&lt; 90 px)</div>
+      <div class="legend-row"><span class="legend-swatch" style="background:#ff4d4d"></span>Measured ray (&lt; 45 px) · collision zone</div>
+      <div class="legend-row"><span class="legend-swatch" style="background:rgba(214,120,255,0.7)"></span>Scan sweep — <i>illustrative only</i></div>
     </div>
   </div>
 
@@ -356,6 +368,6 @@
   <div id="tabLong" style="display:none;"></div>
   <div id="tabHist" style="display:none;"></div>
 
-  <script src="/static/app.js?v=p4b"></script>
+  <script src="/static/app.js?v=p5c"></script>
 </body>
 </html>
