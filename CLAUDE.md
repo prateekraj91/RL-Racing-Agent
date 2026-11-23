@@ -56,8 +56,8 @@ target for the frontend. Use its scene-building code and layout for art directio
 
 ## 5. Workflow
 
-- Work on branch **`feat/visual-uplift`**. **Commit after each prompt.** **Never merge to
-  `main`.**
+- Work on a feature branch. **Commit after each prompt.** Merge to `main` only via PR after
+  the full suite passes and the user explicitly approves.
 - **Every visual task ends with**: screenshots placed side by side with the matching concept
   frame, plus the full `PYTHONPATH=. pytest -q` summary run from the repo root, and the
   hash check from §1.

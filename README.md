@@ -48,6 +48,7 @@ PYTHONPATH=. pytest -q
 Some tests need local (git-ignored) training run directories under `runs/`.
 
 ## Reports
+- **Final report (start here):** [`docs/REPORT.md`](docs/REPORT.md)
 - BIC audit: [`docs/evaluation/BIC_INDEPENDENT_AUDIT.md`](docs/evaluation/BIC_INDEPENDENT_AUDIT.md)
 - Grip-limit experiment: [`docs/evaluation/GRIP_LIMIT_EXPERIMENT.md`](docs/evaluation/GRIP_LIMIT_EXPERIMENT.md)
 - Model card: [`docs/GENERALIST_MODEL_CARD.md`](docs/GENERALIST_MODEL_CARD.md)
