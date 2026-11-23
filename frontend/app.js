@@ -8,9 +8,10 @@
 // ==============================================================================
 
 // Data source: "live" (policy rollout via API) or "bic" (recorded BIC evaluation CSV; no API calls).
+// Default landing (/demo with no ?source) is BIC recorded playback; ?source=live opens the live standard-track rollout.
 const SOURCE = (() => {
-  try { return new URLSearchParams(window.location.search).get("source") === "bic" ? "bic" : "live"; }
-  catch (e) { return "live"; }
+  try { return new URLSearchParams(window.location.search).get("source") === "live" ? "live" : "bic"; }
+  catch (e) { return "bic"; }
 })();
 
 const STATE = {

@@ -21,12 +21,18 @@
   const mmss = (sec) => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
   function setBadge() {
-    const b = $("sourceBadge"), sw = $("sourceSwitch");
+    const b = $("sourceBadge"), sw = $("sourceSwitch"), sel = $("sourceSelect");
+    if (sel && !sel.dataset.bound) {
+      sel.dataset.bound = "1";
+      const cur = STATE.source === "live" ? "source=live" : (RUN ? `source=bic&run=${RUN}` : "source=bic");
+      if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+      sel.addEventListener("change", () => { window.location.search = "?" + sel.value; });
+    }
     if (!b) return;
     if (STATE.source === "bic") {
       b.className = "source-badge recorded";
       b.textContent = RUN ? runLabel() : "RECORDED PLAYBACK — BIC eval";
-      if (sw) { sw.textContent = "◂ switch to LIVE rollout"; sw.href = window.location.pathname; }
+      if (sw) { sw.textContent = "◂ switch to LIVE rollout"; sw.href = "?source=live"; }
     } else {
       b.className = "source-badge live";
       b.textContent = "LIVE — policy rollout";
@@ -231,6 +237,12 @@
     }
     hideLoadingOverlay();
     updateStatusPill("READY (RECORDED RUN LOADED)", "cyan");
+    // Landing page (/demo with no query): start BIC playback automatically in the chase cam.
+    if (!window.location.search) {
+      STATE.playback.isPlaying = true; STATE.simRunning = true;
+      if (startIcon) startIcon.innerText = "⏸";
+      updateStatusPill("RUNNING", "green");
+    }
   }
 
   window.addEventListener("DOMContentLoaded", () => {

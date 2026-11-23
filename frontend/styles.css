@@ -1087,3 +1087,6 @@ body.recorded-source .post-lap-footer { display: flex; align-items: center; }
 
 .concept-step-display, .brand-title, .policy-badge, .concept-camera-switcher { white-space: nowrap; }
 .concept-top-bar { flex-wrap: nowrap; }
+
+.source-select { font: 11px "DejaVu Sans Mono", monospace; color: #cfe0f2; background: rgba(12,18,26,0.85); border: 1px solid #35506b; border-radius: 6px; padding: 3px 6px; cursor: pointer; }
+.source-select:hover { border-color: #7fb4ea; }

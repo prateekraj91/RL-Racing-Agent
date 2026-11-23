@@ -33,7 +33,7 @@ RUN apt-get update && \
 COPY --from=builder /opt/venv /opt/venv
 
 # Create unprivileged system user for process isolation
-RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+RUN groupadd -g 1000 appuser && useradd -m -u 1000 -g appuser -d /home/appuser -s /sbin/nologin appuser
 
 # Copy application code and frozen model artifacts
 COPY sac/__init__.py ./sac/__init__.py
@@ -41,6 +41,10 @@ COPY sac/actor.py ./sac/actor.py
 COPY env/ ./env/
 COPY inference/ ./inference/
 COPY frontend/ ./frontend/
+# Recorded playback data (read-only): BIC eval CSV + track, grip-limit experiment runs
+COPY buddh/buddh_track_data.npz buddh/buddh_manifest.json ./buddh/
+COPY analysis/buddh/buddh_full_rollout.csv ./analysis/buddh/buddh_full_rollout.csv
+COPY runs/grip_eval/ ./runs/grip_eval/
 COPY models/generalist_v1.pth ./models/generalist_v1.pth
 COPY configs/generalist_v1.json ./configs/generalist_v1.json
 
@@ -55,16 +59,19 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH="/app" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8000 \
+    PORT=7860 \
+    ROLLOUT_CACHE_DIR=/tmp/rollout_cache \
     MODEL_PATH="models/generalist_v1.pth" \
     CONFIG_PATH="configs/generalist_v1.json" \
     DEVICE="cpu"
 
-EXPOSE 8000
+# Gemini is OPTIONAL and off by default: the app runs with no keys (commentary_mode=offline).
+# GEMINI_API_KEY is only read from the environment at request time; never bake it into the image.
+EXPOSE 7860
 
 # Container healthcheck
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Start Uvicorn single-worker production server
-CMD ["uvicorn", "inference.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["sh", "-c", "uvicorn inference.app:app --host 0.0.0.0 --port ${PORT} --workers 1"]
