@@ -1,7 +1,8 @@
 """E2E: BIC recorded playback never calls the policy / simulation endpoints."""
 import re
 import pytest
-from playwright.sync_api import Playwright
+pytest.importorskip("pytest_playwright", reason="pytest-playwright not installed (pip install -r requirements-dev.txt)")
+from playwright.sync_api import Playwright  # noqa: E402
 
 URL = "http://127.0.0.1:8000/demo?source=bic"
 FORBIDDEN = re.compile(r"/(predict|step|rollout)|/simulation/|/predict_batch")

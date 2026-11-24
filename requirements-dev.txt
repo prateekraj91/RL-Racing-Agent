@@ -1,0 +1,4 @@
+# Optional: browser end-to-end tests (tests/e2e). Skipped automatically when absent.
+-r requirements.txt
+pytest-playwright>=0.5.0
+# then: playwright install chromium
