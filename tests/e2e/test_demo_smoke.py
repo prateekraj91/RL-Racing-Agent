@@ -11,7 +11,8 @@ Tests:
 
 import time
 import pytest
-from playwright.sync_api import Playwright, Page
+pytest.importorskip("pytest_playwright", reason="pytest-playwright not installed (pip install -r requirements-dev.txt)")
+from playwright.sync_api import Playwright, Page  # noqa: E402
 
 BASE_URL = "http://127.0.0.1:8000/demo"
 

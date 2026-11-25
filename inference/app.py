@@ -297,6 +297,7 @@ from collections import OrderedDict as _OrderedDict, deque as _deque
 
 ROLLOUT_CACHE_DIR = Path(os.getenv("ROLLOUT_CACHE_DIR", "/tmp/rollout_cache"))
 ROLLOUT_CACHE_MAX = int(os.getenv("ROLLOUT_CACHE_MAX", "64"))
+ROLLOUT_CACHE_DISK_MAX = int(os.getenv("ROLLOUT_CACHE_DISK_MAX", "256"))  # bound on-disk cache files
 RATE_LIMIT_PER_MIN = int(os.getenv("ROLLOUT_RATE_LIMIT_PER_MIN", "20"))  # uncached rollouts / IP / minute
 _rollout_mem: "_OrderedDict[str, dict]" = _OrderedDict()
 _rollout_lock = _threading.Lock()
@@ -324,6 +325,13 @@ def _rollout_cache_get(key: str):
     return None
 
 
+def _rollout_disk_prune() -> None:
+    """Keep at most ROLLOUT_CACHE_DISK_MAX cached files (oldest mtime evicted first)."""
+    files = sorted(ROLLOUT_CACHE_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime)
+    for old in files[: max(0, len(files) - ROLLOUT_CACHE_DISK_MAX)]:
+        old.unlink(missing_ok=True)
+
+
 def _rollout_cache_put(key: str, data: dict, write_disk: bool = True) -> None:
     with _rollout_lock:
         _rollout_mem[key] = data
@@ -336,6 +344,7 @@ def _rollout_cache_put(key: str, data: dict, write_disk: bool = True) -> None:
             tmp = ROLLOUT_CACHE_DIR / f"{key}.tmp"
             tmp.write_text(_json.dumps(data))
             tmp.replace(ROLLOUT_CACHE_DIR / f"{key}.json")
+            _rollout_disk_prune()
         except Exception:
             pass  # disk cache is best-effort
 
